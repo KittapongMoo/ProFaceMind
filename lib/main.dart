@@ -82,7 +82,7 @@ class _RandomNumberPageState extends State<RandomNumberPage> {
                 ),
                 child: const Text(
                   'Generate',
-                  style: TextStyle(fontSize: 18, color: Colors.red),
+                  style: TextStyle(fontSize: 18, color: Colors.green),
                 ),
               ),
             ],
