@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'SecondPage.dart'; // นำเข้า SecondPage.dart
+import 'SecondPage.dart';
 
 class FirstPage extends StatefulWidget {
   @override
@@ -16,6 +16,45 @@ class _FirstPageState extends State<FirstPage> {
   final TextEditingController weightController = TextEditingController();
   final TextEditingController conditionController = TextEditingController();
 
+  Future<void> checkSavedInformation() async {
+    final prefs = await SharedPreferences.getInstance();
+    final nickname = prefs.getString('nickname') ?? 'ไม่พบข้อมูล';
+    final firstname = prefs.getString('firstname') ?? 'ไม่พบข้อมูล';
+    final lastname = prefs.getString('lastname') ?? 'ไม่พบข้อมูล';
+    final birthdate = prefs.getString('birthdate') ?? 'ไม่พบข้อมูล';
+    final height = prefs.getString('height') ?? 'ไม่พบข้อมูล';
+    final weight = prefs.getString('weight') ?? 'ไม่พบข้อมูล';
+    final condition = prefs.getString('condition') ?? 'ไม่พบข้อมูล';
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('ข้อมูลที่บันทึกไว้'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('ชื่อเล่น: $nickname'),
+              Text('ชื่อจริง: $firstname'),
+              Text('นามสกุล: $lastname'),
+              Text('วันเกิด: $birthdate'),
+              Text('ส่วนสูง: $height'),
+              Text('น้ำหนัก: $weight'),
+              Text('โรคประจำตัว: $condition'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('ปิด'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -29,8 +68,11 @@ class _FirstPageState extends State<FirstPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              // นำพาไปยัง SecondPage พร้อมส่งข้อมูล
+            onPressed: () async {
+              // Save the information locally
+              await saveInformation();
+
+              // Navigate to SecondPage
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -65,6 +107,11 @@ class _FirstPageState extends State<FirstPage> {
               buildInputField('น้ำหนัก', 'กรอกน้ำหนัก', weightController),
               buildInputField('โรคประจำตัว', 'กรอกโรคประจำตัว', conditionController),
               const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: checkSavedInformation,
+                child: const Text('ตรวจสอบข้อมูลที่บันทึกไว้'),
+              ),
+              const SizedBox(height: 16),
               const Text(
                 'รูป :',
                 style: TextStyle(
@@ -77,7 +124,7 @@ class _FirstPageState extends State<FirstPage> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8.0),
                   child: Image.asset(
-                    'assets/profile.jpg', // ใช้รูปภาพจาก assets
+                    'assets/profile.jpg',
                     width: 100,
                     height: 100,
                     fit: BoxFit.cover,
@@ -90,6 +137,7 @@ class _FirstPageState extends State<FirstPage> {
       ),
     );
   }
+
 
   Widget buildInputField(String label, String hintText, TextEditingController controller) {
     return Padding(
@@ -133,4 +181,10 @@ class _FirstPageState extends State<FirstPage> {
     conditionController.dispose();
     super.dispose();
   }
+
+  saveInformation() {}
+}
+
+class SharedPreferences {
+  static getInstance() {}
 }
