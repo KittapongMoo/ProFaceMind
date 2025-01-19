@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'FirstPage.dart'; // นำเข้า FirstPage.dart (ไม่มี assets/)
+import 'firstpage.dart'; // Import FirstPage.dart
 
 void main() {
   runApp(const MyApp());
@@ -67,7 +67,7 @@ class PersonalInfoPage extends StatelessWidget {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => FirstPage()), // นำทางไป FirstPage
+                MaterialPageRoute(builder: (context) => FirstPage()), // Navigate to FirstPage
               );
             },
             style: ElevatedButton.styleFrom(

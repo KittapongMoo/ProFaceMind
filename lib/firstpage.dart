@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'SecondPage.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Import SharedPreferences
+import 'secondpage.dart';
 
 class FirstPage extends StatefulWidget {
   @override
@@ -16,129 +17,26 @@ class _FirstPageState extends State<FirstPage> {
   final TextEditingController weightController = TextEditingController();
   final TextEditingController conditionController = TextEditingController();
 
-  Future<void> checkSavedInformation() async {
+  // Save Information to SharedPreferences
+  Future<void> saveInformation() async {
     final prefs = await SharedPreferences.getInstance();
-    final nickname = prefs.getString('nickname') ?? 'ไม่พบข้อมูล';
-    final firstname = prefs.getString('firstname') ?? 'ไม่พบข้อมูล';
-    final lastname = prefs.getString('lastname') ?? 'ไม่พบข้อมูล';
-    final birthdate = prefs.getString('birthdate') ?? 'ไม่พบข้อมูล';
-    final height = prefs.getString('height') ?? 'ไม่พบข้อมูล';
-    final weight = prefs.getString('weight') ?? 'ไม่พบข้อมูล';
-    final condition = prefs.getString('condition') ?? 'ไม่พบข้อมูล';
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('ข้อมูลที่บันทึกไว้'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('ชื่อเล่น: $nickname'),
-              Text('ชื่อจริง: $firstname'),
-              Text('นามสกุล: $lastname'),
-              Text('วันเกิด: $birthdate'),
-              Text('ส่วนสูง: $height'),
-              Text('น้ำหนัก: $weight'),
-              Text('โรคประจำตัว: $condition'),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('ปิด'),
-            ),
-          ],
-        );
-      },
+    // Save all information
+    await prefs.setString('nickname', nicknameController.text.trim());
+    await prefs.setString('firstname', firstnameController.text.trim());
+    await prefs.setString('lastname', lastnameController.text.trim());
+    await prefs.setString('birthdate', birthdateController.text.trim());
+    await prefs.setString('height', heightController.text.trim());
+    await prefs.setString('weight', weightController.text.trim());
+    await prefs.setString('condition', conditionController.text.trim());
+
+    // Show SnackBar after saving data
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('ข้อมูลถูกบันทึกเรียบร้อยแล้ว!')),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'ข้อมูล',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              // Save the information locally
-              await saveInformation();
-
-              // Navigate to SecondPage
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SecondPage(),
-                ),
-              );
-            },
-            child: const Text(
-              'ยืนยัน',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.blue,
-              ),
-            ),
-          ),
-        ],
-        backgroundColor: Colors.white,
-        elevation: 1,
-        iconTheme: const IconThemeData(color: Colors.black),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              buildInputField('ชื่อเล่น', 'กรอกชื่อเล่น', nicknameController),
-              buildInputField('ชื่อจริง', 'กรอกชื่อจริง', firstnameController),
-              buildInputField('นามสกุล', 'กรอกนามสกุล', lastnameController),
-              buildInputField('วันเกิด', 'กรอกวันเกิด', birthdateController),
-              buildInputField('ส่วนสูง', 'กรอกส่วนสูง', heightController),
-              buildInputField('น้ำหนัก', 'กรอกน้ำหนัก', weightController),
-              buildInputField('โรคประจำตัว', 'กรอกโรคประจำตัว', conditionController),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: checkSavedInformation,
-                child: const Text('ตรวจสอบข้อมูลที่บันทึกไว้'),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'รูป :',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8.0),
-                  child: Image.asset(
-                    'assets/profile.jpg',
-                    width: 100,
-                    height: 100,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-
+  // Build the input field widget
   Widget buildInputField(String label, String hintText, TextEditingController controller) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
@@ -170,8 +68,86 @@ class _FirstPageState extends State<FirstPage> {
   }
 
   @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'ข้อมูล',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              // Save the information locally
+              await saveInformation();
+
+              // Navigate to SecondPage
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SecondPage(),
+                ),
+              );
+            },
+            child: const Text(
+              'ยืนยัน',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.blue,
+              ),
+            ),
+          ),
+        ],
+        backgroundColor: Colors.white,
+        elevation: 1,
+        iconTheme: const IconThemeData(color: Colors.black),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              buildInputField('ชื่อเล่น', 'กรอกชื่อเล่น', nicknameController),
+              buildInputField('ชื่อจริง', 'กรอกชื่อจริง', firstnameController),
+              buildInputField('นามสกุล', 'กรอกนามสกุล', lastnameController),
+              buildInputField('วันเกิด', 'กรอกวันเกิด', birthdateController),
+              buildInputField('ส่วนสูง', 'กรอกส่วนสูง', heightController),
+              buildInputField('น้ำหนัก', 'กรอกน้ำหนัก', weightController),
+              buildInputField('โรคประจำตัว', 'กรอกโรคประจำตัว', conditionController),
+              const SizedBox(height: 16),
+              const Text(
+                'รูป :',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8.0),
+                  child: Image.asset(
+                    'assets/profile.jpg',
+                    width: 100,
+                    height: 100,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
   void dispose() {
-    // ล้าง TextEditingController เมื่อปิดหน้า
+    // Clean up TextEditingController when the widget is disposed
     nicknameController.dispose();
     firstnameController.dispose();
     lastnameController.dispose();
@@ -181,10 +157,4 @@ class _FirstPageState extends State<FirstPage> {
     conditionController.dispose();
     super.dispose();
   }
-
-  saveInformation() {}
-}
-
-class SharedPreferences {
-  static getInstance() {}
 }
