@@ -1,160 +1,33 @@
+// FirstPage.dart
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // Import SharedPreferences
-import 'secondpage.dart';
 
-class FirstPage extends StatefulWidget {
-  @override
-  _FirstPageState createState() => _FirstPageState();
-}
-
-class _FirstPageState extends State<FirstPage> {
-  // Controllers สำหรับแต่ละฟิลด์
-  final TextEditingController nicknameController = TextEditingController();
-  final TextEditingController firstnameController = TextEditingController();
-  final TextEditingController lastnameController = TextEditingController();
-  final TextEditingController birthdateController = TextEditingController();
-  final TextEditingController heightController = TextEditingController();
-  final TextEditingController weightController = TextEditingController();
-  final TextEditingController conditionController = TextEditingController();
-
-  // Save Information to SharedPreferences
-  Future<void> saveInformation() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    // Save all information
-    await prefs.setString('nickname', nicknameController.text.trim());
-    await prefs.setString('firstname', firstnameController.text.trim());
-    await prefs.setString('lastname', lastnameController.text.trim());
-    await prefs.setString('birthdate', birthdateController.text.trim());
-    await prefs.setString('height', heightController.text.trim());
-    await prefs.setString('weight', weightController.text.trim());
-    await prefs.setString('condition', conditionController.text.trim());
-
-    // Show SnackBar after saving data
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('ข้อมูลถูกบันทึกเรียบร้อยแล้ว!')),
-    );
-  }
-
-  // Build the input field widget
-  Widget buildInputField(String label, String hintText, TextEditingController controller) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$label :',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: controller,
-            decoration: InputDecoration(
-              hintText: hintText,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8.0),
-              ),
-              filled: true,
-              fillColor: Colors.grey[200],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+class FirstPage extends StatelessWidget {
+  const FirstPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'ข้อมูล',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              // Save the information locally
-              await saveInformation();
-
-              // Navigate to SecondPage
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SecondPage(),
-                ),
-              );
-            },
-            child: const Text(
-              'ยืนยัน',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.blue,
-              ),
-            ),
-          ),
-        ],
-        backgroundColor: Colors.white,
-        elevation: 1,
-        iconTheme: const IconThemeData(color: Colors.black),
+        title: Text('First Page'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              buildInputField('ชื่อเล่น', 'กรอกชื่อเล่น', nicknameController),
-              buildInputField('ชื่อจริง', 'กรอกชื่อจริง', firstnameController),
-              buildInputField('นามสกุล', 'กรอกนามสกุล', lastnameController),
-              buildInputField('วันเกิด', 'กรอกวันเกิด', birthdateController),
-              buildInputField('ส่วนสูง', 'กรอกส่วนสูง', heightController),
-              buildInputField('น้ำหนัก', 'กรอกน้ำหนัก', weightController),
-              buildInputField('โรคประจำตัว', 'กรอกโรคประจำตัว', conditionController),
-              const SizedBox(height: 16),
-              const Text(
-                'รูป :',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8.0),
-                  child: Image.asset(
-                    'assets/profile.jpg',
-                    width: 100,
-                    height: 100,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            ],
-          ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Welcome to the First Page!!!!!!!!!!!!!!!',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: Text('Go Back'),
+            ),
+          ],
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    // Clean up TextEditingController when the widget is disposed
-    nicknameController.dispose();
-    firstnameController.dispose();
-    lastnameController.dispose();
-    birthdateController.dispose();
-    heightController.dispose();
-    weightController.dispose();
-    conditionController.dispose();
-    super.dispose();
   }
 }
