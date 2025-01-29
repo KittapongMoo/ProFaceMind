@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // Import SharedPreferences
+import 'thirdpage.dart'; // Import ThirdPage
 
 class SecondPage extends StatelessWidget {
   const SecondPage({super.key});
@@ -54,14 +55,15 @@ class SecondPage extends StatelessWidget {
                 Text('น้ำหนัก: ${data['weight']}'),
                 Text('โรคประจำตัว: ${data['condition']}'),
                 const SizedBox(height: 40),
+
+                // ปุ่มย้อนกลับไป FirstPage
                 Center(
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.pop(context); // กลับไปยังหน้าก่อนหน้า
+                      Navigator.pop(context); // กลับไปยัง FirstPage
                     },
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 30, vertical: 15),
+                      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(30),
                       ),
@@ -69,6 +71,31 @@ class SecondPage extends StatelessWidget {
                     ),
                     child: const Text(
                       'Back to First Page',
+                      style: TextStyle(fontSize: 18, color: Colors.white),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // ปุ่มไปยัง ThirdPage
+                Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ThirdPage()),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      backgroundColor: Colors.green, // ใช้สีเขียวเพื่อแยกความแตกต่าง
+                    ),
+                    child: const Text(
+                      'Go to Third Page',
                       style: TextStyle(fontSize: 18, color: Colors.white),
                     ),
                   ),

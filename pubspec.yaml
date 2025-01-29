@@ -28,6 +28,10 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  google_maps_flutter: ^2.2.0
+  geolocator: ^10.0.0
+  geocoding: ^2.1.0 # ใช้หาชื่อสถานที่จากพิกัด
+
   shared_preferences: ^2.0.15
   flutter:
     sdk: flutter
