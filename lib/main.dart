@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'firstpage.dart'; // Import FirstPage.dart
+import 'FirstPage.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+
 
 void main() {
   runApp(const MyApp());
@@ -11,8 +13,21 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'My App',
+      theme: ThemeData(
+        primarySwatch: Colors.teal,
+      ),
       debugShowCheckedModeBanner: false,
-      home: const PersonalInfoPage(),
+      home: const FirstPage(),
+      supportedLocales: const [
+        Locale('en', 'US'),
+        Locale('th', 'TH'), // Ensure Thai locale is supported
+      ],
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
     );
   }
 }
