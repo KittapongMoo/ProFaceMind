@@ -31,9 +31,13 @@ dependencies:
   google_maps_flutter: ^2.2.0
   geolocator: ^10.0.0
   geocoding: ^2.1.0 # ใช้หาชื่อสถานที่จากพิกัด
+  image_picker: ^1.0.4
+  permission_handler: ^11.0.1
 
   shared_preferences: ^2.0.15
   flutter:
+    sdk: flutter
+  flutter_localizations:
     sdk: flutter
 
   # The following adds the Cupertino Icons font to your application.
