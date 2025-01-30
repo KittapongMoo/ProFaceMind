@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 
 class ThirdPage extends StatefulWidget {
   const ThirdPage({super.key});
@@ -12,7 +14,7 @@ class ThirdPage extends StatefulWidget {
 class _ThirdPageState extends State<ThirdPage> {
   late GoogleMapController mapController;
   LatLng _currentPosition = const LatLng(13.736717, 100.523186); // ค่าเริ่มต้น (กรุงเทพฯ)
-  bool _locationFetched = false; // ตรวจสอบว่าดึงตำแหน่งแล้วหรือยัง
+  bool _locationFetched = false;
 
   @override
   void initState() {
@@ -20,54 +22,68 @@ class _ThirdPageState extends State<ThirdPage> {
     _determinePosition();
   }
 
-  // ฟังก์ชันตรวจสอบการอนุญาตและดึงตำแหน่งปัจจุบัน
+  // ฟังก์ชันตรวจสอบ GPS และขอตำแหน่ง
   Future<void> _determinePosition() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
-    // ตรวจสอบว่าบริการ GPS เปิดอยู่หรือไม่
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      // แจ้งเตือนให้เปิด GPS
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("กรุณาเปิด GPS เพื่อใช้ฟีเจอร์นี้")),
-      );
+      print("⚠️ GPS ปิด! ดึงตำแหน่งจาก IP แทน");
+      _getLocationFromAPI();
       return;
     }
 
-    // ขออนุญาตเข้าถึงตำแหน่ง
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("การเข้าถึงตำแหน่งถูกปฏิเสธ")),
-        );
-        return;
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      print("🚫 ปฏิเสธการเข้าถึง GPS! ดึงตำแหน่งจาก IP แทน");
+      _getLocationFromAPI();
+      return;
+    }
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      print("📍 ตำแหน่ง GPS: ${position.latitude}, ${position.longitude}");
+
+      _updatePosition(LatLng(position.latitude, position.longitude));
+    } catch (e) {
+      print("❌ ดึงตำแหน่ง GPS ไม่ได้: $e");
+      _getLocationFromAPI();
+    }
+  }
+
+  // ฟังก์ชันดึงพิกัดจาก API (ใช้แทน GPS)
+  Future<void> _getLocationFromAPI() async {
+    try {
+      final response = await http.get(Uri.parse("https://ipapi.co/json/"));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        double lat = data["latitude"];
+        double lon = data["longitude"];
+        print("🌍 ตำแหน่งจาก API: $lat, $lon");
+
+        _updatePosition(LatLng(lat, lon));
+      } else {
+        print("❌ API ใช้ไม่ได้! ใช้ค่าพิกัดสำรอง");
+        _updatePosition(const LatLng(13.736717, 100.523186));
       }
+    } catch (e) {
+      print("❌ เกิดข้อผิดพลาดกับ API: $e");
+      _updatePosition(const LatLng(13.736717, 100.523186));
     }
+  }
 
-    if (permission == LocationPermission.deniedForever) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("การเข้าถึงตำแหน่งถูกปฏิเสธถาวร กรุณาเปิดสิทธิ์ในการตั้งค่า")),
-      );
-      return;
-    }
-
-    // ดึงตำแหน่งปัจจุบัน
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-
+  // ฟังก์ชันอัปเดตตำแหน่งและเลื่อนกล้อง
+  void _updatePosition(LatLng newPosition) {
     setState(() {
-      _currentPosition = LatLng(position.latitude, position.longitude);
+      _currentPosition = newPosition;
       _locationFetched = true;
-
-      // ย้ายกล้องไปยังตำแหน่งปัจจุบัน
-      mapController.animateCamera(
-        CameraUpdate.newLatLngZoom(_currentPosition, 15),
-      );
     });
+
+    if (mapController != null) {
+      mapController.animateCamera(CameraUpdate.newLatLngZoom(newPosition, 15));
+    }
   }
 
   @override
@@ -75,7 +91,6 @@ class _ThirdPageState extends State<ThirdPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // Google Map Widget
           GoogleMap(
             onMapCreated: (GoogleMapController controller) {
               mapController = controller;
@@ -96,24 +111,22 @@ class _ThirdPageState extends State<ThirdPage> {
                 icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
               ),
             },
-            myLocationEnabled: true, // เปิดไอคอนแสดงตำแหน่งปัจจุบัน
-            myLocationButtonEnabled: true, // ปุ่มให้ผู้ใช้กดเพื่อกลับไปยังตำแหน่งของตน
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
           ),
 
-          // ปุ่มย้อนกลับที่มุมซ้ายบน
           Positioned(
             top: 40,
             left: 16,
             child: FloatingActionButton(
               onPressed: () {
-                Navigator.pop(context); // กลับไปหน้าก่อนหน้า
+                Navigator.pop(context);
               },
               backgroundColor: Colors.white,
               child: const Icon(Icons.arrow_back, color: Colors.black),
             ),
           ),
 
-          // UI ด้านล่างของแผนที่
           Positioned(
             left: 0,
             right: 0,
@@ -137,32 +150,11 @@ class _ThirdPageState extends State<ThirdPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Indicator จุด 3 จุด
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      3,
-                          (index) => Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: index == 1 ? Colors.blue : Colors.blue[100], // จุดตรงกลางเป็นสีเข้ม
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-
-                  // หัวข้อ
                   const Text(
                     "ตั้งค่าที่อยู่ของคุณ",
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
                   ),
                   const SizedBox(height: 10),
-
-                  // คำอธิบาย
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
@@ -172,8 +164,6 @@ class _ThirdPageState extends State<ThirdPage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-
-                  // ปุ่ม "ตั้งค่าเลย"
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
