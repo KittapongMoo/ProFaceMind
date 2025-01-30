@@ -1,28 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'fourthpage.dart'; // ✅ เพิ่มการ import หน้า FourthPage
+import 'package:geocoding/geocoding.dart';
+import 'package:google_places_flutter/google_places_flutter.dart';
 
-class ThirdPage extends StatefulWidget {
-  const ThirdPage({super.key});
+class FourthPage extends StatefulWidget {
+  const FourthPage({super.key});
 
   @override
-  _ThirdPageState createState() => _ThirdPageState();
+  _FourthPageState createState() => _FourthPageState();
 }
 
-class _ThirdPageState extends State<ThirdPage> {
+class _FourthPageState extends State<FourthPage> {
   GoogleMapController? mapController;
-  LatLng _currentPosition = const LatLng(13.736717, 100.523186); // ค่าเริ่มต้น
+  LatLng _selectedPosition = const LatLng(13.736717, 100.523186); // ค่าเริ่มต้น (กรุงเทพฯ)
+  TextEditingController _locationController = TextEditingController();
   bool _locationFetched = false;
 
   @override
   void initState() {
     super.initState();
-    _requestLocation(); // ✅ ดึงตำแหน่งทันทีที่หน้าโหลด
+    _getCurrentLocation();
   }
 
-  // ✅ ขออนุญาตและดึงตำแหน่ง GPS
-  Future<void> _requestLocation() async {
+  // ✅ ดึงตำแหน่ง GPS ปัจจุบัน
+  Future<void> _getCurrentLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       _showLocationDialog();
@@ -43,29 +45,54 @@ class _ThirdPageState extends State<ThirdPage> {
       return;
     }
 
-    _getCurrentLocation();
-  }
-
-  // ✅ ดึงตำแหน่งจาก GPS อัตโนมัติ
-  Future<void> _getCurrentLocation() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        desiredAccuracy: LocationAccuracy.best,
       );
 
-      print("📍 ตำแหน่ง GPS: ${position.latitude}, ${position.longitude}");
-
       setState(() {
-        _currentPosition = LatLng(13.736717, 100.523186);
+        _selectedPosition = LatLng(position.latitude, position.longitude);
         _locationFetched = true;
       });
 
       if (mapController != null) {
-        mapController!.animateCamera(CameraUpdate.newLatLngZoom(_currentPosition, 15));
+        mapController!.animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition, 15));
       }
+
+      _getAddressFromLatLng(_selectedPosition);
     } catch (e) {
       print("❌ ไม่สามารถดึงตำแหน่ง GPS ได้: $e");
     }
+  }
+
+  // ✅ ค้นหาที่อยู่จาก LatLng
+  Future<void> _getAddressFromLatLng(LatLng position) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks.first;
+        String address =
+            "${place.street}, ${place.subLocality}, ${place.locality}, ${place.postalCode}";
+        setState(() {
+          _locationController.text = address;
+        });
+      }
+    } catch (e) {
+      print("❌ ไม่สามารถดึงที่อยู่จากพิกัดได้: $e");
+    }
+  }
+
+  // ✅ อัปเดตตำแหน่งเมื่อผู้ใช้เลือกจากแผนที่
+  void _onMapTapped(LatLng position) {
+    setState(() {
+      _selectedPosition = position;
+    });
+
+    _getAddressFromLatLng(position);
   }
 
   // ❗ แจ้งเตือนให้เปิด GPS
@@ -126,34 +153,61 @@ class _ThirdPageState extends State<ThirdPage> {
               mapController = controller;
               if (_locationFetched) {
                 mapController!.animateCamera(
-                  CameraUpdate.newLatLngZoom(_currentPosition, 15),
+                  CameraUpdate.newLatLngZoom(_selectedPosition, 15),
                 );
               }
             },
             initialCameraPosition: CameraPosition(
-              target: _currentPosition,
+              target: _selectedPosition,
               zoom: 15,
             ),
             markers: {
               Marker(
-                markerId: const MarkerId('current-location'),
-                position: _currentPosition,
+                markerId: const MarkerId('selected-location'),
+                position: _selectedPosition,
                 icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
               ),
             },
             myLocationEnabled: true,
             myLocationButtonEnabled: true,
+            onTap: _onMapTapped,
           ),
 
           Positioned(
             top: 40,
             left: 16,
-            child: FloatingActionButton(
-              onPressed: () {
-                Navigator.pop(context);
+            right: 16,
+            child: TextField(
+              controller: _locationController,
+              decoration: InputDecoration(
+                hintText: "ค้นหาสถานที่",
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
+                ),
+                prefixIcon: const Icon(Icons.search, color: Colors.blue),
+              ),
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => Dialog(
+                    child: GooglePlaceAutoCompleteTextField(
+                      textEditingController: _locationController,
+                      googleAPIKey: "YOUR_GOOGLE_MAPS_API_KEY",
+                      inputDecoration: InputDecoration(
+                        hintText: "ค้นหาสถานที่",
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      itemClick: (prediction) {
+                        _locationController.text = prediction.description!;
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ),
+                );
               },
-              backgroundColor: Colors.white,
-              child: const Icon(Icons.arrow_back, color: Colors.black),
             ),
           ),
 
@@ -162,59 +216,21 @@ class _ThirdPageState extends State<ThirdPage> {
             right: 0,
             bottom: 0,
             child: Container(
-              decoration: BoxDecoration(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
                 color: Colors.white,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(25),
-                  topRight: Radius.circular(25),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 10,
-                    spreadRadius: 2,
-                  ),
-                ],
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
               ),
-              padding: const EdgeInsets.symmetric(vertical: 25, horizontal: 16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    "ตั้งค่าที่อยู่ของคุณ",
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
-                  ),
+                  Text(_locationController.text, textAlign: TextAlign.center),
                   const SizedBox(height: 10),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      "กรุณาระบุตำแหน่งที่คุณต้องการจะตั้งไว้เพื่อเป็นข้อมูลในการหาเส้นทางกลับของคุณ",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 16, color: Colors.black54),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const FourthPage()), // ✅ ไปที่ FourthPage
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: const Text(
-                        "ตั้งค่าเลย",
-                        style: TextStyle(fontSize: 18, color: Colors.white),
-                      ),
-                    ),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context, _selectedPosition);
+                    },
+                    child: const Text("เลือกที่นี่"),
                   ),
                 ],
               ),
