@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.teal,
       ),
       debugShowCheckedModeBanner: false,
-      home: const FirstPage(),
+      home: const PersonalInfoPage(),
       supportedLocales: const [
         Locale('en', 'US'),
         Locale('th', 'TH'), // Ensure Thai locale is supported
