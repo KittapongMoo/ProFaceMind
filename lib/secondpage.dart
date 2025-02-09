@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // Import SharedPreferences
 import 'thirdpage.dart'; // Import ThirdPage
+import 'camera.dart';
 
 class SecondPage extends StatelessWidget {
   const SecondPage({super.key});
@@ -96,6 +97,31 @@ class SecondPage extends StatelessWidget {
                     ),
                     child: const Text(
                       'Go to Third Page',
+                      style: TextStyle(fontSize: 18, color: Colors.white),
+                    ),
+                  ),
+                ),
+                // ปุ่มไปยัง ThirdPage
+
+                const SizedBox(height: 20),
+
+                Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const CameraPage()),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      backgroundColor: Colors.green, // ใช้สีเขียวเพื่อแยกความแตกต่าง
+                    ),
+                    child: const Text(
+                      'Go to Camera Page',
                       style: TextStyle(fontSize: 18, color: Colors.white),
                     ),
                   ),
