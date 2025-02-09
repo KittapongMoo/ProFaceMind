@@ -26,6 +26,8 @@ android {
         targetSdkVersion 34 // ใช้เวอร์ชันล่าสุดของ Android
         versionCode flutter.versionCode
         versionName flutter.versionName
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = project.hasProperty("GOOGLE_MAPS_API_KEY") ? GOOGLE_MAPS_API_KEY : ""
+
     }
 
     buildTypes {

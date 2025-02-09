@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'FirstPage.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env"); // Load .env file
+
   runApp(const MyApp());
 }
 
@@ -18,7 +22,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.teal,
       ),
       debugShowCheckedModeBanner: false,
-      home: const FirstPage(),
+      home: const PersonalInfoPage(),
       supportedLocales: const [
         Locale('en', 'US'),
         Locale('th', 'TH'), // Ensure Thai locale is supported
