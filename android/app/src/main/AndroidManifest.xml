@@ -20,7 +20,7 @@
         <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="${GOOGLE_MAPS_API_KEY}"/> <!-- เปลี่ยนเป็น API Key google map cloud ดูในดิส -->
+            android:value="AIzaSyChd-Tfsm3EFmC8Jc5RXAj2Kg6r5pXojyU"/> <!-- เปลี่ยนเป็น API Key google map cloud ดูในดิส -->
 
 
         <activity
