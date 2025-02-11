@@ -30,6 +30,13 @@ class _OwnerinfoState extends State<Ownerinfo> {
   String _selectedHeight = "150 ซม.";
   String _selectedWeight = "50 กก.";
   bool _isLoading = false;
+  String? _imagePath;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedInformation(); // Load saved data when opening the app
+  }
 
   // Dispose controllers when not needed
   @override
@@ -55,16 +62,23 @@ class _OwnerinfoState extends State<Ownerinfo> {
     }
 
     try {
-      final pickedFile =
-      await ImagePicker().pickImage(source: ImageSource.gallery);
+      final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
       if (pickedFile != null) {
         debugPrint("Image selected: ${pickedFile.path}");
+
+        // Save image path in SharedPreferences first
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('imagePath', pickedFile.path);
+
+        // Update UI state after saving
         setState(() {
           _image = File(pickedFile.path);
         });
       } else {
         debugPrint("No image selected.");
       }
+
+
     } catch (e) {
       debugPrint("Error picking image: $e");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -105,8 +119,7 @@ class _OwnerinfoState extends State<Ownerinfo> {
   // Method to save information to SharedPreferences
   Future<void> _saveInformation() async {
     if (!_formKey.currentState!.validate()) {
-      // If form is not valid, do not proceed
-      return;
+      return; // If form is not valid, do not proceed
     }
 
     setState(() {
@@ -114,7 +127,8 @@ class _OwnerinfoState extends State<Ownerinfo> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SharedPreferences.getInstance(); // Define prefs here
+
       await prefs.setString('nickname', _nicknameController.text.trim());
       await prefs.setString('firstname', _firstnameController.text.trim());
       await prefs.setString('lastname', _lastnameController.text.trim());
@@ -124,11 +138,15 @@ class _OwnerinfoState extends State<Ownerinfo> {
       await prefs.setString('weight', _selectedWeight);
       await prefs.setString('condition', _conditionController.text.trim());
 
+      // Save image path if an image is selected
+      if (_image != null) {
+        await prefs.setString('imagePath', _image!.path);
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('ข้อมูลถูกบันทึกเรียบร้อยแล้ว!')),
       );
 
-      // Navigate to SecondPage after a short delay to allow snackbar to show
       await Future.delayed(const Duration(milliseconds: 500));
       if (!mounted) return;
       Navigator.push(
@@ -146,6 +164,74 @@ class _OwnerinfoState extends State<Ownerinfo> {
       });
     }
   }
+
+
+  Future<void> _loadSavedInformation() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    setState(() {
+      _nicknameController.text = prefs.getString('nickname') ?? '';
+      _firstnameController.text = prefs.getString('firstname') ?? '';
+      _lastnameController.text = prefs.getString('lastname') ?? '';
+      _selectedDate = prefs.getString('birthdate') != null
+          ? DateTime.parse(prefs.getString('birthdate')!)
+          : null;
+      _selectedHeight = prefs.getString('height') ?? "150 ซม.";
+      _selectedWeight = prefs.getString('weight') ?? "50 กก.";
+      _conditionController.text = prefs.getString('condition') ?? '';
+      _imagePath = prefs.getString('imagePath');
+      _image = _imagePath != null ? File(_imagePath!) : null;
+    });
+  }
+
+  void _showInfoDialog() {
+    // Ensure the data is loaded before showing the dialog
+    if (_nicknameController.text.isEmpty || _firstnameController.text.isEmpty || _lastnameController.text.isEmpty) {
+      // If the information is not loaded, prompt the user
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ข้อมูลยังไม่ถูกบันทึก!')),
+      );
+      return;
+    }
+
+    // Create the dialog with the saved information
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('ข้อมูลผู้ใช้'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('ชื่อเล่น: ${_nicknameController.text}'),
+                Text('ชื่อจริง: ${_firstnameController.text}'),
+                Text('นามสกุล: ${_lastnameController.text}'),
+                Text('วันเกิด: ${_selectedDate != null ? "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}" : 'ไม่ได้ระบุ'}'),
+                Text('ส่วนสูง: $_selectedHeight'),
+                Text('น้ำหนัก: $_selectedWeight'),
+                Text('โรคประจำตัว: ${_conditionController.text.isNotEmpty ? _conditionController.text : 'ไม่มีข้อมูล'}'),
+                _image != null
+                    ? Image.file(_image!, width: 100, height: 100, fit: BoxFit.cover)
+                    : const Text('ไม่มีรูปภาพโปรไฟล์'),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+              child: const Text('ปิด'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+
 
   // Reusable widget for input fields with validation
   Widget _buildInputField({
@@ -358,6 +444,10 @@ class _OwnerinfoState extends State<Ownerinfo> {
                 ),
               ),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            onPressed: _showInfoDialog, // Calls the function to show the information
           ),
         ],
         backgroundColor: primaryColor,
