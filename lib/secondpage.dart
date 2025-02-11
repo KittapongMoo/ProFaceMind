@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // Import SharedPreferences
-import 'thirdpage.dart'; // Import ThirdPage
+import 'setmap.dart'; // Import ThirdPage
 import 'camera.dart';
 
 class SecondPage extends StatelessWidget {
@@ -85,7 +85,7 @@ class SecondPage extends StatelessWidget {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const ThirdPage()),
+                        MaterialPageRoute(builder: (context) => const Setmap()),
                       );
                     },
                     style: ElevatedButton.styleFrom(

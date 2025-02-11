@@ -7,14 +7,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'SecondPage.dart';
 
-class FirstPage extends StatefulWidget {
-  const FirstPage({Key? key}) : super(key: key);
+class Ownerinfo extends StatefulWidget {
+  const Ownerinfo({Key? key}) : super(key: key);
 
   @override
-  _FirstPageState createState() => _FirstPageState();
+  _OwnerinfoState createState() => _OwnerinfoState();
 }
 
-class _FirstPageState extends State<FirstPage> {
+class _OwnerinfoState extends State<Ownerinfo> {
   // Global key for the form
   final _formKey = GlobalKey<FormState>();
 
@@ -386,19 +386,19 @@ class _FirstPageState extends State<FirstPage> {
                           label: 'ชื่อเล่น',
                           hintText: 'กรอกชื่อเล่น',
                           controller: _nicknameController,
-                          isRequired: true,
+                          isRequired: false,
                         ),
                         _buildInputField(
                           label: 'ชื่อจริง',
                           hintText: 'กรอกชื่อจริง',
                           controller: _firstnameController,
-                          isRequired: true,
+                          isRequired: false,
                         ),
                         _buildInputField(
                           label: 'นามสกุล',
                           hintText: 'กรอกนามสกุล',
                           controller: _lastnameController,
-                          isRequired: true,
+                          isRequired: false,
                         ),
                         _buildDatePicker(),
                         _buildDropdownField(
