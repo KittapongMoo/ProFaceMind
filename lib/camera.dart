@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -15,6 +18,7 @@ class _CameraPageState extends State<CameraPage> {
   bool _isCameraInitialized = false;
   XFile? _capturedImage;
   bool _isFrontCamera = false;
+  File? _galleryImage;
 
   @override
   void initState() {
@@ -28,8 +32,12 @@ class _CameraPageState extends State<CameraPage> {
       _cameraController = CameraController(
         _cameras![_isFrontCamera ? 1 : 0],
         ResolutionPreset.medium,
+        enableAudio: false,
       );
       await _cameraController!.initialize();
+      await _cameraController!.setExposureMode(ExposureMode.auto);
+      await _cameraController!.setFocusMode(FocusMode.auto);
+      await _cameraController!.lockCaptureOrientation(DeviceOrientation.portraitUp);
       if (!mounted) return;
       setState(() {
         _isCameraInitialized = true;
@@ -77,6 +85,29 @@ class _CameraPageState extends State<CameraPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _pickImage() async {
+    final status = await Permission.photos.request();
+    if (!status.isGranted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ต้องอนุญาตให้เข้าถึงรูปภาพก่อน')),
+      );
+      return;
+    }
+
+    try {
+      final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        setState(() {
+          _galleryImage = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
+      );
+    }
   }
 
   @override
@@ -133,9 +164,7 @@ class _CameraPageState extends State<CameraPage> {
                   heroTag: 'gallery',
                   backgroundColor: Colors.blue,
                   child: const Icon(Icons.photo_library),
-                  onPressed: () {
-                    // Open gallery
-                  },
+                  onPressed: _pickImage,
                 ),
                 const SizedBox(height: 16),
                 FloatingActionButton(
