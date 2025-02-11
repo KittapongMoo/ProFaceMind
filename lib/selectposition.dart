@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:uuid/uuid.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 class Selectposition extends StatefulWidget {
   const Selectposition({super.key});
@@ -17,10 +14,7 @@ class _SelectpositionState extends State<Selectposition> {
   GoogleMapController? mapController;
   LatLng? _selectedPosition;
   final TextEditingController _searchController = TextEditingController();
-  bool _isSearching = false;
   bool _isLoading = true;
-  List<dynamic> _placeSuggestions = [];
-  final String _sessionToken = Uuid().v4();
 
   @override
   void initState() {
@@ -89,49 +83,7 @@ class _SelectpositionState extends State<Selectposition> {
     }
   }
 
-  Future<void> _fetchPlaceSuggestions(String query) async {
-    if (query.isEmpty) return;
-
-    setState(() {
-      _isSearching = true;
-    });
-
-    String apiKey = "YOUR_GOOGLE_MAPS_API_KEY";
-    String requestUrl =
-        "https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$query&key=$apiKey&sessiontoken=$_sessionToken&components=country:th";
-
-    final response = await http.get(Uri.parse(requestUrl));
-
-    if (response.statusCode == 200) {
-      setState(() {
-        _placeSuggestions = json.decode(response.body)['predictions'];
-      });
-    }
-  }
-
-  Future<void> _getPlaceDetails(String placeId) async {
-    String apiKey = "YOUR_GOOGLE_MAPS_API_KEY";
-    String requestUrl =
-        "https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=$apiKey";
-
-    final response = await http.get(Uri.parse(requestUrl));
-
-    if (response.statusCode == 200) {
-      var result = json.decode(response.body)['result'];
-      double lat = result['geometry']['location']['lat'];
-      double lng = result['geometry']['location']['lng'];
-
-      setState(() {
-        _selectedPosition = LatLng(lat, lng);
-        _placeSuggestions = [];
-        _isSearching = false;
-      });
-
-      mapController?.animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition!, 15));
-      _getAddressFromLatLng(_selectedPosition!);
-    }
-  }
-
+  /// **✅ เพิ่มฟังก์ชัน `_showLocationDialog()`**
   void _showLocationDialog() {
     showDialog(
       context: context,
@@ -155,6 +107,7 @@ class _SelectpositionState extends State<Selectposition> {
     );
   }
 
+  /// **✅ เพิ่มฟังก์ชัน `_showPermissionDeniedDialog()`**
   void _showPermissionDeniedDialog() {
     showDialog(
       context: context,
@@ -219,7 +172,33 @@ class _SelectpositionState extends State<Selectposition> {
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
                 prefixIcon: const Icon(Icons.search, color: Colors.blue),
               ),
-              onChanged: (query) => _fetchPlaceSuggestions(query),
+            ),
+          ),
+
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 80,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 5, spreadRadius: 2)],
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    _searchController.text.isNotEmpty
+                        ? _searchController.text
+                        : _isLoading
+                        ? "กำลังโหลดตำแหน่ง..."
+                        : "ไม่สามารถระบุตำแหน่งได้",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
             ),
           ),
 
