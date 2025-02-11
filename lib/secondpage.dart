@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // Import SharedPreferences
 import 'setmap.dart'; // Import ThirdPage
 import 'camera.dart';
+import 'ownerinfo.dart';
 
 class SecondPage extends StatelessWidget {
   const SecondPage({super.key});
@@ -68,10 +69,34 @@ class SecondPage extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(30),
                       ),
-                      backgroundColor: Colors.blue,
+                      backgroundColor: Colors.red,
                     ),
                     child: const Text(
                       'Back to First Page',
+                      style: TextStyle(fontSize: 18, color: Colors.white),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const Ownerinfo()),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      backgroundColor: Colors.orange, // ใช้สีเขียวเพื่อแยกความแตกต่าง
+                    ),
+                    child: const Text(
+                      'Go to owner information page',
                       style: TextStyle(fontSize: 18, color: Colors.white),
                     ),
                   ),
@@ -103,6 +128,8 @@ class SecondPage extends StatelessWidget {
                 ),
                 // ปุ่มไปยัง ThirdPage
 
+
+
                 const SizedBox(height: 20),
 
                 Center(
@@ -118,7 +145,7 @@ class SecondPage extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(30),
                       ),
-                      backgroundColor: Colors.green, // ใช้สีเขียวเพื่อแยกความแตกต่าง
+                      backgroundColor: Colors.blueAccent, // ใช้สีเขียวเพื่อแยกความแตกต่าง
                     ),
                     child: const Text(
                       'Go to Camera Page',
