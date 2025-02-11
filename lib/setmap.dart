@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'selectpostition.dart'; // ✅ เพิ่มการ import หน้า FourthPage
+import 'fourthpage.dart';
 
-class Setmap extends StatefulWidget {
-  const Setmap({super.key});
+class ThirdPage extends StatefulWidget {
+  const ThirdPage({super.key});
 
   @override
-  _SetmapState createState() => _SetmapState();
+  _ThirdPageState createState() => _ThirdPageState();
 }
 
-class _SetmapState extends State<Setmap> {
+class _ThirdPageState extends State<ThirdPage> {
   GoogleMapController? mapController;
   LatLng _currentPosition = const LatLng(13.736717, 100.523186); // ค่าเริ่มต้น
   bool _locationFetched = false;
@@ -21,7 +21,6 @@ class _SetmapState extends State<Setmap> {
     _requestLocation(); // ✅ ดึงตำแหน่งทันทีที่หน้าโหลด
   }
 
-  // ✅ ขออนุญาตและดึงตำแหน่ง GPS
   Future<void> _requestLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -46,7 +45,6 @@ class _SetmapState extends State<Setmap> {
     _getCurrentLocation();
   }
 
-  // ✅ ดึงตำแหน่งจาก GPS อัตโนมัติ
   Future<void> _getCurrentLocation() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
@@ -56,7 +54,7 @@ class _SetmapState extends State<Setmap> {
       print("📍 ตำแหน่ง GPS: ${position.latitude}, ${position.longitude}");
 
       setState(() {
-        _currentPosition = LatLng(13.736717, 100.523186);
+        _currentPosition = LatLng(position.latitude, position.longitude);
         _locationFetched = true;
       });
 
@@ -68,7 +66,6 @@ class _SetmapState extends State<Setmap> {
     }
   }
 
-  // ❗ แจ้งเตือนให้เปิด GPS
   void _showLocationDialog() {
     showDialog(
       context: context,
@@ -92,7 +89,6 @@ class _SetmapState extends State<Setmap> {
     );
   }
 
-  // ❗ แจ้งเตือนเมื่อปฏิเสธสิทธิ์
   void _showPermissionDeniedDialog() {
     showDialog(
       context: context,
@@ -200,7 +196,7 @@ class _SetmapState extends State<Setmap> {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const Selectpostition()), // ✅ ไปที่ FourthPage
+                          MaterialPageRoute(builder: (context) => const FourthPage()),
                         );
                       },
                       style: ElevatedButton.styleFrom(
