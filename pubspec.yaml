@@ -28,12 +28,14 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
-  google_maps_flutter: ^2.2.0
-  geolocator: ^10.0.0
-  geocoding: ^2.1.0 # ใช้หาชื่อสถานที่จากพิกัด
+  google_maps_flutter: ^2.5.0
+  geolocator: ^13.0.2
+  geocoding: ^2.1.0
   image_picker: ^1.0.4
   permission_handler: ^11.0.1
   google_places_flutter: ^2.0.5
+  http: ^0.13.4
+  uuid: ^4.5.1
 
   shared_preferences: ^2.0.15
   flutter:
@@ -45,6 +47,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   flutter_dotenv: ^5.2.1
+  camera: ^0.11.1
 
 dev_dependencies:
   flutter_test:

@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'fourthpage.dart'; // ✅ เพิ่มการ import หน้า FourthPage
+import 'selectpostition.dart';
 
-class ThirdPage extends StatefulWidget {
-  const ThirdPage({super.key});
+class Setmap extends StatefulWidget {
+  const Setmap({super.key});
 
   @override
-  _ThirdPageState createState() => _ThirdPageState();
+  _SetmapState createState() => _SetmapState();
 }
 
-class _ThirdPageState extends State<ThirdPage> {
+class _SetmapState extends State<Setmap> {
   GoogleMapController? mapController;
   LatLng _currentPosition = const LatLng(13.736717, 100.523186); // ค่าเริ่มต้น
   bool _locationFetched = false;
@@ -21,7 +21,6 @@ class _ThirdPageState extends State<ThirdPage> {
     _requestLocation(); // ✅ ดึงตำแหน่งทันทีที่หน้าโหลด
   }
 
-  // ✅ ขออนุญาตและดึงตำแหน่ง GPS
   Future<void> _requestLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -46,7 +45,6 @@ class _ThirdPageState extends State<ThirdPage> {
     _getCurrentLocation();
   }
 
-  // ✅ ดึงตำแหน่งจาก GPS อัตโนมัติ
   Future<void> _getCurrentLocation() async {
     try {
       Position position = await Geolocator.getCurrentPosition(
@@ -56,7 +54,7 @@ class _ThirdPageState extends State<ThirdPage> {
       print("📍 ตำแหน่ง GPS: ${position.latitude}, ${position.longitude}");
 
       setState(() {
-        _currentPosition = LatLng(13.736717, 100.523186);
+        _currentPosition = LatLng(position.latitude, position.longitude);
         _locationFetched = true;
       });
 
@@ -68,7 +66,6 @@ class _ThirdPageState extends State<ThirdPage> {
     }
   }
 
-  // ❗ แจ้งเตือนให้เปิด GPS
   void _showLocationDialog() {
     showDialog(
       context: context,
@@ -92,7 +89,6 @@ class _ThirdPageState extends State<ThirdPage> {
     );
   }
 
-  // ❗ แจ้งเตือนเมื่อปฏิเสธสิทธิ์
   void _showPermissionDeniedDialog() {
     showDialog(
       context: context,
@@ -200,7 +196,7 @@ class _ThirdPageState extends State<ThirdPage> {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const FourthPage()), // ✅ ไปที่ FourthPage
+                          MaterialPageRoute(builder: (context) => const Selectpostition()),
                         );
                       },
                       style: ElevatedButton.styleFrom(
