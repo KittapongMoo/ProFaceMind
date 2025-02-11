@@ -6,18 +6,19 @@ import 'package:uuid/uuid.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-class Selectpostition extends StatefulWidget {
-  const Selectpostition({super.key});
+class SelectPosition extends StatefulWidget {
+  const SelectPosition({super.key});
 
   @override
-  _SelectpostitionState createState() => _SelectpostitionState();
+  _SelectPositionState createState() => _SelectPositionState();
 }
 
-class _SelectpostitionState extends State<Selectpostition> {
+class _SelectPositionState extends State<SelectPosition> {
   GoogleMapController? mapController;
-  LatLng _selectedPosition = const LatLng(13.736717, 100.523186);
+  LatLng? _selectedPosition;
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
+  bool _isLoading = true;
   List<dynamic> _placeSuggestions = [];
   final String _sessionToken = Uuid().v4();
 
@@ -28,30 +29,63 @@ class _SelectpostitionState extends State<Selectpostition> {
   }
 
   Future<void> _getCurrentLocation() async {
-    Position position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.best));
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _showLocationDialog();
+      return;
+    }
 
-    setState(() {
-      _selectedPosition = LatLng(position.latitude, position.longitude);
-    });
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        _showPermissionDeniedDialog();
+        return;
+      }
+    }
 
-    mapController?.animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition, 15));
-    _getAddressFromLatLng(_selectedPosition);
+    if (permission == LocationPermission.deniedForever) {
+      _showPermissionDeniedDialog();
+      return;
+    }
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(accuracy: LocationAccuracy.best));
+
+      setState(() {
+        _selectedPosition = LatLng(position.latitude, position.longitude);
+        _isLoading = false;
+      });
+
+      if (mapController != null) {
+        mapController!.animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition!, 15));
+      }
+
+      _getAddressFromLatLng(_selectedPosition!);
+    } catch (e) {
+      debugPrint("❌ ไม่สามารถดึงตำแหน่ง GPS ได้: $e");
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _getAddressFromLatLng(LatLng position) async {
-    List<Placemark> placemarks = await placemarkFromCoordinates(
-      position.latitude,
-      position.longitude,
-    );
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
 
-    if (placemarks.isNotEmpty) {
-      Placemark place = placemarks.first;
-      String address =
-          "${place.street}, ${place.subLocality}, ${place.locality}, ${place.postalCode}";
-      setState(() {
-        _searchController.text = address;
-      });
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks.first;
+        String address =
+            "${place.street}, ${place.subLocality}, ${place.locality}, ${place.postalCode}";
+        setState(() {
+          _searchController.text = address;
+        });
+      }
+    } catch (e) {
+      debugPrint("❌ ไม่สามารถดึงที่อยู่จากพิกัดได้: $e");
     }
   }
 
@@ -93,9 +127,55 @@ class _SelectpostitionState extends State<Selectpostition> {
         _isSearching = false;
       });
 
-      mapController?.animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition, 15));
-      _getAddressFromLatLng(_selectedPosition);
+      mapController?.animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition!, 15));
+      _getAddressFromLatLng(_selectedPosition!);
     }
+  }
+
+  void _showLocationDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("ต้องเปิด GPS"),
+        content: const Text("กรุณาเปิด GPS เพื่อใช้งานแผนที่"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("ปิด"),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Geolocator.openLocationSettings();
+            },
+            child: const Text("ไปที่ตั้งค่า"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPermissionDeniedDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("สิทธิ์ถูกปฏิเสธ"),
+        content: const Text("กรุณาให้สิทธิ์ตำแหน่งในตั้งค่าแอปเพื่อใช้งานฟีเจอร์นี้"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("ปิด"),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Geolocator.openAppSettings();
+            },
+            child: const Text("ไปที่ตั้งค่า"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -103,78 +183,43 @@ class _SelectpostitionState extends State<Selectpostition> {
     return Scaffold(
       body: Stack(
         children: [
-          GoogleMap(
-            onMapCreated: (controller) {
-              mapController = controller;
-              mapController?.animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition, 15));
-            },
-            initialCameraPosition: CameraPosition(target: _selectedPosition, zoom: 15),
-            myLocationEnabled: true,
-            myLocationButtonEnabled: true,
-            onCameraMove: (position) {
-              setState(() {
-                _selectedPosition = position.target;
-              });
-            },
-            onCameraIdle: () {
-              _getAddressFromLatLng(_selectedPosition);
-            },
-          ),
+          if (_selectedPosition != null)
+            GoogleMap(
+              onMapCreated: (controller) {
+                mapController = controller;
+                mapController?.animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition!, 15));
+              },
+              initialCameraPosition: CameraPosition(target: _selectedPosition!, zoom: 15),
+              myLocationEnabled: true,
+              myLocationButtonEnabled: true,
+              onCameraMove: (position) {
+                setState(() {
+                  _selectedPosition = position.target;
+                });
+              },
+              onCameraIdle: () {
+                _getAddressFromLatLng(_selectedPosition!);
+              },
+            )
+          else
+            const Center(child: CircularProgressIndicator()),
 
-          Center(
-            child: Icon(Icons.location_pin, color: Colors.red, size: 50),
-          ),
+          Center(child: Icon(Icons.location_pin, color: Colors.red, size: 50)),
 
           Positioned(
             top: 40,
             left: 16,
             right: 16,
-            child: Column(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 5, spreadRadius: 2)],
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: "ค้นหาสถานที่",
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        borderSide: BorderSide.none,
-                      ),
-                      prefixIcon: const Icon(Icons.search, color: Colors.blue),
-                      suffixIcon: const Icon(Icons.search, color: Colors.grey),
-                    ),
-                    onChanged: (query) => _fetchPlaceSuggestions(query),
-                  ),
-                ),
-
-                if (_isSearching && _placeSuggestions.isNotEmpty)
-                  Container(
-                    height: 200,
-                    margin: const EdgeInsets.only(top: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: ListView.builder(
-                      itemCount: _placeSuggestions.length,
-                      itemBuilder: (context, index) {
-                        return ListTile(
-                          title: Text(_placeSuggestions[index]['description']),
-                          onTap: () {
-                            _getPlaceDetails(_placeSuggestions[index]['place_id']);
-                          },
-                        );
-                      },
-                    ),
-                  ),
-              ],
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: "ค้นหาสถานที่",
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                prefixIcon: const Icon(Icons.search, color: Colors.blue),
+              ),
+              onChanged: (query) => _fetchPlaceSuggestions(query),
             ),
           ),
 
@@ -182,39 +227,12 @@ class _SelectpostitionState extends State<Selectpostition> {
             left: 16,
             right: 16,
             bottom: 16,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 5, spreadRadius: 2)],
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    _searchController.text.isNotEmpty ? _searchController.text : "กำลังโหลดที่อยู่...",
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context, _selectedPosition);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: const Text("เลือกที่นี่", style: TextStyle(fontSize: 18, color: Colors.white)),
-                    ),
-                  ),
-                ],
-              ),
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context, _selectedPosition);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, padding: const EdgeInsets.symmetric(vertical: 15)),
+              child: const Text("เลือกที่นี่", style: TextStyle(fontSize: 18, color: Colors.white)),
             ),
           ),
         ],
