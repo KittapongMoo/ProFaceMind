@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'selectpostition.dart';
+import 'selectposition.dart';
 
 class Setmap extends StatefulWidget {
   const Setmap({super.key});
@@ -196,7 +196,7 @@ class _SetmapState extends State<Setmap> {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const Selectpostition()),
+                          MaterialPageRoute(builder: (context) => const Selectposition()),
                         );
                       },
                       style: ElevatedButton.styleFrom(
