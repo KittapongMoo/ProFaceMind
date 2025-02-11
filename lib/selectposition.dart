@@ -14,7 +14,7 @@ class _SelectpositionState extends State<Selectposition> {
   GoogleMapController? mapController;
   LatLng? _selectedPosition;
   final TextEditingController _searchController = TextEditingController();
-  bool _isLoading = true;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -23,9 +23,12 @@ class _SelectpositionState extends State<Selectposition> {
   }
 
   Future<void> _getCurrentLocation() async {
+    setState(() => _isLoading = true);
+
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       _showLocationDialog();
+      setState(() => _isLoading = false);
       return;
     }
 
@@ -34,12 +37,14 @@ class _SelectpositionState extends State<Selectposition> {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
         _showPermissionDeniedDialog();
+        setState(() => _isLoading = false);
         return;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
       _showPermissionDeniedDialog();
+      setState(() => _isLoading = false);
       return;
     }
 
@@ -83,7 +88,7 @@ class _SelectpositionState extends State<Selectposition> {
     }
   }
 
-  /// **✅ เพิ่มฟังก์ชัน `_showLocationDialog()`**
+  /// **🔥 ฟังก์ชันแจ้งเตือนเมื่อ GPS ถูกปิด**
   void _showLocationDialog() {
     showDialog(
       context: context,
@@ -107,7 +112,7 @@ class _SelectpositionState extends State<Selectposition> {
     );
   }
 
-  /// **✅ เพิ่มฟังก์ชัน `_showPermissionDeniedDialog()`**
+  /// **🔥 ฟังก์ชันแจ้งเตือนเมื่อผู้ใช้ปฏิเสธการเข้าถึงตำแหน่ง**
   void _showPermissionDeniedDialog() {
     showDialog(
       context: context,
@@ -145,6 +150,15 @@ class _SelectpositionState extends State<Selectposition> {
               initialCameraPosition: CameraPosition(target: _selectedPosition!, zoom: 15),
               myLocationEnabled: true,
               myLocationButtonEnabled: true,
+              markers: {
+                if (_selectedPosition != null)
+                  Marker(
+                    markerId: const MarkerId("selected-location"),
+                    position: _selectedPosition!,
+                    infoWindow: const InfoWindow(title: "ตำแหน่งที่เลือก"),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                  ),
+              },
               onCameraMove: (position) {
                 setState(() {
                   _selectedPosition = position.target;
@@ -156,8 +170,6 @@ class _SelectpositionState extends State<Selectposition> {
             )
           else
             const Center(child: CircularProgressIndicator()),
-
-          Center(child: Icon(Icons.location_pin, color: Colors.red, size: 50)),
 
           Positioned(
             top: 40,
@@ -210,7 +222,10 @@ class _SelectpositionState extends State<Selectposition> {
               onPressed: () {
                 Navigator.pop(context, _selectedPosition);
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, padding: const EdgeInsets.symmetric(vertical: 15)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+              ),
               child: const Text("เลือกที่นี่", style: TextStyle(fontSize: 18, color: Colors.white)),
             ),
           ),
