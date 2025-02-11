@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'fourthpage.dart'; // ✅ เพิ่มการ import หน้า FourthPage
+import 'selectpostition.dart'; // ✅ เพิ่มการ import หน้า FourthPage
 
-class ThirdPage extends StatefulWidget {
-  const ThirdPage({super.key});
+class Setmap extends StatefulWidget {
+  const Setmap({super.key});
 
   @override
-  _ThirdPageState createState() => _ThirdPageState();
+  _SetmapState createState() => _SetmapState();
 }
 
-class _ThirdPageState extends State<ThirdPage> {
+class _SetmapState extends State<Setmap> {
   GoogleMapController? mapController;
   LatLng _currentPosition = const LatLng(13.736717, 100.523186); // ค่าเริ่มต้น
   bool _locationFetched = false;
@@ -200,7 +200,7 @@ class _ThirdPageState extends State<ThirdPage> {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const FourthPage()), // ✅ ไปที่ FourthPage
+                          MaterialPageRoute(builder: (context) => const Selectpostition()), // ✅ ไปที่ FourthPage
                         );
                       },
                       style: ElevatedButton.styleFrom(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'FirstPage.dart';
+// import 'FirstPage.dart';
+import 'Ownerinfo.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -120,7 +121,7 @@ class PersonalInfoPage extends StatelessWidget {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => FirstPage()), // Navigate to FirstPage
+                MaterialPageRoute(builder: (context) => Ownerinfo()), // Navigate to FirstPage
               );
             },
             style: ElevatedButton.styleFrom(

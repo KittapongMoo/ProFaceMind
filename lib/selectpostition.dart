@@ -4,14 +4,14 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_places_flutter/google_places_flutter.dart';
 
-class FourthPage extends StatefulWidget {
-  const FourthPage({super.key});
+class Selectpostition extends StatefulWidget {
+  const Selectpostition({super.key});
 
   @override
-  _FourthPageState createState() => _FourthPageState();
+  _SelectpostitionState createState() => _SelectpostitionState();
 }
 
-class _FourthPageState extends State<FourthPage> {
+class _SelectpostitionState extends State<Selectpostition> {
   GoogleMapController? mapController;
   LatLng _selectedPosition = const LatLng(13.736717, 100.523186); // ค่าเริ่มต้น (กรุงเทพฯ)
   TextEditingController _locationController = TextEditingController();
