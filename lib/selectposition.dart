@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:uuid/uuid.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class Selectposition extends StatefulWidget {
   const Selectposition({super.key});
@@ -14,7 +17,10 @@ class _SelectpositionState extends State<Selectposition> {
   GoogleMapController? mapController;
   LatLng? _selectedPosition;
   final TextEditingController _searchController = TextEditingController();
-  bool _isLoading = true;
+  bool _isLoading = false; // ใช้ให้มีผล
+  List<dynamic> _placeSuggestions = [];
+  final String _sessionToken = Uuid().v4();
+  final String googleApiKey = "YOUR_GOOGLE_MAPS_API_KEY"; // 🔥 ใช้ API Key จริง
 
   @override
   void initState() {
@@ -23,9 +29,12 @@ class _SelectpositionState extends State<Selectposition> {
   }
 
   Future<void> _getCurrentLocation() async {
+    setState(() => _isLoading = true);
+
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       _showLocationDialog();
+      setState(() => _isLoading = false);
       return;
     }
 
@@ -34,12 +43,14 @@ class _SelectpositionState extends State<Selectposition> {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
         _showPermissionDeniedDialog();
+        setState(() => _isLoading = false);
         return;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
       _showPermissionDeniedDialog();
+      setState(() => _isLoading = false);
       return;
     }
 
@@ -83,7 +94,7 @@ class _SelectpositionState extends State<Selectposition> {
     }
   }
 
-  /// **✅ เพิ่มฟังก์ชัน `_showLocationDialog()`**
+  /// 🔥 **เพิ่มฟังก์ชัน `_showLocationDialog()`**
   void _showLocationDialog() {
     showDialog(
       context: context,
@@ -107,7 +118,7 @@ class _SelectpositionState extends State<Selectposition> {
     );
   }
 
-  /// **✅ เพิ่มฟังก์ชัน `_showPermissionDeniedDialog()`**
+  /// 🔥 **เพิ่มฟังก์ชัน `_showPermissionDeniedDialog()`**
   void _showPermissionDeniedDialog() {
     showDialog(
       context: context,
