@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'setphonenum.dart'; // ✅ Import หน้า setphonenum.dart
 
 class Selectposition extends StatefulWidget {
   const Selectposition({super.key});
@@ -88,7 +89,6 @@ class _SelectpositionState extends State<Selectposition> {
     }
   }
 
-  /// **🔥 ฟังก์ชันแจ้งเตือนเมื่อ GPS ถูกปิด**
   void _showLocationDialog() {
     showDialog(
       context: context,
@@ -112,7 +112,6 @@ class _SelectpositionState extends State<Selectposition> {
     );
   }
 
-  /// **🔥 ฟังก์ชันแจ้งเตือนเมื่อผู้ใช้ปฏิเสธการเข้าถึงตำแหน่ง**
   void _showPermissionDeniedDialog() {
     showDialog(
       context: context,
@@ -220,7 +219,11 @@ class _SelectpositionState extends State<Selectposition> {
             bottom: 16,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.pop(context, _selectedPosition);
+                // ✅ เปลี่ยนไปที่ `setphonenum.dart`
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SetPhoneNumber()),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
