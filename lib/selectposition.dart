@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:google_place/google_place.dart';
 import 'setphonenum.dart'; // ✅ Import หน้า setphonenum.dart
 
 class Selectposition extends StatefulWidget {
@@ -16,11 +17,16 @@ class _SelectpositionState extends State<Selectposition> {
   LatLng? _selectedPosition;
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = false;
+  late GooglePlace googlePlace; // ✅ Declare googlePlace
+  List<AutocompletePrediction> predictions = []; // ✅ Declare predictions
+
 
   @override
   void initState() {
     super.initState();
     _getCurrentLocation();
+
+    googlePlace = GooglePlace("AIzaSyChd-Tfsm3EFmC8Jc5RXAj2Kg6r5pXojyU");
   }
 
   Future<void> _getCurrentLocation() async {
@@ -135,6 +141,41 @@ class _SelectpositionState extends State<Selectposition> {
     );
   }
 
+  // ✅ Handle location search with Google Places API
+  void _onSearchChanged(String value) async {
+    if (value.isNotEmpty) {
+      var result = await googlePlace.autocomplete.get(value);
+      if (result != null && result.predictions != null) {
+        setState(() {
+          predictions = result.predictions!;
+        });
+      }
+    } else {
+      setState(() {
+        predictions = [];
+      });
+    }
+  }
+
+// ✅ Get LatLng from Place ID and update map
+  void _selectLocation(String placeId, String description) async {
+    var details = await googlePlace.details.get(placeId);
+    if (details != null && details.result != null) {
+      double lat = details.result!.geometry!.location!.lat!;
+      double lng = details.result!.geometry!.location!.lng!;
+      setState(() {
+        _selectedPosition = LatLng(lat, lng);
+        _searchController.text = description;
+        predictions = []; // Clear search results
+      });
+
+      // ✅ Move map camera to new location
+      if (mapController != null) {
+        mapController!.animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition!, 15));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -174,17 +215,48 @@ class _SelectpositionState extends State<Selectposition> {
             top: 40,
             left: 16,
             right: 16,
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: "ค้นหาสถานที่",
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
-                prefixIcon: const Icon(Icons.search, color: Colors.blue),
-              ),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _searchController,
+                  onSubmitted: (value) async {
+                    if (predictions.isNotEmpty) {
+                      _selectLocation(predictions.first.placeId!, predictions.first.description!);
+                    }
+                  },
+                  onChanged: _onSearchChanged,
+
+                  decoration: InputDecoration(
+                    hintText: "ค้นหาสถานที่",
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                    prefixIcon: const Icon(Icons.search, color: Colors.blue),
+                  ),
+                ),
+
+                // ✅ Show search suggestions
+                if (predictions.isNotEmpty)
+                  Container(
+                    height: 200,
+                    color: Colors.white,
+                    child: ListView.builder(
+                      itemCount: predictions.length,
+                      itemBuilder: (context, index) {
+                        return ListTile(
+                          title: Text(predictions[index].description ?? ""),
+                          onTap: () => _selectLocation(
+                            predictions[index].placeId!,
+                            predictions[index].description!,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
             ),
           ),
+
 
           Positioned(
             left: 16,
