@@ -26,24 +26,36 @@ class _CameraPageState extends State<CameraPage> {
     _initializeCamera();
   }
 
+  int _sensorOrientation = 0; // ✅ Store sensor orientation
+
   Future<void> _initializeCamera() async {
     _cameras = await availableCameras();
     if (_cameras!.isNotEmpty) {
+      CameraDescription selectedCamera = _cameras![_isFrontCamera ? 1 : 0];
+
       _cameraController = CameraController(
-        _cameras![_isFrontCamera ? 1 : 0],
+        selectedCamera,
         ResolutionPreset.medium,
         enableAudio: false,
       );
+
       await _cameraController!.initialize();
       await _cameraController!.setExposureMode(ExposureMode.auto);
       await _cameraController!.setFocusMode(FocusMode.auto);
       await _cameraController!.lockCaptureOrientation(DeviceOrientation.portraitUp);
+
+      // ✅ Store sensor orientation
+      _sensorOrientation = selectedCamera.sensorOrientation;
+
       if (!mounted) return;
+
       setState(() {
         _isCameraInitialized = true;
       });
     }
   }
+
+
 
   Future<void> _takePicture() async {
     if (!_cameraController!.value.isTakingPicture) {
@@ -110,6 +122,22 @@ class _CameraPageState extends State<CameraPage> {
     }
   }
 
+  double _calculateRotation() {
+    if (_isFrontCamera) {
+      // ✅ Front Camera: Adjust rotation based on sensor orientation
+      if (_sensorOrientation == 90) return 90 * (3.1415927 / 180);   // Adjusted
+      if (_sensorOrientation == 270) return -90 * (3.1415927 / 180); // Adjusted
+      if (_sensorOrientation == 180) return 180 * (3.1415927 / 180); // ✅ Fix for 180° flip
+    } else {
+      // ✅ Back Camera: Normal behavior
+      if (_sensorOrientation == 90) return 90 * (3.1415927 / 180);
+      if (_sensorOrientation == 270) return -90 * (3.1415927 / 180);
+    }
+    return 0.0;
+  }
+
+
+
   @override
   void dispose() {
     _cameraController?.dispose();
@@ -122,8 +150,31 @@ class _CameraPageState extends State<CameraPage> {
       body: Stack(
         children: [
           _isCameraInitialized
-              ? CameraPreview(_cameraController!)
+              ? Positioned.fill(
+            child: ClipRect( // ✅ Ensures no unwanted cropping
+              child: OverflowBox( // ✅ Allows resizing beyond constraints
+                maxWidth: double.infinity,
+                maxHeight: double.infinity,
+                child: FittedBox(
+                  fit: BoxFit.cover,  // ✅ Ensures preview fills the screen properly
+                  child: SizedBox(
+                    width: MediaQuery.of(context).size.height * 0.01, // ✅ Increase width manually
+                    height: MediaQuery.of(context).size.width * 0.02, // ✅ Increase height manually
+                    child: Transform(
+                      alignment: Alignment.center,
+                      transform: Matrix4.identity()
+                        ..rotateZ(_calculateRotation())
+                        ..scale(_isFrontCamera ? 1.0 : 1.0, 1.0), // ✅ Fix mirroring for front camera
+                      child: CameraPreview(_cameraController!),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          )
               : const Center(child: CircularProgressIndicator()),
+
+
           Positioned(
             top: 40,
             left: 20,
