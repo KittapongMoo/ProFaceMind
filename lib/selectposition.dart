@@ -3,7 +3,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_place/google_place.dart';
-import 'setphonenum.dart'; // ✅ Import หน้า setphonenum.dart
+import 'package:shared_preferences/shared_preferences.dart'; // ✅ สำหรับบันทึกข้อมูล
+import 'setphonenum.dart';
 
 class Selectposition extends StatefulWidget {
   const Selectposition({super.key});
@@ -17,15 +18,13 @@ class _SelectpositionState extends State<Selectposition> {
   LatLng? _selectedPosition;
   final TextEditingController _searchController = TextEditingController();
   bool _isLoading = false;
-  late GooglePlace googlePlace; // ✅ Declare googlePlace
-  List<AutocompletePrediction> predictions = []; // ✅ Declare predictions
-
+  late GooglePlace googlePlace;
+  List<AutocompletePrediction> predictions = [];
 
   @override
   void initState() {
     super.initState();
     _getCurrentLocation();
-
     googlePlace = GooglePlace("AIzaSyChd-Tfsm3EFmC8Jc5RXAj2Kg6r5pXojyU");
   }
 
@@ -84,8 +83,7 @@ class _SelectpositionState extends State<Selectposition> {
 
       if (placemarks.isNotEmpty) {
         Placemark place = placemarks.first;
-        String address =
-            "${place.street}, ${place.subLocality}, ${place.locality}, ${place.postalCode}";
+        String address = "${place.street}, ${place.subLocality}, ${place.locality}, ${place.postalCode}";
         setState(() {
           _searchController.text = address;
         });
@@ -141,7 +139,6 @@ class _SelectpositionState extends State<Selectposition> {
     );
   }
 
-  // ✅ Handle location search with Google Places API
   void _onSearchChanged(String value) async {
     if (value.isNotEmpty) {
       var result = await googlePlace.autocomplete.get(value);
@@ -157,7 +154,6 @@ class _SelectpositionState extends State<Selectposition> {
     }
   }
 
-// ✅ Get LatLng from Place ID and update map
   void _selectLocation(String placeId, String description) async {
     var details = await googlePlace.details.get(placeId);
     if (details != null && details.result != null) {
@@ -166,13 +162,31 @@ class _SelectpositionState extends State<Selectposition> {
       setState(() {
         _selectedPosition = LatLng(lat, lng);
         _searchController.text = description;
-        predictions = []; // Clear search results
+        predictions = [];
       });
 
-      // ✅ Move map camera to new location
       if (mapController != null) {
         mapController!.animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition!, 15));
       }
+    }
+  }
+
+  // ✅ บันทึกตำแหน่งใน SharedPreferences
+  Future<void> _saveSelectedLocation() async {
+    if (_selectedPosition != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('selected_latitude', _selectedPosition!.latitude);
+      await prefs.setDouble('selected_longitude', _selectedPosition!.longitude);
+
+      // นำทางไปหน้า SecondPage
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const SetPhoneNumber()),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณาเลือกตำแหน่งก่อน')),
+      );
     }
   }
 
@@ -225,7 +239,6 @@ class _SelectpositionState extends State<Selectposition> {
                     }
                   },
                   onChanged: _onSearchChanged,
-
                   decoration: InputDecoration(
                     hintText: "ค้นหาสถานที่",
                     filled: true,
@@ -234,8 +247,6 @@ class _SelectpositionState extends State<Selectposition> {
                     prefixIcon: const Icon(Icons.search, color: Colors.blue),
                   ),
                 ),
-
-                // ✅ Show search suggestions
                 if (predictions.isNotEmpty)
                   Container(
                     height: 200,
@@ -257,46 +268,12 @@ class _SelectpositionState extends State<Selectposition> {
             ),
           ),
 
-
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 80,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 5, spreadRadius: 2)],
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    _searchController.text.isNotEmpty
-                        ? _searchController.text
-                        : _isLoading
-                        ? "กำลังโหลดตำแหน่ง..."
-                        : "ไม่สามารถระบุตำแหน่งได้",
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
           Positioned(
             left: 16,
             right: 16,
             bottom: 16,
             child: ElevatedButton(
-              onPressed: () {
-                // ✅ เปลี่ยนไปที่ `setphonenum.dart`
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const SetPhoneNumber()),
-                );
-              },
+              onPressed: _saveSelectedLocation, // ✅ บันทึกตำแหน่ง
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 padding: const EdgeInsets.symmetric(vertical: 15),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'setmap.dart'; // Import แผนที่
-import 'camera.dart'; // Import กล้อง
-import 'ownerinfo.dart'; // Import ข้อมูลผู้ใช้
-import 'setphonenum.dart'; // Import ตั้งค่าเบอร์ฉุกเฉิน
+import 'setmap.dart'; // แผนที่
+import 'camera.dart'; // กล้อง
+import 'ownerinfo.dart'; // ข้อมูลผู้ใช้
+import 'setphonenum.dart'; // ตั้งค่าเบอร์ฉุกเฉิน
 
 class SecondPage extends StatefulWidget {
   const SecondPage({Key? key}) : super(key: key);
@@ -18,13 +18,7 @@ class _SecondPageState extends State<SecondPage> {
   @override
   void initState() {
     super.initState();
-    _loadSavedInformation();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _loadSavedInformation();
+    _savedInformation = _loadSavedInformation();
   }
 
   /// **📌 โหลดข้อมูลทั้งหมดจาก SharedPreferences**
@@ -41,6 +35,9 @@ class _SecondPageState extends State<SecondPage> {
       'emergency_name': prefs.getString('emergency_name') ?? 'ไม่พบข้อมูล',
       'emergency_relation': prefs.getString('emergency_relation') ?? 'ไม่พบข้อมูล',
       'emergency_phone': prefs.getString('emergency_phone') ?? 'ไม่พบข้อมูล',
+      // 📍 โหลด Latitude และ Longitude
+      'latitude': prefs.getDouble('selected_latitude')?.toString() ?? 'ไม่พบข้อมูล',
+      'longitude': prefs.getDouble('selected_longitude')?.toString() ?? 'ไม่พบข้อมูล',
     };
   }
 
@@ -52,7 +49,7 @@ class _SecondPageState extends State<SecondPage> {
         backgroundColor: Colors.blue,
       ),
       body: FutureBuilder<Map<String, String>>(
-        future: _loadSavedInformation(),
+        future: _savedInformation,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -92,6 +89,16 @@ class _SecondPageState extends State<SecondPage> {
                 _buildInfoTile('ชื่อ', data['emergency_name']!),
                 _buildInfoTile('ความสัมพันธ์', data['emergency_relation']!),
                 _buildInfoTile('เบอร์โทร', data['emergency_phone']!),
+
+                const SizedBox(height: 30),
+
+                const Text(
+                  '📌 ข้อมูลตำแหน่งที่เลือก:',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                _buildInfoTile('ละติจูด', data['latitude']!),
+                _buildInfoTile('ลองจิจูด', data['longitude']!),
 
                 const SizedBox(height: 40),
 
@@ -143,12 +150,14 @@ class _SecondPageState extends State<SecondPage> {
       child: Row(
         children: [
           Expanded(
+            flex: 3,
             child: Text(
               '$title:',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
           Expanded(
+            flex: 5,
             child: Text(
               value,
               style: const TextStyle(fontSize: 16, color: Colors.black87),
