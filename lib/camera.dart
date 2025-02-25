@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'navigation.dart'; // ✅ Import หน้า navigation.dart
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -54,8 +55,6 @@ class _CameraPageState extends State<CameraPage> {
       });
     }
   }
-
-
 
   Future<void> _takePicture() async {
     if (!_cameraController!.value.isTakingPicture) {
@@ -125,9 +124,9 @@ class _CameraPageState extends State<CameraPage> {
   double _calculateRotation() {
     if (_isFrontCamera) {
       // ✅ Front Camera: Adjust rotation based on sensor orientation
-      if (_sensorOrientation == 90) return 90 * (3.1415927 / 180);   // Adjusted
-      if (_sensorOrientation == 270) return -90 * (3.1415927 / 180); // Adjusted
-      if (_sensorOrientation == 180) return 180 * (3.1415927 / 180); // ✅ Fix for 180° flip
+      if (_sensorOrientation == 90) return 90 * (3.1415927 / 180);
+      if (_sensorOrientation == 270) return -90 * (3.1415927 / 180);
+      if (_sensorOrientation == 180) return 180 * (3.1415927 / 180);
     } else {
       // ✅ Back Camera: Normal behavior
       if (_sensorOrientation == 90) return 90 * (3.1415927 / 180);
@@ -135,8 +134,6 @@ class _CameraPageState extends State<CameraPage> {
     }
     return 0.0;
   }
-
-
 
   @override
   void dispose() {
@@ -151,20 +148,20 @@ class _CameraPageState extends State<CameraPage> {
         children: [
           _isCameraInitialized
               ? Positioned.fill(
-            child: ClipRect( // ✅ Ensures no unwanted cropping
-              child: OverflowBox( // ✅ Allows resizing beyond constraints
+            child: ClipRect(
+              child: OverflowBox(
                 maxWidth: double.infinity,
                 maxHeight: double.infinity,
                 child: FittedBox(
-                  fit: BoxFit.cover,  // ✅ Ensures preview fills the screen properly
+                  fit: BoxFit.cover,
                   child: SizedBox(
-                    width: MediaQuery.of(context).size.height * 0.01, // ✅ Increase width manually
-                    height: MediaQuery.of(context).size.width * 0.02, // ✅ Increase height manually
+                    width: MediaQuery.of(context).size.height * 0.01,
+                    height: MediaQuery.of(context).size.width * 0.02,
                     child: Transform(
                       alignment: Alignment.center,
                       transform: Matrix4.identity()
                         ..rotateZ(_calculateRotation())
-                        ..scale(_isFrontCamera ? 1.0 : 1.0, 1.0), // ✅ Fix mirroring for front camera
+                        ..scale(_isFrontCamera ? 1.0 : 1.0, 1.0),
                       child: CameraPreview(_cameraController!),
                     ),
                   ),
@@ -173,7 +170,6 @@ class _CameraPageState extends State<CameraPage> {
             ),
           )
               : const Center(child: CircularProgressIndicator()),
-
 
           Positioned(
             top: 40,
@@ -223,7 +219,11 @@ class _CameraPageState extends State<CameraPage> {
                   backgroundColor: Colors.green,
                   child: const Icon(Icons.map),
                   onPressed: () {
-                    // Navigate to map page
+                    // ✅ นำทางไปยังหน้า navigation.dart
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const NavigationPage()),
+                    );
                   },
                 ),
               ],
