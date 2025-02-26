@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'navigation.dart'; // ✅ Import หน้า navigation.dart
+import 'profile.dart'; // ✅ Import หน้า profile.dart
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -27,7 +28,7 @@ class _CameraPageState extends State<CameraPage> {
     _initializeCamera();
   }
 
-  int _sensorOrientation = 0; // ✅ Store sensor orientation
+  int _sensorOrientation = 0;
 
   Future<void> _initializeCamera() async {
     _cameras = await availableCameras();
@@ -45,7 +46,6 @@ class _CameraPageState extends State<CameraPage> {
       await _cameraController!.setFocusMode(FocusMode.auto);
       await _cameraController!.lockCaptureOrientation(DeviceOrientation.portraitUp);
 
-      // ✅ Store sensor orientation
       _sensorOrientation = selectedCamera.sensorOrientation;
 
       if (!mounted) return;
@@ -123,12 +123,10 @@ class _CameraPageState extends State<CameraPage> {
 
   double _calculateRotation() {
     if (_isFrontCamera) {
-      // ✅ Front Camera: Adjust rotation based on sensor orientation
       if (_sensorOrientation == 90) return 90 * (3.1415927 / 180);
       if (_sensorOrientation == 270) return -90 * (3.1415927 / 180);
       if (_sensorOrientation == 180) return 180 * (3.1415927 / 180);
     } else {
-      // ✅ Back Camera: Normal behavior
       if (_sensorOrientation == 90) return 90 * (3.1415927 / 180);
       if (_sensorOrientation == 270) return -90 * (3.1415927 / 180);
     }
@@ -171,6 +169,7 @@ class _CameraPageState extends State<CameraPage> {
           )
               : const Center(child: CircularProgressIndicator()),
 
+          // ✅ เพิ่มปุ่มเปิดหน้าโปรไฟล์
           Positioned(
             top: 40,
             left: 20,
@@ -179,11 +178,16 @@ class _CameraPageState extends State<CameraPage> {
               child: IconButton(
                 icon: const Icon(Icons.person, color: Colors.blue),
                 onPressed: () {
-                  // Navigate to personal information page
+                  // ✅ นำทางไปหน้า ProfilePage
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfilePage()),
+                  );
                 },
               ),
             ),
           ),
+
           Positioned(
             top: 40,
             right: 20,
@@ -195,6 +199,7 @@ class _CameraPageState extends State<CameraPage> {
               ),
             ),
           ),
+
           Positioned(
             bottom: 80,
             left: 20,
@@ -229,6 +234,7 @@ class _CameraPageState extends State<CameraPage> {
               ],
             ),
           ),
+
           Positioned(
             bottom: 30,
             left: MediaQuery.of(context).size.width / 2 - 30,
