@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'navigation.dart'; // ✅ Import หน้า navigation.dart
-import 'profile.dart'; // ✅ Import หน้า profile.dart
+import 'navigation.dart';
+import 'profile.dart';
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -18,41 +18,51 @@ class _CameraPageState extends State<CameraPage> {
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
   bool _isCameraInitialized = false;
-  XFile? _capturedImage;
   bool _isFrontCamera = false;
+  XFile? _capturedImage;
   File? _galleryImage;
+  int _sensorOrientation = 0;
 
   @override
   void initState() {
     super.initState();
-    _initializeCamera();
+
+    // Lock the app orientation to portrait only
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+    ]);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeCamera();
+    });
   }
 
-  int _sensorOrientation = 0;
-
   Future<void> _initializeCamera() async {
-    _cameras = await availableCameras();
-    if (_cameras!.isNotEmpty) {
-      CameraDescription selectedCamera = _cameras![_isFrontCamera ? 1 : 0];
+    try {
+      _cameras = await availableCameras();
+      if (_cameras!.isNotEmpty) {
+        CameraDescription selectedCamera = _cameras![_isFrontCamera ? 1 : 0];
 
-      _cameraController = CameraController(
-        selectedCamera,
-        ResolutionPreset.medium,
-        enableAudio: false,
-      );
+        _cameraController = CameraController(
+          selectedCamera,
+          ResolutionPreset.high,
+          enableAudio: false,
+        );
 
-      await _cameraController!.initialize();
-      await _cameraController!.setExposureMode(ExposureMode.auto);
-      await _cameraController!.setFocusMode(FocusMode.auto);
-      await _cameraController!.lockCaptureOrientation(DeviceOrientation.portraitUp);
+        await _cameraController!.initialize();
+        if (!mounted) return;
 
-      _sensorOrientation = selectedCamera.sensorOrientation;
+        // Lock preview to portrait mode
+        await _cameraController!
+            .lockCaptureOrientation(DeviceOrientation.portraitUp);
 
-      if (!mounted) return;
-
-      setState(() {
-        _isCameraInitialized = true;
-      });
+        setState(() {
+          _isCameraInitialized = true;
+          _sensorOrientation = selectedCamera.sensorOrientation;
+        });
+      }
+    } catch (e) {
+      print('Error initializing camera: $e');
     }
   }
 
@@ -72,30 +82,9 @@ class _CameraPageState extends State<CameraPage> {
   void _switchCamera() async {
     setState(() {
       _isFrontCamera = !_isFrontCamera;
+      _isCameraInitialized = false;
     });
     await _initializeCamera();
-  }
-
-  void _showEmergencyContact() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("เบอร์โทรศัพท์ฉุกเฉิน"),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text("นายสมพร (ลูกชาย)"),
-            Text("093 - 478 - 9323", style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("ปิด"),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _pickImage() async {
@@ -108,7 +97,8 @@ class _CameraPageState extends State<CameraPage> {
     }
 
     try {
-      final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+      final pickedFile =
+          await ImagePicker().pickImage(source: ImageSource.gallery);
       if (pickedFile != null) {
         setState(() {
           _galleryImage = File(pickedFile.path);
@@ -122,15 +112,9 @@ class _CameraPageState extends State<CameraPage> {
   }
 
   double _calculateRotation() {
-    if (_isFrontCamera) {
-      if (_sensorOrientation == 90) return 90 * (3.1415927 / 180);
-      if (_sensorOrientation == 270) return -90 * (3.1415927 / 180);
-      if (_sensorOrientation == 180) return 180 * (3.1415927 / 180);
-    } else {
-      if (_sensorOrientation == 90) return 90 * (3.1415927 / 180);
-      if (_sensorOrientation == 270) return -90 * (3.1415927 / 180);
-    }
-    return 0.0;
+    if (_sensorOrientation == 90) return 1.5708; // 90 degrees in radians
+    if (_sensorOrientation == 270) return -1.5708; // -90 degrees in radians
+    return 0; // Default no rotation
   }
 
   @override
@@ -144,32 +128,30 @@ class _CameraPageState extends State<CameraPage> {
     return Scaffold(
       body: Stack(
         children: [
-          _isCameraInitialized
-              ? Positioned.fill(
-            child: ClipRect(
-              child: OverflowBox(
-                maxWidth: double.infinity,
-                maxHeight: double.infinity,
-                child: FittedBox(
-                  fit: BoxFit.cover,
-                  child: SizedBox(
-                    width: MediaQuery.of(context).size.height * 0.01,
-                    height: MediaQuery.of(context).size.width * 0.02,
-                    child: Transform(
-                      alignment: Alignment.center,
-                      transform: Matrix4.identity()
-                        ..rotateZ(_calculateRotation())
-                        ..scale(_isFrontCamera ? 1.0 : 1.0, 1.0),
-                      child: CameraPreview(_cameraController!),
+          Positioned.fill(
+            child: _isCameraInitialized
+                ? Center(
+                    child: AspectRatio(
+                      aspectRatio:
+                          _cameraController!.value.previewSize!.height /
+                              _cameraController!.value.previewSize!.width,
+                      child: Transform.rotate(
+                        angle:
+                            _calculateRotation(), // Fix rotation based on sensor
+                        child: Transform(
+                          alignment: Alignment.center,
+                          transform: _isFrontCamera
+                              ? Matrix4.rotationY(3.1415927) // Mirror front cam
+                              : Matrix4.identity(),
+                          child: CameraPreview(_cameraController!),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
-            ),
-          )
-              : const Center(child: CircularProgressIndicator()),
+                  )
+                : const Center(child: CircularProgressIndicator()),
+          ),
 
-          // ✅ เพิ่มปุ่มเปิดหน้าโปรไฟล์
+          // Profile button
           Positioned(
             top: 40,
             left: 20,
@@ -178,10 +160,10 @@ class _CameraPageState extends State<CameraPage> {
               child: IconButton(
                 icon: const Icon(Icons.person, color: Colors.blue),
                 onPressed: () {
-                  // ✅ นำทางไปหน้า ProfilePage
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const ProfilePage()),
+                    MaterialPageRoute(
+                        builder: (context) => const ProfilePage()),
                   );
                 },
               ),
@@ -195,7 +177,28 @@ class _CameraPageState extends State<CameraPage> {
               backgroundColor: Colors.red,
               child: IconButton(
                 icon: const Icon(Icons.phone, color: Colors.white),
-                onPressed: _showEmergencyContact,
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text("เบอร์โทรศัพท์ฉุกเฉิน"),
+                      content: const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text("นายสมพร (ลูกชาย)"),
+                          Text("093 - 478 - 9323",
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("ปิด"),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -224,10 +227,10 @@ class _CameraPageState extends State<CameraPage> {
                   backgroundColor: Colors.green,
                   child: const Icon(Icons.map),
                   onPressed: () {
-                    // ✅ นำทางไปยังหน้า navigation.dart
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const NavigationPage()),
+                      MaterialPageRoute(
+                          builder: (context) => const NavigationPage()),
                     );
                   },
                 ),
