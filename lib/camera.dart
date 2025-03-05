@@ -6,6 +6,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'navigation.dart';
 import 'profile.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'dart:typed_data';
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -23,14 +25,25 @@ class _CameraPageState extends State<CameraPage> {
   File? _galleryImage;
   int _sensorOrientation = 0;
 
+  // Face Detection
+  late FaceDetector _faceDetector;
+  bool _isDetectingFaces = false;
+  List<Face> _faces = [];
+
   @override
   void initState() {
     super.initState();
-
-    // Lock the app orientation to portrait only
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
+
+    _faceDetector = FaceDetector(
+      options: FaceDetectorOptions(
+        performanceMode: FaceDetectorMode.accurate,
+        enableContours: true,
+        enableLandmarks: true,
+      ),
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeCamera();
@@ -47,6 +60,7 @@ class _CameraPageState extends State<CameraPage> {
           selectedCamera,
           ResolutionPreset.high,
           enableAudio: false,
+          imageFormatGroup: ImageFormatGroup.nv21, // Optimize for ML Kit
         );
 
         await _cameraController!.initialize();
@@ -60,9 +74,50 @@ class _CameraPageState extends State<CameraPage> {
           _isCameraInitialized = true;
           _sensorOrientation = selectedCamera.sensorOrientation;
         });
+
+        _cameraController!.startImageStream((CameraImage image) {
+          if (!_isDetectingFaces) {
+            _isDetectingFaces = true;
+            _detectFaces(image);
+          }
+        });
       }
     } catch (e) {
       print('Error initializing camera: $e');
+    }
+  }
+
+  Future<void> _detectFaces(CameraImage image) async {
+    final WriteBuffer allBytes = WriteBuffer();
+    for (final Plane plane in image.planes) {
+      allBytes.putUint8List(plane.bytes);
+    }
+    final Uint8List bytes = allBytes.done().buffer.asUint8List();
+
+    final InputImageMetadata metadata = InputImageMetadata(
+      size: Size(image.width.toDouble(), image.height.toDouble()),
+      rotation: InputImageRotation.rotation0deg, // Adjust based on camera
+      format: InputImageFormat.nv21,
+      bytesPerRow: image.planes[0].bytesPerRow,
+    );
+
+    final InputImage inputImage = InputImage.fromBytes(
+      bytes: bytes,
+      metadata: metadata,
+    );
+
+    try {
+      final List<Face> faces = await _faceDetector.processImage(inputImage);
+      setState(() {
+        _faces = faces;
+        _isDetectingFaces = false;
+      });
+
+      // Small delay before next face detection to reduce lag
+      await Future.delayed(const Duration(milliseconds: 100));
+    } catch (e) {
+      print("Face Detection Error: $e");
+      _isDetectingFaces = false;
     }
   }
 
@@ -98,7 +153,7 @@ class _CameraPageState extends State<CameraPage> {
 
     try {
       final pickedFile =
-          await ImagePicker().pickImage(source: ImageSource.gallery);
+      await ImagePicker().pickImage(source: ImageSource.gallery);
       if (pickedFile != null) {
         setState(() {
           _galleryImage = File(pickedFile.path);
@@ -120,6 +175,7 @@ class _CameraPageState extends State<CameraPage> {
   @override
   void dispose() {
     _cameraController?.dispose();
+    _faceDetector.close();
     super.dispose();
   }
 
@@ -130,24 +186,14 @@ class _CameraPageState extends State<CameraPage> {
         children: [
           Positioned.fill(
             child: _isCameraInitialized
-                ? Center(
-                    child: AspectRatio(
-                      aspectRatio:
-                          _cameraController!.value.previewSize!.height /
-                              _cameraController!.value.previewSize!.width,
-                      child: Transform.rotate(
-                        angle:
-                            _calculateRotation(), // Fix rotation based on sensor
-                        child: Transform(
-                          alignment: Alignment.center,
-                          transform: _isFrontCamera
-                              ? Matrix4.rotationY(3.1415927) // Mirror front cam
-                              : Matrix4.identity(),
-                          child: CameraPreview(_cameraController!),
-                        ),
-                      ),
-                    ),
-                  )
+                ? Stack(
+              children: [
+                CameraPreview(_cameraController!),
+                CustomPaint(
+                  painter: FacePainter(_faces, isFrontCamera: _isFrontCamera),
+                ),
+              ],
+            )
                 : const Center(child: CircularProgressIndicator()),
           ),
 
@@ -169,87 +215,42 @@ class _CameraPageState extends State<CameraPage> {
               ),
             ),
           ),
-
-          Positioned(
-            top: 40,
-            right: 20,
-            child: CircleAvatar(
-              backgroundColor: Colors.red,
-              child: IconButton(
-                icon: const Icon(Icons.phone, color: Colors.white),
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text("เบอร์โทรศัพท์ฉุกเฉิน"),
-                      content: const Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text("นายสมพร (ลูกชาย)"),
-                          Text("093 - 478 - 9323",
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text("ปิด"),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-
-          Positioned(
-            bottom: 80,
-            left: 20,
-            child: Column(
-              children: [
-                FloatingActionButton(
-                  heroTag: 'flipCamera',
-                  backgroundColor: Colors.grey,
-                  child: const Icon(Icons.flip_camera_ios),
-                  onPressed: _switchCamera,
-                ),
-                const SizedBox(height: 16),
-                FloatingActionButton(
-                  heroTag: 'gallery',
-                  backgroundColor: Colors.blue,
-                  child: const Icon(Icons.photo_library),
-                  onPressed: _pickImage,
-                ),
-                const SizedBox(height: 16),
-                FloatingActionButton(
-                  heroTag: 'map',
-                  backgroundColor: Colors.green,
-                  child: const Icon(Icons.map),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const NavigationPage()),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          Positioned(
-            bottom: 30,
-            left: MediaQuery.of(context).size.width / 2 - 30,
-            child: FloatingActionButton(
-              heroTag: 'capture',
-              backgroundColor: Colors.black,
-              child: const Icon(Icons.camera_alt),
-              onPressed: _takePicture,
-            ),
-          ),
         ],
       ),
     );
   }
+}
+
+// Face Detection Painter
+class FacePainter extends CustomPainter {
+  final List<Face> faces;
+  final bool isFrontCamera;
+
+  FacePainter(this.faces, {required this.isFrontCamera});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..color = Colors.red
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0;
+
+    for (final Face face in faces) {
+      Rect faceRect = face.boundingBox;
+
+      if (isFrontCamera) {
+        faceRect = Rect.fromLTWH(
+          size.width - faceRect.right,
+          faceRect.top,
+          faceRect.width,
+          faceRect.height,
+        );
+      }
+
+      canvas.drawRect(faceRect, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(FacePainter oldDelegate) => true;
 }
