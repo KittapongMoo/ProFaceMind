@@ -46,8 +46,8 @@ class PersonalInfoPage extends StatelessWidget {
         children: [
           const Spacer(), // ดันเนื้อหาอื่นขึ้นไปด้านบน
           Container(
-            width: 500,
-            height: 470,
+            width: 400,
+            height: 450,
             decoration: BoxDecoration(
               color: const Color(0xFFB0C4DE),
             ),
