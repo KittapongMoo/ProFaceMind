@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'navigation.dart';
 import 'profile.dart';
+import 'register.dart'; // ✅ Ensure RegisterPage is imported
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -214,10 +215,17 @@ class _CameraPageState extends State<CameraPage> {
                 ),
                 const SizedBox(height: 16),
                 FloatingActionButton(
-                  heroTag: 'gallery',
+                  heroTag: 'register',
                   backgroundColor: Colors.blue,
-                  child: const Icon(Icons.photo_library),
-                  onPressed: _pickImage,
+                  child: const Icon(Icons.how_to_reg),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const RegisterPage(),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 FloatingActionButton(
