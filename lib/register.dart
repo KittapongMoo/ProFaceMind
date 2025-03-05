@@ -23,7 +23,8 @@ class _RegisterPageState extends State<RegisterPage> {
   XFile? _capturedImage;
   File? _galleryImage;
   int _sensorOrientation = 0;
-  final FaceDetector _faceDetector = FaceDetector(options: FaceDetectorOptions());
+  final FaceDetector _faceDetector =
+      FaceDetector(options: FaceDetectorOptions());
   bool _isDetectingFaces = false;
   List<Face> _faces = [];
 
@@ -114,19 +115,24 @@ class _RegisterPageState extends State<RegisterPage> {
         children: [
           Positioned.fill(
             child: _isCameraInitialized
-                ? Center(
-              child: AspectRatio(
-                aspectRatio: _cameraController!.value.aspectRatio,
-                child: Stack(
-                  children: [
-                    CameraPreview(_cameraController!),
-                    CustomPaint(
-                      painter: FacePainter(_faces),
+                ? Transform.rotate(
+                    angle: -1.5708, // Rotate 90 degrees to the left
+                    child: FittedBox(
+                      fit: BoxFit.cover, // Make it full screen
+                      child: SizedBox(
+                        width: _cameraController!.value.previewSize!.height,
+                        height: _cameraController!.value.previewSize!.width,
+                        child: Stack(
+                          children: [
+                            CameraPreview(_cameraController!),
+                            CustomPaint(
+                              painter: FacePainter(_faces),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ],
-                ),
-              ),
-            )
+                  )
                 : const Center(child: CircularProgressIndicator()),
           ),
           Positioned(
