@@ -6,9 +6,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'navigation.dart';
 import 'profile.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import 'package:camera/camera.dart';
-import 'dart:math';
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -26,25 +23,14 @@ class _CameraPageState extends State<CameraPage> {
   File? _galleryImage;
   int _sensorOrientation = 0;
 
-  // Face Detection
-  late FaceDetector _faceDetector;
-  bool _isDetectingFaces = false;
-  List<Face> _faces = [];
-
   @override
   void initState() {
     super.initState();
+
+    // Lock the app orientation to portrait only
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
-
-    _faceDetector = FaceDetector(
-      options: FaceDetectorOptions(
-        performanceMode: FaceDetectorMode.accurate,
-        enableContours: true,
-        enableLandmarks: true,
-      ),
-    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeCamera();
@@ -61,7 +47,6 @@ class _CameraPageState extends State<CameraPage> {
           selectedCamera,
           ResolutionPreset.high,
           enableAudio: false,
-          imageFormatGroup: ImageFormatGroup.nv21, // Optimize for ML Kit
         );
 
         await _cameraController!.initialize();
@@ -75,47 +60,9 @@ class _CameraPageState extends State<CameraPage> {
           _isCameraInitialized = true;
           _sensorOrientation = selectedCamera.sensorOrientation;
         });
-
-        _cameraController!.startImageStream((CameraImage image) {
-          if (!_isDetectingFaces) {
-            _isDetectingFaces = true;
-            _detectFaces(image);
-          }
-        });
       }
     } catch (e) {
       print('Error initializing camera: $e');
-    }
-  }
-
-  Future<void> _detectFaces(CameraImage image) async {
-    final WriteBuffer allBytes = WriteBuffer();
-    for (final Plane plane in image.planes) {
-      allBytes.putUint8List(plane.bytes);
-    }
-    final Uint8List bytes = allBytes.done().buffer.asUint8List();
-
-    final InputImageMetadata metadata = InputImageMetadata(
-      size: Size(image.width.toDouble(), image.height.toDouble()),
-      rotation: InputImageRotation.rotation0deg, // Adjust based on camera
-      format: InputImageFormat.nv21,
-      bytesPerRow: image.planes[0].bytesPerRow,
-    );
-
-    final InputImage inputImage = InputImage.fromBytes(
-      bytes: bytes,
-      metadata: metadata,
-    );
-
-    try {
-      final List<Face> faces = await _faceDetector.processImage(inputImage);
-      setState(() {
-        _faces = faces;
-        _isDetectingFaces = false;
-      });
-    } catch (e) {
-      print("Face Detection Error: $e");
-      _isDetectingFaces = false;
     }
   }
 
@@ -199,14 +146,7 @@ class _CameraPageState extends State<CameraPage> {
                               transform: _isFrontCamera
                                   ? Matrix4.rotationY(3.1415927)
                                   : Matrix4.identity(),
-                              child: Stack(
-                                children: [
-                                  CameraPreview(_cameraController!),
-                                  CustomPaint(
-                                    painter: FacePainter(_faces),
-                                  ),
-                                ],
-                              ),
+                              child: CameraPreview(_cameraController!),
                             ),
                           ),
                         ),
@@ -317,26 +257,4 @@ class _CameraPageState extends State<CameraPage> {
       ),
     );
   }
-}
-
-class FacePainter extends CustomPainter {
-  final List<Face> faces;
-
-  FacePainter(this.faces);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..color = Colors.red
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
-
-    for (final Face face in faces) {
-      final Rect rect = face.boundingBox;
-      canvas.drawRect(rect, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(FacePainter oldDelegate) => true;
 }
