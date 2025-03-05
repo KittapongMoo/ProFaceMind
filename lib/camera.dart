@@ -119,7 +119,6 @@ class _CameraPageState extends State<CameraPage> {
     }
   }
 
-
   Future<void> _takePicture() async {
     if (!_cameraController!.value.isTakingPicture) {
       try {
@@ -200,7 +199,14 @@ class _CameraPageState extends State<CameraPage> {
                               transform: _isFrontCamera
                                   ? Matrix4.rotationY(3.1415927)
                                   : Matrix4.identity(),
-                              child: CameraPreview(_cameraController!),
+                              child: Stack(
+                                children: [
+                                  CameraPreview(_cameraController!),
+                                  CustomPaint(
+                                    painter: FacePainter(_faces),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -311,4 +317,26 @@ class _CameraPageState extends State<CameraPage> {
       ),
     );
   }
+}
+
+class FacePainter extends CustomPainter {
+  final List<Face> faces;
+
+  FacePainter(this.faces);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..color = Colors.red
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0;
+
+    for (final Face face in faces) {
+      final Rect rect = face.boundingBox;
+      canvas.drawRect(rect, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(FacePainter oldDelegate) => true;
 }
