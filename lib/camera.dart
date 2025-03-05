@@ -98,7 +98,7 @@ class _CameraPageState extends State<CameraPage> {
 
     try {
       final pickedFile =
-          await ImagePicker().pickImage(source: ImageSource.gallery);
+      await ImagePicker().pickImage(source: ImageSource.gallery);
       if (pickedFile != null) {
         setState(() {
           _galleryImage = File(pickedFile.path);
@@ -131,28 +131,23 @@ class _CameraPageState extends State<CameraPage> {
           Positioned.fill(
             child: _isCameraInitialized
                 ? Center(
-                    child: AspectRatio(
-                      aspectRatio: _cameraController!.value.aspectRatio,
-                      child: FittedBox(
-                        fit: BoxFit
-                            .cover, // Ensures preview fills the available space correctly
-                        child: SizedBox(
-                          width: _cameraController!.value.previewSize!.height,
-                          height: _cameraController!.value.previewSize!.width,
-                          child: Transform.rotate(
-                            angle: _calculateRotation(),
-                            child: Transform(
-                              alignment: Alignment.center,
-                              transform: _isFrontCamera
-                                  ? Matrix4.rotationY(3.1415927)
-                                  : Matrix4.identity(),
-                              child: CameraPreview(_cameraController!),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
+              child: AspectRatio(
+                aspectRatio:
+                _cameraController!.value.previewSize!.height /
+                    _cameraController!.value.previewSize!.width,
+                child: Transform.rotate(
+                  angle:
+                  _calculateRotation(), // Fix rotation based on sensor
+                  child: Transform(
+                    alignment: Alignment.center,
+                    transform: _isFrontCamera
+                        ? Matrix4.rotationY(3.1415927) // Mirror front cam
+                        : Matrix4.identity(),
+                    child: CameraPreview(_cameraController!),
+                  ),
+                ),
+              ),
+            )
                 : const Center(child: CircularProgressIndicator()),
           ),
 
