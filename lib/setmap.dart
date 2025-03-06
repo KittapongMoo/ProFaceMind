@@ -151,7 +151,8 @@ class _SetmapState extends State<Setmap> {
                 Navigator.pop(context);
               },
               backgroundColor: Colors.white,
-              child: const Icon(Icons.arrow_back, color: Colors.black),
+              shape: const CircleBorder(), // Ensures the button remains circular
+                child: Icon(Icons.arrow_back, color: Colors.black),
             ),
           ),
           Positioned(
