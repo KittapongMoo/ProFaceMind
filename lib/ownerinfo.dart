@@ -233,13 +233,13 @@ class _OwnerinfoState extends State<Ownerinfo> {
 
 
 
-  // Reusable widget for input fields with validation
   Widget _buildInputField({
     required String label,
     required String hintText,
     required TextEditingController controller,
     TextInputType keyboardType = TextInputType.text,
     bool isRequired = false,
+    bool readOnly = false,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
@@ -247,38 +247,40 @@ class _OwnerinfoState extends State<Ownerinfo> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '$label${isRequired ? ' *' : ''}',
+            '$label :',
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          TextFormField(
-            controller: controller,
-            keyboardType: keyboardType,
-            decoration: InputDecoration(
-              hintText: hintText,
-              border: const OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(8.0)),
-              ),
-              filled: true,
-              fillColor: Colors.grey[100],
-              contentPadding:
-              const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.grey[200], // พื้นหลังสีเทาอ่อน
+              borderRadius: BorderRadius.circular(20), // ทำให้ขอบโค้งมน
             ),
-            validator: isRequired
-                ? (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'กรุณากรอก $label';
+            child: TextFormField(
+              controller: controller,
+              keyboardType: keyboardType,
+              readOnly: readOnly, // ใช้สำหรับช่องที่ไม่ต้องการให้แก้ไข
+              decoration: const InputDecoration(
+                border: InputBorder.none, // ไม่มีขอบ
+                contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+              ),
+              validator: isRequired
+                  ? (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'กรุณากรอก $label';
+                }
+                return null;
               }
-              return null;
-            }
-                : null,
+                  : null,
+            ),
           ),
         ],
       ),
     );
   }
 
-  // Reusable widget for dropdown fields
+
+
   Widget _buildDropdownField({
     required String label,
     required String value,
@@ -295,62 +297,68 @@ class _OwnerinfoState extends State<Ownerinfo> {
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: value,
-            decoration: InputDecoration(
-              border: const OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(8.0)),
-              ),
-              filled: true,
-              fillColor: Colors.grey[100],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey[200], // พื้นหลังสีเทาอ่อน
+              borderRadius: BorderRadius.circular(20), // ขอบโค้งมน
             ),
-            onChanged: onChanged,
-            items: items
-                .map<DropdownMenuItem<String>>(
-                  (String item) => DropdownMenuItem<String>(
-                value: item,
-                child: Text(item),
+            child: DropdownButtonFormField<String>(
+              value: value,
+              decoration: const InputDecoration(
+                border: InputBorder.none, // ไม่มีกรอบ
+                contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
               ),
-            )
-                .toList(),
+              isExpanded: true,
+              onChanged: onChanged,
+              items: items.map((String item) {
+                return DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(item, style: const TextStyle(fontSize: 16)),
+                );
+              }).toList(),
+            ),
           ),
         ],
       ),
     );
   }
 
-  // Widget for date picker
-  Widget _buildDatePicker() {
+
+  Widget _buildDatePickerField({
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'วันเกิด :',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          Text(
+            '$label :',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           GestureDetector(
-            onTap: () => _selectDate(context),
+            onTap: onTap,
             child: Container(
-              padding:
-              const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
-                borderRadius: BorderRadius.circular(8.0),
-                color: Colors.grey[100],
+                color: Colors.grey[200], // พื้นหลังสีเทาอ่อน
+                borderRadius: BorderRadius.circular(20), // ขอบโค้งมน
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    _selectedDate != null
-                        ? "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}"
-                        : 'เลือกวันเกิด',
-                    style: const TextStyle(fontSize: 16),
+                    value.isNotEmpty ? value : 'เลือก $label',
+                    style: TextStyle(
+                        fontSize: 16,
+                        color: value.isNotEmpty ? Colors.black : Colors.grey
+                    ),
                   ),
-                  const Icon(Icons.calendar_today, color: Colors.grey),
+                  const Icon(Icons.calendar_today, color: Colors.grey), // ไอคอนปฏิทิน
                 ],
               ),
             ),
@@ -360,6 +368,7 @@ class _OwnerinfoState extends State<Ownerinfo> {
     );
   }
 
+
   // Widget for image picker
   Widget _buildImagePicker() {
     return Column(
@@ -367,7 +376,7 @@ class _OwnerinfoState extends State<Ownerinfo> {
       children: [
         const SizedBox(height: 16),
         const Text(
-          'รูปภาพโปรไฟล์ :',
+          'รูปภาพของคุณ :',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
@@ -412,160 +421,132 @@ class _OwnerinfoState extends State<Ownerinfo> {
     final Color accentColor = Colors.tealAccent;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'ข้อมูลผู้ใช้',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: ElevatedButton.icon(
-              onPressed: _isLoading ? null : _saveInformation,
-              icon: const Icon(Icons.check),
-              label: _isLoading
-                  ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
-                  : const Text(
-                'ยืนยัน',
-                style: TextStyle(fontSize: 16),
-              ),
-              style: ElevatedButton.styleFrom(
-                foregroundColor: Colors.white, backgroundColor: primaryColor,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                ),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: _showInfoDialog, // Calls the function to show the information
-          ),
-        ],
-        backgroundColor: primaryColor,
-        elevation: 2,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(), // Dismiss keyboard
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(80), // กำหนดความสูงของ AppBar
+        child: AppBar(
+          automaticallyImplyLeading: false, // เอาปุ่มย้อนกลับออก
+          backgroundColor: Colors.transparent, // ทำให้โปร่งใส
+          elevation: 0, // เอาเงาออก
+          flexibleSpace: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0), // กำหนด padding
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // User Information Card
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.0)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildInputField(
-                          label: 'ชื่อเล่น',
-                          hintText: 'กรอกชื่อเล่น',
-                          controller: _nicknameController,
-                          isRequired: false,
-                        ),
-                        _buildInputField(
-                          label: 'ชื่อจริง',
-                          hintText: 'กรอกชื่อจริง',
-                          controller: _firstnameController,
-                          isRequired: false,
-                        ),
-                        _buildInputField(
-                          label: 'นามสกุล',
-                          hintText: 'กรอกนามสกุล',
-                          controller: _lastnameController,
-                          isRequired: false,
-                        ),
-                        _buildDatePicker(),
-                        _buildDropdownField(
-                          label: 'ส่วนสูง',
-                          value: _selectedHeight,
-                          items: List.generate(251, (index) => '${150 + index} ซม.'),
-                          onChanged: (String? newValue) {
-                            if (newValue != null) {
-                              setState(() {
-                                _selectedHeight = newValue;
-                              });
-                            }
-                          },
-                        ),
-                        _buildDropdownField(
-                          label: 'น้ำหนัก',
-                          value: _selectedWeight,
-                          items: List.generate(151, (index) => '${50 + index} กก.'),
-                          onChanged: (String? newValue) {
-                            if (newValue != null) {
-                              setState(() {
-                                _selectedWeight = newValue;
-                              });
-                            }
-                          },
-                        ),
-                        _buildInputField(
-                          label: 'โรคประจำตัว',
-                          hintText: 'กรอกโรคประจำตัว (ถ้ามี)',
-                          controller: _conditionController,
-                        ),
-                      ],
+                // ปุ่ม "ยืนยัน" ด้านขวา
+                Align(
+                  alignment: Alignment.topRight,
+                  child: TextButton(
+                    onPressed: _isLoading ? null : _saveInformation,
+                    child: _isLoading
+                        ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        color: Colors.blue,
+                        strokeWidth: 2,
+                      ),
+                    )
+                        : const Text(
+                      'ยืนยัน',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.blue,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                // Image Picker Card
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.0)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: _buildImagePicker(),
+                // ข้อความ "ข้อมูล" อยู่กลางบรรทัด (ต่ำกว่าปุ่มยืนยัน)
+                const Spacer(),
+                const Text(
+                  'ข้อมูล',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
                   ),
                 ),
-                const SizedBox(height: 24),
-                // Submit Button (alternative for accessibility)
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _saveInformation,
-                  child: _isLoading
-                      ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
-                      : const Text(
-                    'ยืนยันข้อมูล',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.white, backgroundColor: primaryColor,
-                    minimumSize: const Size.fromHeight(50), // Full width
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.0),
-                    ),
-                  ),
-                ),
+                const SizedBox(height: 8), // เพิ่มระยะห่างด้านล่าง
               ],
             ),
           ),
         ),
       ),
-      backgroundColor: Colors.grey[50],
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(), // ปิดคีย์บอร์ดเมื่อแตะที่อื่น
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ข้อมูลแบบฟอร์ม (ลบ Card ออก)
+                _buildInputField(
+                  label: 'ชื่อเล่น',
+                  hintText: 'กรอกชื่อเล่น',
+                  controller: _nicknameController,
+                  isRequired: false,
+                ),
+                _buildInputField(
+                  label: 'ชื่อจริง',
+                  hintText: 'กรอกชื่อจริง',
+                  controller: _firstnameController,
+                  isRequired: false,
+                ),
+                _buildInputField(
+                  label: 'นามสกุล',
+                  hintText: 'กรอกนามสกุล',
+                  controller: _lastnameController,
+                  isRequired: false,
+                ),
+                _buildDatePickerField(
+                  label: 'วันเกิด',
+                  value: _selectedDate != null
+                      ? "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}"
+                      : '',
+                  onTap: () => _selectDate(context),
+                ),
+                _buildDropdownField(
+                  label: 'ส่วนสูง',
+                  value: _selectedHeight,
+                  items: List.generate(251, (index) => '${150 + index} ซม.'),
+                  onChanged: (String? newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        _selectedHeight = newValue;
+                      });
+                    }
+                  },
+                ),
+                _buildDropdownField(
+                  label: 'น้ำหนัก',
+                  value: _selectedWeight,
+                  items: List.generate(151, (index) => '${50 + index} กก.'),
+                  onChanged: (String? newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        _selectedWeight = newValue;
+                      });
+                    }
+                  },
+                ),
+                _buildInputField(
+                  label: 'โรคประจำตัว',
+                  hintText: 'กรอกโรคประจำตัว (ถ้ามี)',
+                  controller: _conditionController,
+                ),
+
+                const SizedBox(height: 16),
+
+                // ส่วนของรูปภาพ (ลบ Card ออก)
+                _buildImagePicker(),
+              ],
+            ),
+          ),
+        ),
+      ),
+      backgroundColor: Colors.white, // ทำให้พื้นหลังเป็นสีขาวเรียบง่าย
     );
   }
 }
