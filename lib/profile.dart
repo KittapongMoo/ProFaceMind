@@ -123,6 +123,7 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("ข้อมูลส่วนตัว"),
+        centerTitle: true, // ทำให้หัวข้ออยู่ตรงกลาง
         actions: [
           _isEditing
               ? IconButton(
@@ -188,43 +189,73 @@ class _ProfilePageState extends State<ProfilePage> {
   /// ✅ ช่องข้อมูลที่แก้ไขได้เมื่ออยู่ในโหมดแก้ไข
   Widget _buildEditableField(String label, TextEditingController controller) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(flex: 3, child: Text("$label :", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-          Expanded(
-            flex: 7,
-            child: _isEditing
-                ? TextFormField(
+          Text(
+            '$label :',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.grey[200], // พื้นหลังสีเทาอ่อน
+              borderRadius: BorderRadius.circular(20), // ทำให้ขอบโค้งมน
+            ),
+            child: TextFormField(
               controller: controller,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                filled: true,
-                fillColor: Colors.grey[100],
+              enabled: _isEditing, // แก้ไขได้เมื่ออยู่ในโหมดแก้ไข
+              decoration: const InputDecoration(
+                border: InputBorder.none, // ไม่มีเส้นขอบ
+                contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
               ),
-            )
-                : _buildReadonlyBox(controller.text),
+            ),
           ),
         ],
       ),
     );
   }
 
+
   /// ✅ Widget สำหรับ DatePicker
   Widget _buildDatePicker() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Expanded(flex: 3, child: Text("วันเกิด :", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-          Expanded(
-            flex: 7,
-            child: _isEditing
-                ? ElevatedButton(
-              onPressed: () => _selectDate(context),
-              child: Text(_selectedDate != null ? "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}" : "เลือกวันเกิด"),
-            )
-                : _buildReadonlyBox(_selectedDate != null ? "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}" : "ไม่มีข้อมูล"),
+          const Text(
+            "วันเกิด :",
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: _isEditing ? () => _selectDate(context) : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[200], // พื้นหลังสีเทาอ่อน
+                borderRadius: BorderRadius.circular(20), // ขอบโค้งมน
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _selectedDate != null
+                        ? "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}"
+                        : "เลือกวันเกิด",
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: _selectedDate != null ? Colors.black : Colors.grey,
+                    ),
+                  ),
+                  // ✅ แสดงไอคอนเฉพาะเมื่ออยู่ในโหมดแก้ไข
+                  if (_isEditing)
+                    const Icon(Icons.calendar_today, color: Colors.grey),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -232,17 +263,57 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   /// ✅ Widget สำหรับ Dropdown
-  Widget _buildDropdownField({required String label, required String value, required List<String> items, required ValueChanged<String?> onChanged}) {
+  Widget _buildDropdownField({
+    required String label,
+    required String value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+  }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(flex: 3, child: Text("$label :", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-          Expanded(flex: 7, child: _isEditing ? DropdownButtonFormField(value: value, items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: onChanged) : _buildReadonlyBox(value)),
+          Text(
+            '$label :',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.grey[200], // พื้นหลังสีเทาอ่อน
+              borderRadius: BorderRadius.circular(20), // ขอบโค้งมน
+            ),
+            child: _isEditing
+                ? DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: value,
+                isExpanded: true, // ✅ ทำให้ช่องไม่หดเมื่อ dropdown แสดง
+                onChanged: onChanged,
+                items: items.map((String item) {
+                  return DropdownMenuItem<String>(
+                    value: item,
+                    child: Text(item, style: const TextStyle(fontSize: 16)),
+                  );
+                }).toList(),
+              ),
+            )
+                : SizedBox(
+              height: 50, // ✅ กำหนดความสูงให้เท่ากับ dropdown
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(value, style: const TextStyle(fontSize: 16)),
+              ),
+            ), // ✅ แสดงข้อความเมื่อไม่อยู่ในโหมดแก้ไข แต่ไม่ให้ช่องเล็กลง
+          ),
         ],
       ),
     );
   }
+
+
+
 
   Widget _buildReadonlyBox(String value) => Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)), child: Text(value));
 }
