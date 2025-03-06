@@ -141,7 +141,7 @@ class _SetmapState extends State<Setmap> {
               ),
             },
             myLocationEnabled: true,
-            myLocationButtonEnabled: true,
+            myLocationButtonEnabled: false,
           ),
           Positioned(
             top: 40,
