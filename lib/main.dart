@@ -41,7 +41,7 @@ class PersonalInfoPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE3E7F1), // Light blue background
+      backgroundColor: Colors.white, // Light blue background
       body: Column(
         children: [
           const Spacer(), // ดันเนื้อหาอื่นขึ้นไปด้านบน
