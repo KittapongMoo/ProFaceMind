@@ -3,10 +3,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'navigation.dart';
-import 'profile.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -20,30 +17,33 @@ class _RegisterPageState extends State<RegisterPage> {
   List<CameraDescription>? _cameras;
   bool _isCameraInitialized = false;
   bool _isFrontCamera = true;
-  XFile? _capturedImage;
-  File? _galleryImage;
   int _sensorOrientation = 0;
   final FaceDetector _faceDetector =
-      FaceDetector(options: FaceDetectorOptions());
+  FaceDetector(options: FaceDetectorOptions(performanceMode: FaceDetectorMode.accurate));
   bool _isDetectingFaces = false;
   List<Face> _faces = [];
 
   @override
   void initState() {
     super.initState();
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-    ]);
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeCamera();
     });
   }
 
   Future<void> _initializeCamera() async {
+    final permission = await Permission.camera.request();
+    if (!permission.isGranted) {
+      print("Camera permission denied");
+      return;
+    }
+
     try {
       _cameras = await availableCameras();
       if (_cameras!.isNotEmpty) {
         CameraDescription selectedCamera = _cameras![_isFrontCamera ? 1 : 0];
+
         _cameraController = CameraController(
           selectedCamera,
           ResolutionPreset.high,
@@ -53,6 +53,7 @@ class _RegisterPageState extends State<RegisterPage> {
         await _cameraController!.initialize();
         if (!mounted) return;
 
+        // Start real-time face detection
         _cameraController!.startImageStream((CameraImage image) async {
           if (!_isDetectingFaces) {
             _isDetectingFaces = true;
@@ -76,7 +77,7 @@ class _RegisterPageState extends State<RegisterPage> {
       bytes: image.planes[0].bytes,
       metadata: InputImageMetadata(
         size: Size(image.width.toDouble(), image.height.toDouble()),
-        rotation: InputImageRotation.rotation0deg,
+        rotation: InputImageRotation.rotation90deg, // Rotate correctly
         format: InputImageFormat.nv21,
         bytesPerRow: image.planes[0].bytesPerRow,
       ),
@@ -92,9 +93,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_cameraController!.value.isTakingPicture) {
       try {
         final image = await _cameraController!.takePicture();
-        setState(() {
-          _capturedImage = image;
-        });
+        print("Photo captured: ${image.path}");
       } catch (e) {
         print('Error capturing image: $e');
       }
@@ -116,23 +115,23 @@ class _RegisterPageState extends State<RegisterPage> {
           Positioned.fill(
             child: _isCameraInitialized
                 ? Transform.rotate(
-                    angle: -1.5708, // Rotate 90 degrees to the left
-                    child: FittedBox(
-                      fit: BoxFit.cover, // Make it full screen
-                      child: SizedBox(
-                        width: _cameraController!.value.previewSize!.height,
-                        height: _cameraController!.value.previewSize!.width,
-                        child: Stack(
-                          children: [
-                            CameraPreview(_cameraController!),
-                            CustomPaint(
-                              painter: FacePainter(_faces),
-                            ),
-                          ],
-                        ),
+              angle: -1.5708, // Rotate 90 degrees left
+              child: FittedBox(
+                fit: BoxFit.cover, // Full screen
+                child: SizedBox(
+                  width: _cameraController!.value.previewSize!.height,
+                  height: _cameraController!.value.previewSize!.width,
+                  child: Stack(
+                    children: [
+                      CameraPreview(_cameraController!),
+                      CustomPaint(
+                        painter: FacePainter(_faces),
                       ),
-                    ),
-                  )
+                    ],
+                  ),
+                ),
+              ),
+            )
                 : const Center(child: CircularProgressIndicator()),
           ),
           Positioned(
