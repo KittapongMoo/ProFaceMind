@@ -59,7 +59,8 @@ class _SetmapState extends State<Setmap> {
       });
 
       if (mapController != null) {
-        mapController!.animateCamera(CameraUpdate.newLatLngZoom(_currentPosition, 15));
+        mapController!
+            .animateCamera(CameraUpdate.newLatLngZoom(_currentPosition, 15));
       }
     } catch (e) {
       print("❌ ไม่สามารถดึงตำแหน่ง GPS ได้: $e");
@@ -94,7 +95,8 @@ class _SetmapState extends State<Setmap> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("สิทธิ์ถูกปฏิเสธ"),
-        content: const Text("กรุณาให้สิทธิ์ตำแหน่งในตั้งค่าแอปเพื่อใช้งานฟีเจอร์นี้"),
+        content: const Text(
+            "กรุณาให้สิทธิ์ตำแหน่งในตั้งค่าแอปเพื่อใช้งานฟีเจอร์นี้"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -134,13 +136,13 @@ class _SetmapState extends State<Setmap> {
               Marker(
                 markerId: const MarkerId('current-location'),
                 position: _currentPosition,
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                icon: BitmapDescriptor.defaultMarkerWithHue(
+                    BitmapDescriptor.hueRed),
               ),
             },
             myLocationEnabled: true,
             myLocationButtonEnabled: true,
           ),
-
           Positioned(
             top: 40,
             left: 16,
@@ -152,7 +154,6 @@ class _SetmapState extends State<Setmap> {
               child: const Icon(Icons.arrow_back, color: Colors.black),
             ),
           ),
-
           Positioned(
             left: 0,
             right: 0,
@@ -176,9 +177,46 @@ class _SetmapState extends State<Setmap> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  const SizedBox(height: 5),
+                  // Page indicator dots
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Colors.blue[100],
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: const BoxDecoration(
+                          color: Colors.blue,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Colors.blue[100],
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
                   const Text(
                     "ตั้งค่าที่อยู่ของคุณ",
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+                    style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87),
                   ),
                   const SizedBox(height: 10),
                   const Padding(
@@ -196,7 +234,8 @@ class _SetmapState extends State<Setmap> {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const Selectposition()),
+                          MaterialPageRoute(
+                              builder: (context) => const Selectposition()),
                         );
                       },
                       style: ElevatedButton.styleFrom(
