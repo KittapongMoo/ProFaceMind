@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'dart:math' as math; // Import math for rotation
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -17,7 +18,6 @@ class _RegisterPageState extends State<RegisterPage> {
   List<CameraDescription>? _cameras;
   bool _isCameraInitialized = false;
   bool _isFrontCamera = true;
-  int _sensorOrientation = 0;
   final FaceDetector _faceDetector =
   FaceDetector(options: FaceDetectorOptions(performanceMode: FaceDetectorMode.accurate));
   bool _isDetectingFaces = false;
@@ -64,7 +64,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
         setState(() {
           _isCameraInitialized = true;
-          _sensorOrientation = selectedCamera.sensorOrientation;
         });
       }
     } catch (e) {
@@ -77,7 +76,7 @@ class _RegisterPageState extends State<RegisterPage> {
       bytes: image.planes[0].bytes,
       metadata: InputImageMetadata(
         size: Size(image.width.toDouble(), image.height.toDouble()),
-        rotation: InputImageRotation.rotation90deg, // Rotate correctly
+        rotation: InputImageRotation.rotation0deg, // ✅ Fix rotation issue
         format: InputImageFormat.nv21,
         bytesPerRow: image.planes[0].bytesPerRow,
       ),
@@ -111,31 +110,36 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
+        fit: StackFit.expand,
         children: [
-          Positioned.fill(
-            child: _isCameraInitialized
-                ? Transform.rotate(
-              angle: -1.5708, // Rotate 90 degrees left
-              child: FittedBox(
-                fit: BoxFit.cover, // Full screen
-                child: SizedBox(
-                  width: _cameraController!.value.previewSize!.height,
-                  height: _cameraController!.value.previewSize!.width,
-                  child: Stack(
-                    children: [
-                      CameraPreview(_cameraController!),
-                      CustomPaint(
-                        painter: FacePainter(_faces),
-                      ),
-                    ],
-                  ),
+          if (_isCameraInitialized)
+            Center(
+              child: AspectRatio(
+                aspectRatio: _cameraController!.value.aspectRatio,
+                child: Transform.rotate(
+                  angle: _cameraController!.description.sensorOrientation == 90
+                      ? math.pi / 2 // Rotate correctly for portrait
+                      : _cameraController!.description.sensorOrientation == 270
+                      ? -math.pi / 2 // Adjust back camera
+                      : 0,
+                  child: CameraPreview(_cameraController!),
                 ),
               ),
             )
-                : const Center(child: CircularProgressIndicator()),
-          ),
+          else
+            const Center(child: CircularProgressIndicator()),
+
+          // Face detection overlay
+          if (_isCameraInitialized)
+            Positioned.fill(
+              child: CustomPaint(
+                painter: FacePainter(_faces),
+              ),
+            ),
+
+          // Capture button
           Positioned(
-            bottom: 30,
+            bottom: 50,
             left: MediaQuery.of(context).size.width / 2 - 30,
             child: FloatingActionButton(
               heroTag: 'capture',
@@ -150,6 +154,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 }
 
+// Face Painter for Bounding Box
 class FacePainter extends CustomPainter {
   final List<Face> faces;
   FacePainter(this.faces);
