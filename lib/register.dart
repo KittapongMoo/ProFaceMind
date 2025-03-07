@@ -46,7 +46,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
         _cameraController = CameraController(
           selectedCamera,
-          ResolutionPreset.high,
+          ResolutionPreset.max, // ✅ Use highest resolution for best preview
           enableAudio: false,
         );
 
@@ -99,6 +99,35 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
+  /// **🔄 Apply Flip for Front Camera While Keeping Rotation**
+  Widget _buildCameraPreview() {
+    if (_isCameraInitialized) {
+      return Transform(
+        alignment: Alignment.center,
+        transform: _cameraController!.description.lensDirection == CameraLensDirection.front
+            ? (Matrix4.identity()..scale(-1.0, 1.0, 1.0)) // ✅ Flip horizontally for front camera
+            : Matrix4.identity(),
+        child: Transform.rotate(
+          angle: _cameraController!.description.sensorOrientation == 90
+              ? math.pi / 2 // ✅ Rotate correctly for portrait
+              : _cameraController!.description.sensorOrientation == 270
+              ? -math.pi / 2 // ✅ Adjust back camera
+              : 0,
+          child: FittedBox(
+            fit: BoxFit.cover, // ✅ Ensures full-screen camera preview
+            child: SizedBox(
+              width: 300,
+              height: 300 / _cameraController!.value.aspectRatio,
+              child: CameraPreview(_cameraController!),
+            ),
+          ),
+        ),
+      );
+    } else {
+      return const Center(child: CircularProgressIndicator());
+    }
+  }
+
   @override
   void dispose() {
     _cameraController?.dispose();
@@ -112,22 +141,7 @@ class _RegisterPageState extends State<RegisterPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          if (_isCameraInitialized)
-            Center(
-              child: AspectRatio(
-                aspectRatio: _cameraController!.value.aspectRatio,
-                child: Transform.rotate(
-                  angle: _cameraController!.description.sensorOrientation == 90
-                      ? math.pi / 2 // Rotate correctly for portrait
-                      : _cameraController!.description.sensorOrientation == 270
-                      ? -math.pi / 2 // Adjust back camera
-                      : 0,
-                  child: CameraPreview(_cameraController!),
-                ),
-              ),
-            )
-          else
-            const Center(child: CircularProgressIndicator()),
+          Positioned.fill(child: _buildCameraPreview()), // ✅ Camera preview with flipping & rotation
 
           // Face detection overlay
           if (_isCameraInitialized)
@@ -154,7 +168,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 }
 
-// Face Painter for Bounding Box
+// **Face Painter for Bounding Box**
 class FacePainter extends CustomPainter {
   final List<Face> faces;
   FacePainter(this.faces);
