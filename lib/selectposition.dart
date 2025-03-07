@@ -56,7 +56,8 @@ class _SelectpositionState extends State<Selectposition> {
 
     try {
       Position position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(accuracy: LocationAccuracy.best));
+          locationSettings:
+              const LocationSettings(accuracy: LocationAccuracy.best));
 
       setState(() {
         _selectedPosition = LatLng(position.latitude, position.longitude);
@@ -64,7 +65,8 @@ class _SelectpositionState extends State<Selectposition> {
       });
 
       if (mapController != null) {
-        mapController!.animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition!, 15));
+        mapController!
+            .animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition!, 15));
       }
 
       _getAddressFromLatLng(_selectedPosition!);
@@ -83,7 +85,8 @@ class _SelectpositionState extends State<Selectposition> {
 
       if (placemarks.isNotEmpty) {
         Placemark place = placemarks.first;
-        String address = "${place.street}, ${place.subLocality}, ${place.locality}, ${place.postalCode}";
+        String address =
+            "${place.street}, ${place.subLocality}, ${place.locality}, ${place.postalCode}";
         setState(() {
           _searchController.text = address;
         });
@@ -121,7 +124,8 @@ class _SelectpositionState extends State<Selectposition> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("สิทธิ์ถูกปฏิเสธ"),
-        content: const Text("กรุณาให้สิทธิ์ตำแหน่งในตั้งค่าแอปเพื่อใช้งานฟีเจอร์นี้"),
+        content: const Text(
+            "กรุณาให้สิทธิ์ตำแหน่งในตั้งค่าแอปเพื่อใช้งานฟีเจอร์นี้"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -166,9 +170,18 @@ class _SelectpositionState extends State<Selectposition> {
       });
 
       if (mapController != null) {
-        mapController!.animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition!, 15));
+        mapController!
+            .animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition!, 15));
       }
     }
+  }
+
+  Future<void> _moveToCurrentLocation() async {
+    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+
+    mapController?.animateCamera(
+      CameraUpdate.newLatLngZoom(LatLng(position.latitude, position.longitude), 15),
+    );
   }
 
   // ✅ บันทึกตำแหน่งใน SharedPreferences
@@ -195,22 +208,29 @@ class _SelectpositionState extends State<Selectposition> {
     return Scaffold(
       body: Stack(
         children: [
+          // Google Map
           if (_selectedPosition != null)
             GoogleMap(
               onMapCreated: (controller) {
                 mapController = controller;
-                mapController?.animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition!, 15));
+                mapController?.animateCamera(
+                  CameraUpdate.newLatLngZoom(_selectedPosition!, 15),
+                );
               },
-              initialCameraPosition: CameraPosition(target: _selectedPosition!, zoom: 15),
-              myLocationEnabled: true,
-              myLocationButtonEnabled: true,
+              initialCameraPosition:
+                  CameraPosition(target: _selectedPosition!, zoom: 15),
+              myLocationEnabled: true, // ✅ Show user location
+              myLocationButtonEnabled: false, // ❌ Hide default button
+              zoomControlsEnabled: false, // ❌ Hide Zoom In/Out buttons
+              mapToolbarEnabled: false, // ❌ Hide additional map tools
               markers: {
                 if (_selectedPosition != null)
                   Marker(
                     markerId: const MarkerId("selected-location"),
                     position: _selectedPosition!,
                     infoWindow: const InfoWindow(title: "ตำแหน่งที่เลือก"),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                        BitmapDescriptor.hueRed),
                   ),
               },
               onCameraMove: (position) {
@@ -225,60 +245,81 @@ class _SelectpositionState extends State<Selectposition> {
           else
             const Center(child: CircularProgressIndicator()),
 
+          // Search Bar & Custom My Location Button
           Positioned(
             top: 40,
             left: 16,
-            right: 16,
-            child: Column(
-              children: [
-                TextField(
-                  controller: _searchController,
-                  onSubmitted: (value) async {
-                    if (predictions.isNotEmpty) {
-                      _selectLocation(predictions.first.placeId!, predictions.first.description!);
-                    }
-                  },
-                  onChanged: _onSearchChanged,
-                  decoration: InputDecoration(
-                    hintText: "ค้นหาสถานที่",
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
-                    prefixIcon: const Icon(Icons.search, color: Colors.blue),
-                  ),
-                ),
-                if (predictions.isNotEmpty)
-                  Container(
-                    height: 200,
-                    color: Colors.white,
-                    child: ListView.builder(
-                      itemCount: predictions.length,
-                      itemBuilder: (context, index) {
-                        return ListTile(
-                          title: Text(predictions[index].description ?? ""),
-                          onTap: () => _selectLocation(
-                            predictions[index].placeId!,
-                            predictions[index].description!,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-              ],
+            right: 80, // Adjusted to fit My Location button
+            child: TextField(
+              controller: _searchController,
+              onSubmitted: (value) async {
+                if (predictions.isNotEmpty) {
+                  _selectLocation(predictions.first.placeId!,
+                      predictions.first.description!);
+                }
+              },
+              onChanged: _onSearchChanged,
+              decoration: InputDecoration(
+                hintText: "ค้นหาสถานที่",
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: BorderSide.none),
+                prefixIcon: const Icon(Icons.search, color: Colors.blue),
+              ),
             ),
           ),
 
+          // Custom My Location Button
+          Positioned(
+            top: 40,
+            right: 16,
+            child: FloatingActionButton(
+              mini: true,
+              backgroundColor: Colors.white,
+              onPressed: _moveToCurrentLocation,
+              child: const Icon(Icons.my_location, color: Colors.blue),
+            ),
+          ),
+
+          // Predictions List
+          if (predictions.isNotEmpty)
+            Positioned(
+              top: 90,
+              left: 16,
+              right: 16,
+              child: Container(
+                height: 200,
+                color: Colors.white,
+                child: ListView.builder(
+                  itemCount: predictions.length,
+                  itemBuilder: (context, index) {
+                    return ListTile(
+                      title: Text(predictions[index].description ?? ""),
+                      onTap: () => _selectLocation(
+                        predictions[index].placeId!,
+                        predictions[index].description!,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+          // Select Button
           Positioned(
             left: 16,
             right: 16,
             bottom: 16,
             child: ElevatedButton(
-              onPressed: _saveSelectedLocation, // ✅ บันทึกตำแหน่ง
+              onPressed: _saveSelectedLocation, // ✅ Save the selected location
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 padding: const EdgeInsets.symmetric(vertical: 15),
               ),
-              child: const Text("เลือกที่นี่", style: TextStyle(fontSize: 18, color: Colors.white)),
+              child: const Text("เลือกที่นี่",
+                  style: TextStyle(fontSize: 18, color: Colors.white)),
             ),
           ),
         ],
