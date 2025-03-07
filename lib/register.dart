@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'dart:math' as math; // Import math for rotation
+import 'dart:math' as math;
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -32,6 +32,7 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
+  /// **🔄 Initialize Camera**
   Future<void> _initializeCamera() async {
     final permission = await Permission.camera.request();
     if (!permission.isGranted) {
@@ -42,52 +43,89 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       _cameras = await availableCameras();
       if (_cameras!.isNotEmpty) {
-        CameraDescription selectedCamera = _cameras![_isFrontCamera ? 1 : 0];
-
-        _cameraController = CameraController(
-          selectedCamera,
-          ResolutionPreset.max, // ✅ Use highest resolution for best preview
-          enableAudio: false,
-        );
-
-        await _cameraController!.initialize();
-        if (!mounted) return;
-
-        // Start real-time face detection
-        _cameraController!.startImageStream((CameraImage image) async {
-          if (!_isDetectingFaces) {
-            _isDetectingFaces = true;
-            await _detectFaces(image);
-            _isDetectingFaces = false;
-          }
-        });
-
-        setState(() {
-          _isCameraInitialized = true;
-        });
+        await _setCamera(_isFrontCamera ? 1 : 0);
       }
     } catch (e) {
       print('Error initializing camera: $e');
     }
   }
 
-  Future<void> _detectFaces(CameraImage image) async {
-    final InputImage inputImage = InputImage.fromBytes(
-      bytes: image.planes[0].bytes,
-      metadata: InputImageMetadata(
-        size: Size(image.width.toDouble(), image.height.toDouble()),
-        rotation: InputImageRotation.rotation0deg, // ✅ Fix rotation issue
-        format: InputImageFormat.nv21,
-        bytesPerRow: image.planes[0].bytesPerRow,
-      ),
-    );
-
-    final faces = await _faceDetector.processImage(inputImage);
+  /// **🔀 Switch Between Front and Back Cameras**
+  Future<void> _switchCamera() async {
     setState(() {
-      _faces = faces;
+      _isFrontCamera = !_isFrontCamera;
     });
+    await _setCamera(_isFrontCamera ? 1 : 0);
   }
 
+  /// **📷 Set Camera by Index**
+  Future<void> _setCamera(int cameraIndex) async {
+    if (_cameraController != null) {
+      await _cameraController!.dispose();
+    }
+
+    try {
+      CameraDescription selectedCamera = _cameras![cameraIndex];
+
+      _cameraController = CameraController(
+        selectedCamera,
+        ResolutionPreset.max, // ✅ Highest resolution for best preview
+        enableAudio: false,
+      );
+
+      await _cameraController!.initialize();
+      if (!mounted) return;
+
+      // Start real-time face detection
+      _cameraController!.startImageStream((CameraImage image) async {
+        if (!_isDetectingFaces) {
+          _isDetectingFaces = true;
+          await _detectFaces(image);
+          _isDetectingFaces = false;
+        }
+      });
+
+      setState(() {
+        _isCameraInitialized = true;
+      });
+    } catch (e) {
+      print('Error setting camera: $e');
+    }
+  }
+
+  /// **🤖 Face Detection Using ML Kit**
+  Future<void> _detectFaces(CameraImage image) async {
+    try {
+      final InputImage inputImage = _convertCameraImage(image);
+      final List<Face> detectedFaces = await _faceDetector.processImage(inputImage);
+
+      setState(() {
+        _faces = detectedFaces;
+      });
+    } catch (e) {
+      print("Error detecting faces: $e");
+    }
+  }
+
+  /// **📌 Convert CameraImage to InputImage (For ML Kit)**
+  InputImage _convertCameraImage(CameraImage image) {
+    final WriteBuffer allBytes = WriteBuffer();
+    for (var plane in image.planes) {
+      allBytes.putUint8List(plane.bytes);
+    }
+    final bytes = allBytes.done().buffer.asUint8List();
+
+    final metadata = InputImageMetadata(
+      size: Size(image.width.toDouble(), image.height.toDouble()),
+      rotation: InputImageRotation.rotation0deg, // ✅ Fix rotation issue
+      format: InputImageFormat.nv21,
+      bytesPerRow: image.planes[0].bytesPerRow,
+    );
+
+    return InputImage.fromBytes(bytes: bytes, metadata: metadata);
+  }
+
+  /// **📸 Take Picture**
   Future<void> _takePicture() async {
     if (!_cameraController!.value.isTakingPicture) {
       try {
@@ -99,7 +137,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// **🔄 Apply Flip for Front Camera While Keeping Rotation**
+  /// **🔄 Flip Camera Preview for Front Camera**
   Widget _buildCameraPreview() {
     if (_isCameraInitialized) {
       return Transform(
@@ -114,7 +152,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ? -math.pi / 2 // ✅ Adjust back camera
               : 0,
           child: FittedBox(
-            fit: BoxFit.cover, // ✅ Ensures full-screen camera preview
+            fit: BoxFit.cover, // ✅ Full-screen preview
             child: SizedBox(
               width: 300,
               height: 300 / _cameraController!.value.aspectRatio,
@@ -141,7 +179,7 @@ class _RegisterPageState extends State<RegisterPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Positioned.fill(child: _buildCameraPreview()), // ✅ Camera preview with flipping & rotation
+          Positioned.fill(child: _buildCameraPreview()), // ✅ Full-screen camera preview
 
           // Face detection overlay
           if (_isCameraInitialized)
@@ -151,7 +189,19 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
             ),
 
-          // Capture button
+          // **🔄 Switch Camera Button**
+          Positioned(
+            top: 50,
+            right: 20,
+            child: FloatingActionButton(
+              heroTag: 'switch',
+              backgroundColor: Colors.blue,
+              child: const Icon(Icons.switch_camera),
+              onPressed: _switchCamera, // ✅ Switch camera function
+            ),
+          ),
+
+          // **📸 Capture Button**
           Positioned(
             bottom: 50,
             left: MediaQuery.of(context).size.width / 2 - 30,
@@ -168,7 +218,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 }
 
-// **Face Painter for Bounding Box**
+// **🎯 Face Detection Painter**
 class FacePainter extends CustomPainter {
   final List<Face> faces;
   FacePainter(this.faces);
@@ -176,9 +226,9 @@ class FacePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
-      ..color = Colors.blue
+      ..color = Colors.red // ✅ Change to red for better visibility
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
+      ..strokeWidth = 3.0;
 
     for (var face in faces) {
       final rect = face.boundingBox;
