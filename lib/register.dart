@@ -238,23 +238,24 @@ class _RegisterPageState extends State<RegisterPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Wrap in AspectRatio to maintain proper dimensions.
-    final preview = AspectRatio(
-      aspectRatio: _cameraController!.value.aspectRatio,
+    // Use a RotatedBox to force portrait mode.
+    Widget preview = RotatedBox(
+      quarterTurns: 1, // Rotates the preview by 90 degrees. Adjust if needed.
       child: CameraPreview(_cameraController!),
     );
 
-    // If using the front camera, mirror it horizontally.
+    // Mirror the preview horizontally for the front camera.
     if (_isFrontCamera) {
-      return Transform(
+      preview = Transform(
         alignment: Alignment.center,
         transform: Matrix4.rotationY(math.pi),
         child: preview,
       );
-    } else {
-      return preview;
     }
+
+    return Center(child: preview);
   }
+
 
 
   @override
