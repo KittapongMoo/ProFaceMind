@@ -128,15 +128,26 @@ class _RegisterPageState extends State<RegisterPage> {
     }
     final bytes = allBytes.done().buffer.asUint8List();
 
+    // Get sensor orientation from the camera description.
+    final int sensorOrientation = _cameraController!.description.sensorOrientation;
+    // Map sensorOrientation to InputImageRotation (e.g., 90 or 270 degrees for front/back cameras)
+    // Here, you can adjust as needed for your device.
+    InputImageRotation rotation = sensorOrientation == 90
+        ? InputImageRotation.rotation90deg
+        : sensorOrientation == 270
+        ? InputImageRotation.rotation270deg
+        : InputImageRotation.rotation0deg;
+
     final metadata = InputImageMetadata(
       size: Size(image.width.toDouble(), image.height.toDouble()),
-      rotation: InputImageRotation.rotation0deg,
+      rotation: rotation,
       format: InputImageFormat.nv21,
       bytesPerRow: image.planes[0].bytesPerRow,
     );
 
     return InputImage.fromBytes(bytes: bytes, metadata: metadata);
   }
+
 
   /// **📸 Capture and Save Image**
   Future<void> _takePicture() async {
@@ -224,13 +235,27 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_isCameraInitialized ||
         _cameraController == null ||
         !_cameraController!.value.isInitialized) {
-      return const Center(
-          child:
-              CircularProgressIndicator()); // Show loading indicator while initializing
+      return const Center(child: CircularProgressIndicator());
     }
 
-    return CameraPreview(_cameraController!);
+    // Wrap in AspectRatio to maintain proper dimensions.
+    final preview = AspectRatio(
+      aspectRatio: _cameraController!.value.aspectRatio,
+      child: CameraPreview(_cameraController!),
+    );
+
+    // If using the front camera, mirror it horizontally.
+    if (_isFrontCamera) {
+      return Transform(
+        alignment: Alignment.center,
+        transform: Matrix4.rotationY(math.pi),
+        child: preview,
+      );
+    } else {
+      return preview;
+    }
   }
+
 
   @override
   void dispose() {
