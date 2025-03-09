@@ -118,8 +118,7 @@ class _RegisterPageState extends State<RegisterPage> {
       allBytes.putUint8List(plane.bytes);
     }
     final bytes = allBytes.done().buffer.asUint8List();
-    final int sensorOrientation =
-        _cameraController!.description.sensorOrientation;
+    final int sensorOrientation = _cameraController!.description.sensorOrientation;
     InputImageRotation rotation = sensorOrientation == 90
         ? InputImageRotation.rotation90deg
         : sensorOrientation == 270
@@ -216,7 +215,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Build Camera Preview in Fullscreen Portrait Mode
+  /// Build Camera Preview in Fullscreen Portrait Mode (Native Look)
   Widget _buildCameraPreview() {
     if (!_isCameraInitialized ||
         _cameraController == null ||
@@ -224,18 +223,21 @@ class _RegisterPageState extends State<RegisterPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Get screen size.
+    // The native camera app typically fills the screen in portrait mode.
+    // We use a scale transform based on the ratio between the camera preview size and device screen.
     final size = MediaQuery.of(context).size;
-    // Calculate scale factor to fill the screen.
-    double scale = size.aspectRatio * _cameraController!.value.aspectRatio;
-    if (scale < 1) scale = 1 / scale;
+    final previewSize = _cameraController!.value.previewSize;
+    if (previewSize == null) return const Center(child: CircularProgressIndicator());
+
+    // The preview is provided in landscape, so we swap its dimensions.
+    final double screenRatio = size.height / size.width;
+    final double previewRatio = previewSize.height / previewSize.width;
+    // Calculate scale to cover the screen.
+    final scale = previewRatio / screenRatio;
 
     Widget preview = Transform.scale(
       scale: scale,
-      child: RotatedBox(
-        quarterTurns: 1,
-        child: CameraPreview(_cameraController!),
-      ),
+      child: Center(child: CameraPreview(_cameraController!)),
     );
 
     // Mirror the preview horizontally for the front camera.
@@ -265,7 +267,6 @@ class _RegisterPageState extends State<RegisterPage> {
         children: [
           // Full-screen camera preview (under all buttons).
           Positioned.fill(child: _buildCameraPreview()),
-
           // Face detection overlay.
           if (_isCameraInitialized)
             Positioned.fill(
@@ -273,7 +274,6 @@ class _RegisterPageState extends State<RegisterPage> {
                 painter: FacePainter(_faces),
               ),
             ),
-
           // Switch camera button.
           Positioned(
             top: 50,
@@ -285,7 +285,6 @@ class _RegisterPageState extends State<RegisterPage> {
               onPressed: _switchCamera,
             ),
           ),
-
           // Capture button.
           Positioned(
             bottom: 50,
@@ -297,7 +296,6 @@ class _RegisterPageState extends State<RegisterPage> {
               onPressed: _takePicture,
             ),
           ),
-
           // Display captured image.
           if (_capturedImagePath != null)
             Positioned(
@@ -325,7 +323,6 @@ class FacePainter extends CustomPainter {
       ..color = Colors.red
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0;
-
     for (var face in faces) {
       canvas.drawRect(face.boundingBox, paint);
     }
