@@ -31,6 +31,7 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   void initState() {
     super.initState();
+    // Force portrait orientation.
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeCamera();
@@ -77,7 +78,7 @@ class _RegisterPageState extends State<RegisterPage> {
       await _cameraController!.initialize();
       if (!mounted) return;
 
-      // Start real-time face detection
+      // Start real-time face detection.
       _cameraController!.startImageStream((CameraImage image) async {
         if (!_isDetectingFaces) {
           _isDetectingFaces = true;
@@ -85,7 +86,6 @@ class _RegisterPageState extends State<RegisterPage> {
           _isDetectingFaces = false;
         }
       });
-
       setState(() {
         _isCameraInitialized = true;
       });
@@ -156,19 +156,14 @@ class _RegisterPageState extends State<RegisterPage> {
           await getApplicationDocumentsDirectory();
       final String newPath =
           '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-      // Read the image file bytes.
       final bytes = await File(imagePath).readAsBytes();
-      // Decode the image.
       img.Image? capturedImage = img.decodeImage(bytes);
       if (capturedImage == null) {
         print("Error decoding image.");
         return "";
       }
-      // Correct the orientation using bakeOrientation.
       img.Image orientedImage = img.bakeOrientation(capturedImage);
-      // Encode the oriented image back to jpg.
       final orientedBytes = img.encodeJpg(orientedImage);
-      // Write the oriented image to a new file.
       final File newImage = await File(newPath).writeAsBytes(orientedBytes);
       print("Image saved successfully: $newPath");
       return newPath;
@@ -186,7 +181,7 @@ class _RegisterPageState extends State<RegisterPage> {
         allBytes.putUint8List(plane.bytes);
       }
       final Uint8List bytes = allBytes.done().buffer.asUint8List();
-      img.Image? capturedImage = img.decodeImage(Uint8List.fromList(bytes));
+      img.Image? capturedImage = img.decodeImage(bytes);
       if (capturedImage == null) return;
       Rect faceRect = face.boundingBox;
       int x = faceRect.left.toInt();
@@ -204,8 +199,7 @@ class _RegisterPageState extends State<RegisterPage> {
         width: w,
         height: h,
       );
-      Uint8List croppedBytes =
-      Uint8List.fromList(img.encodeJpg(croppedFace));
+      Uint8List croppedBytes = Uint8List.fromList(img.encodeJpg(croppedFace));
       setState(() {
         _croppedFace = croppedBytes;
       });
@@ -222,25 +216,28 @@ class _RegisterPageState extends State<RegisterPage> {
         !_cameraController!.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
-
-    // The native camera app typically fills the screen in portrait mode.
-    // We use a scale transform based on the ratio between the camera preview size and device screen.
     final size = MediaQuery.of(context).size;
     final previewSize = _cameraController!.value.previewSize;
-    if (previewSize == null) return const Center(child: CircularProgressIndicator());
+    if (previewSize == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-    // The preview is provided in landscape, so we swap its dimensions.
-    final double screenRatio = size.height / size.width;
-    final double previewRatio = previewSize.height / previewSize.width;
-    // Calculate scale to cover the screen.
-    final scale = previewRatio / screenRatio;
-
-    Widget preview = Transform.scale(
-      scale: scale,
-      child: Center(child: CameraPreview(_cameraController!)),
+    // Use FittedBox to cover the screen.
+    Widget preview = Container(
+      width: size.width,
+      height: size.height,
+      child: FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          // Swap width and height since the preview is typically in landscape.
+          width: previewSize.height,
+          height: previewSize.width,
+          child: CameraPreview(_cameraController!),
+        ),
+      ),
     );
 
-    // Mirror the preview horizontally for the front camera.
+    // For front camera, mirror the preview.
     if (_isFrontCamera) {
       preview = Transform(
         alignment: Alignment.center,
@@ -248,6 +245,13 @@ class _RegisterPageState extends State<RegisterPage> {
         child: preview,
       );
     }
+
+    // If needed, adjust rotation (e.g. RotatedBox with quarterTurns: 3)
+    // Uncomment the following lines if the preview appears rotated -90 degrees.
+    // preview = RotatedBox(
+    //   quarterTurns: 3,
+    //   child: preview,
+    // );
 
     return preview;
   }
@@ -265,7 +269,7 @@ class _RegisterPageState extends State<RegisterPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Full-screen camera preview (under all buttons).
+          // Fullscreen camera preview (under all buttons).
           Positioned.fill(child: _buildCameraPreview()),
           // Face detection overlay.
           if (_isCameraInitialized)
