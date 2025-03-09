@@ -122,24 +122,55 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("ข้อมูลส่วนตัว"),
+        backgroundColor: Colors.transparent, // ทำให้ AppBar โปร่งใส
+        elevation: 0, // ลบเงาออก
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16, top: 8), // ปรับระยะห่างจากขอบจอ
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white, // พื้นหลังสีขาว
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26, // เงาสีดำบางๆ
+                  blurRadius: 5,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: IconButton(
+              onPressed: () {
+                Navigator.pop(context); // กลับไปหน้าก่อนหน้า
+              },
+              icon: const Icon(Icons.arrow_back, color: Colors.black),
+            ),
+          ),
+        ),
+        title: const Text(
+          "ข้อมูลส่วนตัว",
+          style: TextStyle(color: Colors.black), // เปลี่ยนสีข้อความเป็นดำ
+        ),
         centerTitle: true, // ทำให้หัวข้ออยู่ตรงกลาง
+
+        /// ✅ ปุ่มแก้ไขที่อยู่ด้านขวาบน (ไม่หายไป)
         actions: [
           _isEditing
               ? IconButton(
             icon: const Icon(Icons.check, color: Colors.green),
-            onPressed: _saveProfileData,
+            onPressed: _saveProfileData, // กดแล้วบันทึกข้อมูล
           )
               : IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () {
               setState(() {
-                _isEditing = true;
+                _isEditing = true; // ✅ เข้าโหมดแก้ไข
               });
             },
           ),
         ],
       ),
+
+
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
