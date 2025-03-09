@@ -6,8 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
-// import 'package:gallery_saver/gallery_saver.dart';
-// import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:image/image.dart' as img;
@@ -106,7 +104,7 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       final InputImage inputImage = _convertCameraImage(image);
       final List<Face> detectedFaces =
-          await _faceDetector.processImage(inputImage);
+      await _faceDetector.processImage(inputImage);
 
       setState(() {
         _faces = detectedFaces;
@@ -130,8 +128,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     // Get sensor orientation from the camera description.
     final int sensorOrientation = _cameraController!.description.sensorOrientation;
-    // Map sensorOrientation to InputImageRotation (e.g., 90 or 270 degrees for front/back cameras)
-    // Here, you can adjust as needed for your device.
+    // Map sensorOrientation to InputImageRotation.
     InputImageRotation rotation = sensorOrientation == 90
         ? InputImageRotation.rotation90deg
         : sensorOrientation == 270
@@ -147,7 +144,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
     return InputImage.fromBytes(bytes: bytes, metadata: metadata);
   }
-
 
   /// **📸 Capture and Save Image**
   Future<void> _takePicture() async {
@@ -167,13 +163,33 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// **💾 Save Image to Mobile Gallery**
+  /// **💾 Save Image to Mobile Gallery with Correct Orientation**
   Future<String> _saveImageToGallery(String imagePath) async {
     try {
-      final Directory directory = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
-      final String newPath = '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final Directory directory = await getExternalStorageDirectory() ??
+          await getApplicationDocumentsDirectory();
+      final String newPath =
+          '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-      final File newImage = await File(imagePath).copy(newPath);
+      // Read the image file bytes.
+      final bytes = await File(imagePath).readAsBytes();
+
+      // Decode the image.
+      img.Image? capturedImage = img.decodeImage(bytes);
+      if (capturedImage == null) {
+        print("Error decoding image.");
+        return "";
+      }
+
+      // Correct the orientation using bakeOrientation.
+      img.Image orientedImage = img.bakeOrientation(capturedImage);
+
+      // Encode the oriented image back to jpg.
+      final orientedBytes = img.encodeJpg(orientedImage);
+
+      // Write the oriented image to a new file.
+      final File newImage = await File(newPath).writeAsBytes(orientedBytes);
+
       print("Image saved successfully: $newPath");
       return newPath;
     } catch (e) {
@@ -191,24 +207,24 @@ class _RegisterPageState extends State<RegisterPage> {
       }
       final Uint8List bytes = allBytes.done().buffer.asUint8List();
 
-      // Convert bytes to an image
+      // Convert bytes to an image.
       img.Image? capturedImage = img.decodeImage(Uint8List.fromList(bytes));
       if (capturedImage == null) return;
 
-      // Get face bounding box
+      // Get face bounding box.
       Rect faceRect = face.boundingBox;
       int x = faceRect.left.toInt();
       int y = faceRect.top.toInt();
       int w = faceRect.width.toInt();
       int h = faceRect.height.toInt();
 
-      // Ensure cropping is within bounds
+      // Ensure cropping is within bounds.
       x = math.max(0, x);
       y = math.max(0, y);
       w = math.min(capturedImage.width - x, w);
       h = math.min(capturedImage.height - y, h);
 
-      // Crop the face
+      // Crop the face.
       img.Image croppedFace = img.copyCrop(
         capturedImage,
         x: x,
@@ -217,11 +233,12 @@ class _RegisterPageState extends State<RegisterPage> {
         height: h,
       );
 
-      // Convert cropped image to Uint8List
-      Uint8List croppedBytes = Uint8List.fromList(img.encodeJpg(croppedFace));
+      // Convert cropped image to Uint8List.
+      Uint8List croppedBytes =
+      Uint8List.fromList(img.encodeJpg(croppedFace));
 
       setState(() {
-        _croppedFace = croppedBytes; // Store the cropped face image
+        _croppedFace = croppedBytes; // Store the cropped face image.
       });
 
       print("Face cropped successfully");
@@ -230,7 +247,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// **📷 Build Camera Preview**
+  /// **📷 Build Camera Preview in Portrait Mode**
   Widget _buildCameraPreview() {
     if (!_isCameraInitialized ||
         _cameraController == null ||
@@ -256,8 +273,6 @@ class _RegisterPageState extends State<RegisterPage> {
     return Center(child: preview);
   }
 
-
-
   @override
   void dispose() {
     _cameraController?.dispose();
@@ -271,10 +286,9 @@ class _RegisterPageState extends State<RegisterPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Positioned.fill(
-              child: _buildCameraPreview()), // ✅ Full-screen camera preview
+          Positioned.fill(child: _buildCameraPreview()), // Full-screen preview
 
-          // Face detection overlay
+          // Face detection overlay.
           if (_isCameraInitialized)
             Positioned.fill(
               child: CustomPaint(
@@ -282,7 +296,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
             ),
 
-          // **🔄 Switch Camera Button**
+          // Switch camera button.
           Positioned(
             top: 50,
             right: 20,
@@ -294,7 +308,7 @@ class _RegisterPageState extends State<RegisterPage> {
             ),
           ),
 
-          // **📸 Capture Button**
+          // Capture button.
           Positioned(
             bottom: 50,
             left: MediaQuery.of(context).size.width / 2 - 30,
@@ -306,7 +320,7 @@ class _RegisterPageState extends State<RegisterPage> {
             ),
           ),
 
-          // **🖼️ Show Captured Image**
+          // Display captured image.
           if (_capturedImagePath != null)
             Positioned(
               bottom: 50,
