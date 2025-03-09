@@ -99,7 +99,7 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       final InputImage inputImage = _convertCameraImage(image);
       final List<Face> detectedFaces =
-      await _faceDetector.processImage(inputImage);
+          await _faceDetector.processImage(inputImage);
       setState(() {
         _faces = detectedFaces;
       });
@@ -118,12 +118,13 @@ class _RegisterPageState extends State<RegisterPage> {
       allBytes.putUint8List(plane.bytes);
     }
     final bytes = allBytes.done().buffer.asUint8List();
-    final int sensorOrientation = _cameraController!.description.sensorOrientation;
+    final int sensorOrientation =
+        _cameraController!.description.sensorOrientation;
     InputImageRotation rotation = sensorOrientation == 90
         ? InputImageRotation.rotation90deg
         : sensorOrientation == 270
-        ? InputImageRotation.rotation270deg
-        : InputImageRotation.rotation0deg;
+            ? InputImageRotation.rotation270deg
+            : InputImageRotation.rotation0deg;
     final metadata = InputImageMetadata(
       size: Size(image.width.toDouble(), image.height.toDouble()),
       rotation: rotation,
@@ -219,27 +220,26 @@ class _RegisterPageState extends State<RegisterPage> {
 
     // Calculate the size of the preview
     final Size size = MediaQuery.of(context).size;
-    final double screenHeight = size.height;
     final double screenWidth = size.width;
-    final double screenRatio = screenWidth / screenHeight;
+    final double screenHeight = size.height;
+
+    // Calculate the display size of the camera preview
+    double renderWidth, renderHeight;
 
     final double previewWidth = _cameraController!.value.previewSize!.height;
     final double previewHeight = _cameraController!.value.previewSize!.width;
     final double previewRatio = previewWidth / previewHeight;
 
-    // Calculate the display size of the camera preview
-    double renderWidth, renderHeight;
-    if (previewRatio > screenRatio) {
-      renderWidth = screenWidth;
-      renderHeight = screenWidth / previewRatio;
-    } else {
-      renderWidth = screenHeight * previewRatio;
-      renderHeight = screenHeight;
-    }
+    final double screenRatio = screenWidth / screenHeight;
+
+    // Ensure the renderHeight respects the desired aspect ratio
+    renderHeight = screenHeight;
+    renderWidth = screenHeight * previewRatio;
 
     // Rotate the camera preview based on the camera lens direction
     int rotationAngle = 0;
-    if (_cameraController!.description.lensDirection == CameraLensDirection.front) {
+    if (_cameraController!.description.lensDirection ==
+        CameraLensDirection.front) {
       rotationAngle = 270;
     } else {
       rotationAngle = 90;
@@ -248,24 +248,26 @@ class _RegisterPageState extends State<RegisterPage> {
     // Return the transformed camera preview
     return Transform.rotate(
       angle: rotationAngle * math.pi / 180,
-      child: Center(
+      child: Align(
+        alignment: Alignment.topCenter, // Adjust alignment as needed
         child: OverflowBox(
           alignment: Alignment.center,
-          child: FittedBox(
-            fit: BoxFit.fitWidth,
-            child: SizedBox(
-              width: renderWidth,
-              height: renderHeight,
-              child: CameraPreview(_cameraController!),
+          child: SizedBox(
+            width: screenWidth,
+            height: screenHeight,
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: renderWidth,
+                height: renderHeight,
+                child: CameraPreview(_cameraController!),
+              ),
             ),
           ),
         ),
       ),
     );
   }
-
-
-
 
   @override
   void dispose() {
