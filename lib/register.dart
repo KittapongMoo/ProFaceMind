@@ -219,48 +219,49 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     // Calculate the size of the preview
-    final Size size = MediaQuery.of(context).size;
-    final double screenWidth = size.width;
-    final double screenHeight = size.height;
+    final Size screenSize = MediaQuery.of(context).size;
+    final double screenWidth = screenSize.width;
+    final double screenHeight = screenSize.height;
 
-    // Calculate the display size of the camera preview
-    double renderWidth, renderHeight;
-
+// Get preview size (swap width and height because preview is in landscape)
     final double previewWidth = _cameraController!.value.previewSize!.height;
     final double previewHeight = _cameraController!.value.previewSize!.width;
-    final double previewRatio = previewWidth / previewHeight;
+    final double previewAspectRatio = previewWidth / previewHeight;
 
-    final double screenRatio = screenWidth / screenHeight;
+// Set target dimensions based on full screen height
+    double targetHeight = screenHeight;
+    double targetWidth = targetHeight * previewAspectRatio;
 
-    // Ensure the renderHeight respects the desired aspect ratio
-    renderHeight = screenHeight;
-    renderWidth = screenHeight * previewRatio;
-
-    // Rotate the camera preview based on the camera lens direction
-    int rotationAngle = 0;
-    if (_cameraController!.description.lensDirection ==
-        CameraLensDirection.front) {
-      rotationAngle = 270;
-    } else {
-      rotationAngle = 90;
+// If the computed width is less than the screen width, adjust to fill screen width
+    if (targetWidth < screenWidth) {
+      targetWidth = screenWidth;
+      targetHeight = targetWidth / previewAspectRatio;
     }
 
-    // Return the transformed camera preview
-    return Transform.rotate(
-      angle: rotationAngle * math.pi / 180,
-      child: Align(
-        alignment: Alignment.topCenter, // Adjust alignment as needed
-        child: OverflowBox(
-          alignment: Alignment.center,
+// Compute rotation angle based on lens direction
+    int rotationAngle = (_cameraController!.description.lensDirection ==
+            CameraLensDirection.front)
+        ? 270
+        : 90;
+
+    return ClipRect(
+      child: Transform.rotate(
+        angle: rotationAngle * math.pi / 180,
+        child: Center(
           child: SizedBox(
             width: screenWidth,
             height: screenHeight,
-            child: FittedBox(
-              fit: BoxFit.cover,
-              child: SizedBox(
-                width: renderWidth,
-                height: renderHeight,
-                child: CameraPreview(_cameraController!),
+            child: OverflowBox(
+              alignment: Alignment.center,
+              maxWidth: targetWidth,
+              maxHeight: targetHeight,
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: targetWidth,
+                  height: targetHeight,
+                  child: CameraPreview(_cameraController!),
+                ),
               ),
             ),
           ),
