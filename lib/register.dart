@@ -1,10 +1,15 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:gallery_saver/gallery_saver.dart';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
+import 'package:image/image.dart' as img;
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -18,10 +23,12 @@ class _RegisterPageState extends State<RegisterPage> {
   List<CameraDescription>? _cameras;
   bool _isCameraInitialized = false;
   bool _isFrontCamera = true;
-  final FaceDetector _faceDetector =
-  FaceDetector(options: FaceDetectorOptions(performanceMode: FaceDetectorMode.accurate));
+  final FaceDetector _faceDetector = FaceDetector(
+      options: FaceDetectorOptions(performanceMode: FaceDetectorMode.accurate));
   bool _isDetectingFaces = false;
   List<Face> _faces = [];
+  Uint8List? _croppedFace; // ✅ Store cropped face
+  String? _capturedImagePath; // ✅ Store the captured image path
 
   @override
   void initState() {
@@ -97,11 +104,16 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _detectFaces(CameraImage image) async {
     try {
       final InputImage inputImage = _convertCameraImage(image);
-      final List<Face> detectedFaces = await _faceDetector.processImage(inputImage);
+      final List<Face> detectedFaces =
+          await _faceDetector.processImage(inputImage);
 
       setState(() {
         _faces = detectedFaces;
       });
+
+      if (detectedFaces.isNotEmpty) {
+        _cropFace(image, detectedFaces.first);
+      }
     } catch (e) {
       print("Error detecting faces: $e");
     }
@@ -117,7 +129,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     final metadata = InputImageMetadata(
       size: Size(image.width.toDouble(), image.height.toDouble()),
-      rotation: InputImageRotation.rotation0deg, // ✅ Fix rotation issue
+      rotation: InputImageRotation.rotation0deg,
       format: InputImageFormat.nv21,
       bytesPerRow: image.planes[0].bytesPerRow,
     );
@@ -125,45 +137,100 @@ class _RegisterPageState extends State<RegisterPage> {
     return InputImage.fromBytes(bytes: bytes, metadata: metadata);
   }
 
-  /// **📸 Take Picture**
+  /// **📸 Capture and Save Image**
   Future<void> _takePicture() async {
     if (!_cameraController!.value.isTakingPicture) {
       try {
-        final image = await _cameraController!.takePicture();
-        print("Photo captured: ${image.path}");
+        final XFile image = await _cameraController!.takePicture();
+        final String newPath = await _saveImageToGallery(image.path);
+
+        setState(() {
+          _capturedImagePath = newPath;
+        });
+
+        print("Photo saved: $newPath");
       } catch (e) {
         print('Error capturing image: $e');
       }
     }
   }
 
-  /// **🔄 Flip Camera Preview for Front Camera**
-  Widget _buildCameraPreview() {
-    if (_isCameraInitialized) {
-      return Transform(
-        alignment: Alignment.center,
-        transform: _cameraController!.description.lensDirection == CameraLensDirection.front
-            ? (Matrix4.identity()..scale(-1.0, 1.0, 1.0)) // ✅ Flip horizontally for front camera
-            : Matrix4.identity(),
-        child: Transform.rotate(
-          angle: _cameraController!.description.sensorOrientation == 90
-              ? math.pi / 2 // ✅ Rotate correctly for portrait
-              : _cameraController!.description.sensorOrientation == 270
-              ? -math.pi / 2 // ✅ Adjust back camera
-              : 0,
-          child: FittedBox(
-            fit: BoxFit.cover, // ✅ Full-screen preview
-            child: SizedBox(
-              width: 300,
-              height: 300 / _cameraController!.value.aspectRatio,
-              child: CameraPreview(_cameraController!),
-            ),
-          ),
-        ),
-      );
-    } else {
-      return const Center(child: CircularProgressIndicator());
+  /// **💾 Save Image to Mobile Gallery**
+  Future<String> _saveImageToGallery(String imagePath) async {
+    try {
+      final Directory directory = await getApplicationDocumentsDirectory();
+      final String newPath =
+          '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final File newImage = await File(imagePath).copy(newPath);
+
+      await GallerySaver.saveImage(newImage.path, albumName: "MyCameraApp");
+
+      return newImage.path;
+    } catch (e) {
+      print("Error saving image: $e");
+      return "";
     }
+  }
+
+  /// **✂️ Crop the detected face**
+  Future<void> _cropFace(CameraImage image, Face face) async {
+    try {
+      final WriteBuffer allBytes = WriteBuffer();
+      for (var plane in image.planes) {
+        allBytes.putUint8List(plane.bytes);
+      }
+      final Uint8List bytes = allBytes.done().buffer.asUint8List();
+
+      // Convert bytes to an image
+      img.Image? capturedImage = img.decodeImage(Uint8List.fromList(bytes));
+      if (capturedImage == null) return;
+
+      // Get face bounding box
+      Rect faceRect = face.boundingBox;
+      int x = faceRect.left.toInt();
+      int y = faceRect.top.toInt();
+      int w = faceRect.width.toInt();
+      int h = faceRect.height.toInt();
+
+      // Ensure cropping is within bounds
+      x = math.max(0, x);
+      y = math.max(0, y);
+      w = math.min(capturedImage.width - x, w);
+      h = math.min(capturedImage.height - y, h);
+
+      // Crop the face
+      img.Image croppedFace = img.copyCrop(
+        capturedImage,
+        x: x,
+        y: y,
+        width: w,
+        height: h,
+      );
+
+      // Convert cropped image to Uint8List
+      Uint8List croppedBytes = Uint8List.fromList(img.encodeJpg(croppedFace));
+
+      setState(() {
+        _croppedFace = croppedBytes; // Store the cropped face image
+      });
+
+      print("Face cropped successfully");
+    } catch (e) {
+      print("Error cropping face: $e");
+    }
+  }
+
+  /// **📷 Build Camera Preview**
+  Widget _buildCameraPreview() {
+    if (!_isCameraInitialized ||
+        _cameraController == null ||
+        !_cameraController!.value.isInitialized) {
+      return const Center(
+          child:
+              CircularProgressIndicator()); // Show loading indicator while initializing
+    }
+
+    return CameraPreview(_cameraController!);
   }
 
   @override
@@ -179,7 +246,8 @@ class _RegisterPageState extends State<RegisterPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Positioned.fill(child: _buildCameraPreview()), // ✅ Full-screen camera preview
+          Positioned.fill(
+              child: _buildCameraPreview()), // ✅ Full-screen camera preview
 
           // Face detection overlay
           if (_isCameraInitialized)
@@ -197,7 +265,7 @@ class _RegisterPageState extends State<RegisterPage> {
               heroTag: 'switch',
               backgroundColor: Colors.blue,
               child: const Icon(Icons.switch_camera),
-              onPressed: _switchCamera, // ✅ Switch camera function
+              onPressed: _switchCamera,
             ),
           ),
 
@@ -212,6 +280,18 @@ class _RegisterPageState extends State<RegisterPage> {
               onPressed: _takePicture,
             ),
           ),
+
+          // **🖼️ Show Captured Image**
+          if (_capturedImagePath != null)
+            Positioned(
+              bottom: 50,
+              right: 20,
+              child: Image.file(
+                File(_capturedImagePath!),
+                width: 100,
+                height: 100,
+              ),
+            ),
         ],
       ),
     );
@@ -226,7 +306,7 @@ class FacePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
-      ..color = Colors.red // ✅ Change to red for better visibility
+      ..color = Colors.red
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0;
 
