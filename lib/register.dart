@@ -221,39 +221,21 @@ class _RegisterPageState extends State<RegisterPage> {
     if (previewSize == null) {
       return const Center(child: CircularProgressIndicator());
     }
-
-    // Use FittedBox to cover the screen.
-    Widget preview = Container(
-      width: size.width,
-      height: size.height,
-      child: FittedBox(
-        fit: BoxFit.cover,
-        child: SizedBox(
-          // Swap width and height since the preview is typically in landscape.
-          width: previewSize.height,
-          height: previewSize.width,
-          child: CameraPreview(_cameraController!),
+    // To fix the -90° rotation, we rotate the preview by +90° (π/2 radians)
+    return Center(
+      child: Transform.rotate(
+        angle: math.pi / 2,
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            // Swap width and height because the preview is in landscape by default.
+            width: size.height,
+            height: size.width,
+            child: CameraPreview(_cameraController!),
+          ),
         ),
       ),
     );
-
-    // For front camera, mirror the preview.
-    if (_isFrontCamera) {
-      preview = Transform(
-        alignment: Alignment.center,
-        transform: Matrix4.rotationY(math.pi),
-        child: preview,
-      );
-    }
-
-    // If needed, adjust rotation (e.g. RotatedBox with quarterTurns: 3)
-    // Uncomment the following lines if the preview appears rotated -90 degrees.
-    // preview = RotatedBox(
-    //   quarterTurns: 3,
-    //   child: preview,
-    // );
-
-    return preview;
   }
 
   @override
