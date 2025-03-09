@@ -217,52 +217,46 @@ class _RegisterPageState extends State<RegisterPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final size = MediaQuery.of(context).size;
-    final previewSize = _cameraController!.value.previewSize;
-    if (previewSize == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    // Calculate the size of the preview
+    final Size size = MediaQuery.of(context).size;
+    final double screenHeight = size.height;
+    final double screenWidth = size.width;
+    final double screenRatio = screenWidth / screenHeight;
 
-    // Calculate the aspect ratio of the screen and camera preview
-    final screenRatio = size.width / size.height;
-    final previewRatio = previewSize.height / previewSize.width;
+    final double previewWidth = _cameraController!.value.previewSize!.height;
+    final double previewHeight = _cameraController!.value.previewSize!.width;
+    final double previewRatio = previewWidth / previewHeight;
 
-    // Determine the display size of the camera preview
-    double previewWidth, previewHeight;
+    // Calculate the display size of the camera preview
+    double renderWidth, renderHeight;
     if (previewRatio > screenRatio) {
-      // Preview ratio is larger than screen ratio (taller preview)
-      previewWidth = size.width;
-      previewHeight = size.width / previewRatio;
+      renderWidth = screenWidth;
+      renderHeight = screenWidth / previewRatio;
     } else {
-      // Preview ratio is smaller than or equal to screen ratio (wider preview)
-      previewWidth = size.height * previewRatio;
-      previewHeight = size.height;
+      renderWidth = screenHeight * previewRatio;
+      renderHeight = screenHeight;
     }
 
-    // Determine rotation angle based on the camera type
+    // Rotate the camera preview based on the camera lens direction
     int rotationAngle = 0;
     if (_cameraController!.description.lensDirection == CameraLensDirection.front) {
-      rotationAngle = 180; // Rotate by 180 degrees for front camera
+      rotationAngle = 270;
     } else {
-      rotationAngle = 90; // Rotate by 90 degrees for back camera
+      rotationAngle = 90;
     }
 
-    // To fix the rotation, apply the angle in radians
-    return Center(
-      child: Transform.rotate(
-        angle: rotationAngle * math.pi / 180, // Convert degrees to radians
-        child: Container(
-          width: size.width,
-          height: size.height,
-          child: OverflowBox(
-            alignment: Alignment.center,
-            child: FittedBox(
-              fit: BoxFit.fitWidth, // Adjust this fit as needed
-              child: SizedBox(
-                width: previewWidth,
-                height: previewHeight,
-                child: CameraPreview(_cameraController!),
-              ),
+    // Return the transformed camera preview
+    return Transform.rotate(
+      angle: rotationAngle * math.pi / 180,
+      child: Center(
+        child: OverflowBox(
+          alignment: Alignment.center,
+          child: FittedBox(
+            fit: BoxFit.fitWidth,
+            child: SizedBox(
+              width: renderWidth,
+              height: renderHeight,
+              child: CameraPreview(_cameraController!),
             ),
           ),
         ),
