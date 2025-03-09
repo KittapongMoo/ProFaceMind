@@ -210,33 +210,51 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   /// Build Camera Preview in Fullscreen Portrait Mode (Native Look)
+  /// Build Camera Preview in Fullscreen Portrait Mode (Native Look)
   Widget _buildCameraPreview() {
     if (!_isCameraInitialized ||
         _cameraController == null ||
         !_cameraController!.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
+
     final size = MediaQuery.of(context).size;
     final previewSize = _cameraController!.value.previewSize;
     if (previewSize == null) {
       return const Center(child: CircularProgressIndicator());
     }
+
+    // Calculate the aspect ratio of the screen and camera preview
+    final screenRatio = size.width / size.height;
+    final previewRatio = previewSize.height / previewSize.width;
+
+    // Adjust the camera preview size based on aspect ratios
+    final double scaleX = previewRatio / screenRatio;
+    final double scaleY = 1.0;
+
     // To fix the -90° rotation, we rotate the preview by +90° (π/2 radians)
     return Center(
       child: Transform.rotate(
         angle: math.pi / 2,
-        child: FittedBox(
-          fit: BoxFit.cover,
-          child: SizedBox(
-            // Swap width and height because the preview is in landscape by default.
-            width: size.height,
-            height: size.width,
-            child: CameraPreview(_cameraController!),
+        child: Container(
+          width: size.width,
+          height: size.height,
+          child: OverflowBox(
+            alignment: Alignment.center,
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: size.height * scaleX,
+                height: size.width * scaleY,
+                child: CameraPreview(_cameraController!),
+              ),
+            ),
           ),
         ),
       ),
     );
   }
+
 
   @override
   void dispose() {
