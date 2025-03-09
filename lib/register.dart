@@ -7,7 +7,6 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 import 'package:image/image.dart' as img;
 
 class RegisterPage extends StatefulWidget {
@@ -26,8 +25,8 @@ class _RegisterPageState extends State<RegisterPage> {
       options: FaceDetectorOptions(performanceMode: FaceDetectorMode.accurate));
   bool _isDetectingFaces = false;
   List<Face> _faces = [];
-  Uint8List? _croppedFace; // ✅ Store cropped face
-  String? _capturedImagePath; // ✅ Store the captured image path
+  Uint8List? _croppedFace; // Store cropped face
+  String? _capturedImagePath; // Store the captured image path
 
   @override
   void initState() {
@@ -38,14 +37,13 @@ class _RegisterPageState extends State<RegisterPage> {
     });
   }
 
-  /// **🔄 Initialize Camera**
+  /// Initialize Camera
   Future<void> _initializeCamera() async {
     final permission = await Permission.camera.request();
     if (!permission.isGranted) {
       print("Camera permission denied");
       return;
     }
-
     try {
       _cameras = await availableCameras();
       if (_cameras!.isNotEmpty) {
@@ -56,7 +54,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// **🔀 Switch Between Front and Back Cameras**
+  /// Switch Between Front and Back Cameras
   Future<void> _switchCamera() async {
     setState(() {
       _isFrontCamera = !_isFrontCamera;
@@ -64,21 +62,18 @@ class _RegisterPageState extends State<RegisterPage> {
     await _setCamera(_isFrontCamera ? 1 : 0);
   }
 
-  /// **📷 Set Camera by Index**
+  /// Set Camera by Index
   Future<void> _setCamera(int cameraIndex) async {
     if (_cameraController != null) {
       await _cameraController!.dispose();
     }
-
     try {
       CameraDescription selectedCamera = _cameras![cameraIndex];
-
       _cameraController = CameraController(
         selectedCamera,
-        ResolutionPreset.max, // ✅ Highest resolution for best preview
+        ResolutionPreset.max, // Highest resolution for best preview
         enableAudio: false,
       );
-
       await _cameraController!.initialize();
       if (!mounted) return;
 
@@ -99,17 +94,15 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// **🤖 Face Detection Using ML Kit**
+  /// Face Detection Using ML Kit
   Future<void> _detectFaces(CameraImage image) async {
     try {
       final InputImage inputImage = _convertCameraImage(image);
       final List<Face> detectedFaces =
       await _faceDetector.processImage(inputImage);
-
       setState(() {
         _faces = detectedFaces;
       });
-
       if (detectedFaces.isNotEmpty) {
         _cropFace(image, detectedFaces.first);
       }
@@ -118,44 +111,38 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// **📌 Convert CameraImage to InputImage (For ML Kit)**
+  /// Convert CameraImage to InputImage for ML Kit
   InputImage _convertCameraImage(CameraImage image) {
     final WriteBuffer allBytes = WriteBuffer();
     for (var plane in image.planes) {
       allBytes.putUint8List(plane.bytes);
     }
     final bytes = allBytes.done().buffer.asUint8List();
-
-    // Get sensor orientation from the camera description.
-    final int sensorOrientation = _cameraController!.description.sensorOrientation;
-    // Map sensorOrientation to InputImageRotation.
+    final int sensorOrientation =
+        _cameraController!.description.sensorOrientation;
     InputImageRotation rotation = sensorOrientation == 90
         ? InputImageRotation.rotation90deg
         : sensorOrientation == 270
         ? InputImageRotation.rotation270deg
         : InputImageRotation.rotation0deg;
-
     final metadata = InputImageMetadata(
       size: Size(image.width.toDouble(), image.height.toDouble()),
       rotation: rotation,
       format: InputImageFormat.nv21,
       bytesPerRow: image.planes[0].bytesPerRow,
     );
-
     return InputImage.fromBytes(bytes: bytes, metadata: metadata);
   }
 
-  /// **📸 Capture and Save Image**
+  /// Capture and Save Image
   Future<void> _takePicture() async {
     if (!_cameraController!.value.isTakingPicture) {
       try {
         final XFile image = await _cameraController!.takePicture();
         final String newPath = await _saveImageToGallery(image.path);
-
         setState(() {
           _capturedImagePath = newPath;
         });
-
         print("Photo saved: $newPath");
       } catch (e) {
         print('Error capturing image: $e');
@@ -163,33 +150,27 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// **💾 Save Image to Mobile Gallery with Correct Orientation**
+  /// Save Image to Mobile Gallery with Correct Orientation
   Future<String> _saveImageToGallery(String imagePath) async {
     try {
       final Directory directory = await getExternalStorageDirectory() ??
           await getApplicationDocumentsDirectory();
       final String newPath =
           '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-
       // Read the image file bytes.
       final bytes = await File(imagePath).readAsBytes();
-
       // Decode the image.
       img.Image? capturedImage = img.decodeImage(bytes);
       if (capturedImage == null) {
         print("Error decoding image.");
         return "";
       }
-
       // Correct the orientation using bakeOrientation.
       img.Image orientedImage = img.bakeOrientation(capturedImage);
-
       // Encode the oriented image back to jpg.
       final orientedBytes = img.encodeJpg(orientedImage);
-
       // Write the oriented image to a new file.
       final File newImage = await File(newPath).writeAsBytes(orientedBytes);
-
       print("Image saved successfully: $newPath");
       return newPath;
     } catch (e) {
@@ -198,7 +179,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// **✂️ Crop the detected face**
+  /// Crop the detected face
   Future<void> _cropFace(CameraImage image, Face face) async {
     try {
       final WriteBuffer allBytes = WriteBuffer();
@@ -206,25 +187,17 @@ class _RegisterPageState extends State<RegisterPage> {
         allBytes.putUint8List(plane.bytes);
       }
       final Uint8List bytes = allBytes.done().buffer.asUint8List();
-
-      // Convert bytes to an image.
       img.Image? capturedImage = img.decodeImage(Uint8List.fromList(bytes));
       if (capturedImage == null) return;
-
-      // Get face bounding box.
       Rect faceRect = face.boundingBox;
       int x = faceRect.left.toInt();
       int y = faceRect.top.toInt();
       int w = faceRect.width.toInt();
       int h = faceRect.height.toInt();
-
-      // Ensure cropping is within bounds.
       x = math.max(0, x);
       y = math.max(0, y);
       w = math.min(capturedImage.width - x, w);
       h = math.min(capturedImage.height - y, h);
-
-      // Crop the face.
       img.Image croppedFace = img.copyCrop(
         capturedImage,
         x: x,
@@ -232,22 +205,18 @@ class _RegisterPageState extends State<RegisterPage> {
         width: w,
         height: h,
       );
-
-      // Convert cropped image to Uint8List.
       Uint8List croppedBytes =
       Uint8List.fromList(img.encodeJpg(croppedFace));
-
       setState(() {
-        _croppedFace = croppedBytes; // Store the cropped face image.
+        _croppedFace = croppedBytes;
       });
-
       print("Face cropped successfully");
     } catch (e) {
       print("Error cropping face: $e");
     }
   }
 
-  /// **📷 Build Camera Preview in Portrait Mode**
+  /// Build Camera Preview in Fullscreen Portrait Mode
   Widget _buildCameraPreview() {
     if (!_isCameraInitialized ||
         _cameraController == null ||
@@ -255,10 +224,18 @@ class _RegisterPageState extends State<RegisterPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Use a RotatedBox to force portrait mode.
-    Widget preview = RotatedBox(
-      quarterTurns: 1, // Rotates the preview by 90 degrees. Adjust if needed.
-      child: CameraPreview(_cameraController!),
+    // Get screen size.
+    final size = MediaQuery.of(context).size;
+    // Calculate scale factor to fill the screen.
+    double scale = size.aspectRatio * _cameraController!.value.aspectRatio;
+    if (scale < 1) scale = 1 / scale;
+
+    Widget preview = Transform.scale(
+      scale: scale,
+      child: RotatedBox(
+        quarterTurns: 1,
+        child: CameraPreview(_cameraController!),
+      ),
     );
 
     // Mirror the preview horizontally for the front camera.
@@ -270,7 +247,7 @@ class _RegisterPageState extends State<RegisterPage> {
       );
     }
 
-    return Center(child: preview);
+    return preview;
   }
 
   @override
@@ -286,7 +263,8 @@ class _RegisterPageState extends State<RegisterPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Positioned.fill(child: _buildCameraPreview()), // Full-screen preview
+          // Full-screen camera preview (under all buttons).
+          Positioned.fill(child: _buildCameraPreview()),
 
           // Face detection overlay.
           if (_isCameraInitialized)
@@ -337,7 +315,6 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 }
 
-// **🎯 Face Detection Painter**
 class FacePainter extends CustomPainter {
   final List<Face> faces;
   FacePainter(this.faces);
@@ -350,8 +327,7 @@ class FacePainter extends CustomPainter {
       ..strokeWidth = 3.0;
 
     for (var face in faces) {
-      final rect = face.boundingBox;
-      canvas.drawRect(rect, paint);
+      canvas.drawRect(face.boundingBox, paint);
     }
   }
 
