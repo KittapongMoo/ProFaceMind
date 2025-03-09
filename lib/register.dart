@@ -239,10 +239,18 @@ class _RegisterPageState extends State<RegisterPage> {
       previewHeight = size.height;
     }
 
-    // To fix the -90° rotation, we rotate the preview by +90° (π/2 radians)
+    // Determine rotation angle based on the camera type
+    int rotationAngle = 0;
+    if (_cameraController!.description.lensDirection == CameraLensDirection.front) {
+      rotationAngle = 180; // Rotate by 180 degrees for front camera
+    } else {
+      rotationAngle = 90; // Rotate by 90 degrees for back camera
+    }
+
+    // To fix the rotation, apply the angle in radians
     return Center(
       child: Transform.rotate(
-        angle: math.pi / 2,
+        angle: rotationAngle * math.pi / 180, // Convert degrees to radians
         child: Container(
           width: size.width,
           height: size.height,
@@ -261,6 +269,7 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
     );
   }
+
 
 
 
