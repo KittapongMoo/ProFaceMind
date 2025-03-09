@@ -8,7 +8,7 @@ plugins {
 android {
     namespace "dev.kittapong.facemind" // ตั้งค่า namespace ของแอป
 
-    compileSdkVersion 34 // ใช้เวอร์ชันที่อัปเดตล่าสุด
+    compileSdkVersion 35 // ใช้เวอร์ชันที่อัปเดตล่าสุด
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -23,7 +23,7 @@ android {
     defaultConfig {
         applicationId "dev.kittapong.facemind" // ต้องตรงกับ namespace
         minSdkVersion 21 // ตั้งค่าให้รองรับ Android 5.0+
-        targetSdkVersion 34 // ใช้เวอร์ชันล่าสุดของ Android
+        targetSdkVersion 35 // ใช้เวอร์ชันล่าสุดของ Android
         versionCode flutter.versionCode
         versionName flutter.versionName
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = project.hasProperty("GOOGLE_MAPS_API_KEY") ? GOOGLE_MAPS_API_KEY : ""

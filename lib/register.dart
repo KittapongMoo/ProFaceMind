@@ -6,7 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:gallery_saver/gallery_saver.dart';
+// import 'package:gallery_saver/gallery_saver.dart';
+// import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:image/image.dart' as img;
@@ -158,14 +159,12 @@ class _RegisterPageState extends State<RegisterPage> {
   /// **💾 Save Image to Mobile Gallery**
   Future<String> _saveImageToGallery(String imagePath) async {
     try {
-      final Directory directory = await getApplicationDocumentsDirectory();
-      final String newPath =
-          '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final Directory directory = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
+      final String newPath = '${directory.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+
       final File newImage = await File(imagePath).copy(newPath);
-
-      await GallerySaver.saveImage(newImage.path, albumName: "MyCameraApp");
-
-      return newImage.path;
+      print("Image saved successfully: $newPath");
+      return newPath;
     } catch (e) {
       print("Error saving image: $e");
       return "";
