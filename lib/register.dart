@@ -210,7 +210,6 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   /// Build Camera Preview in Fullscreen Portrait Mode (Native Look)
-  /// Build Camera Preview in Fullscreen Portrait Mode (Native Look)
   Widget _buildCameraPreview() {
     if (!_isCameraInitialized ||
         _cameraController == null ||
@@ -228,9 +227,17 @@ class _RegisterPageState extends State<RegisterPage> {
     final screenRatio = size.width / size.height;
     final previewRatio = previewSize.height / previewSize.width;
 
-    // Adjust the camera preview size based on aspect ratios
-    final double scaleX = previewRatio / screenRatio;
-    final double scaleY = 1.0;
+    // Determine the display size of the camera preview
+    double previewWidth, previewHeight;
+    if (previewRatio > screenRatio) {
+      // Preview ratio is larger than screen ratio (taller preview)
+      previewWidth = size.width;
+      previewHeight = size.width / previewRatio;
+    } else {
+      // Preview ratio is smaller than or equal to screen ratio (wider preview)
+      previewWidth = size.height * previewRatio;
+      previewHeight = size.height;
+    }
 
     // To fix the -90° rotation, we rotate the preview by +90° (π/2 radians)
     return Center(
@@ -242,10 +249,10 @@ class _RegisterPageState extends State<RegisterPage> {
           child: OverflowBox(
             alignment: Alignment.center,
             child: FittedBox(
-              fit: BoxFit.cover,
+              fit: BoxFit.fitWidth, // Adjust this fit as needed
               child: SizedBox(
-                width: size.height * scaleX,
-                height: size.width * scaleY,
+                width: previewWidth,
+                height: previewHeight,
                 child: CameraPreview(_cameraController!),
               ),
             ),
@@ -254,6 +261,7 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
     );
   }
+
 
 
   @override
