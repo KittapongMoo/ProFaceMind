@@ -222,35 +222,38 @@ class _RegisterPageState extends State<RegisterPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Get the screen size
+    // Get screen size
     final Size screenSize = MediaQuery.of(context).size;
     final double screenWidth = screenSize.width;
     final double screenHeight = screenSize.height;
 
-    // Determine camera sensor orientation
+    // Get camera sensor orientation (default is landscape)
     int sensorOrientation = _cameraController!.description.sensorOrientation;
-    bool isPortrait = sensorOrientation == 90 || sensorOrientation == 270;
 
-    // Rotate preview to match portrait mode
+    // Compute correct rotation for portrait mode
     double rotationAngle = 0;
     if (sensorOrientation == 90) {
-      rotationAngle = -math.pi / 2; // Rotate left
+      rotationAngle = -math.pi / 2; // Rotate left for portrait
     } else if (sensorOrientation == 270) {
-      rotationAngle = math.pi / 2; // Rotate right
+      rotationAngle = math.pi / 2; // Rotate right for portrait
     }
 
+    // Apply transformations:
+    // - Always flip the preview along the Y-axis (for both cameras)
+    // - Rotate to match portrait mode
     return SizedBox(
       width: screenWidth,
       height: screenHeight,
       child: Transform(
         alignment: Alignment.center,
-        transform: _isFrontCamera
-            ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle) // Flip for front camera
-            : Matrix4.rotationZ(rotationAngle), // Rotate preview correctly
+        transform: Matrix4.rotationX(math.pi) * Matrix4.rotationZ(rotationAngle), // Flip Y-axis + Rotate
         child: CameraPreview(_cameraController!),
       ),
     );
   }
+
+
+
 
 
 
