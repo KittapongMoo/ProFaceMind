@@ -223,22 +223,22 @@ class _RegisterPageState extends State<RegisterPage> {
     final double screenWidth = screenSize.width;
     final double screenHeight = screenSize.height;
 
-// Get preview size (swap width and height because preview is in landscape)
+    // Get preview size (swap width and height because preview is in landscape)
     final double previewWidth = _cameraController!.value.previewSize!.height;
     final double previewHeight = _cameraController!.value.previewSize!.width;
     final double previewAspectRatio = previewWidth / previewHeight;
 
-// Set target dimensions based on full screen height
+    // Set target dimensions based on full screen height
     double targetHeight = screenHeight;
     double targetWidth = targetHeight * previewAspectRatio;
 
-// If the computed width is less than the screen width, adjust to fill screen width
+    // If the computed width is less than the screen width, adjust to fill screen width
     if (targetWidth < screenWidth) {
       targetWidth = screenWidth;
       targetHeight = targetWidth / previewAspectRatio;
     }
 
-// Compute rotation angle based on lens direction
+    // Compute rotation angle based on lens direction
     int rotationAngle = (_cameraController!.description.lensDirection ==
             CameraLensDirection.front)
         ? 270
@@ -255,11 +255,14 @@ class _RegisterPageState extends State<RegisterPage> {
               alignment: Alignment.center,
               maxWidth: targetWidth,
               maxHeight: targetHeight,
-              child: FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: targetWidth,
-                  height: targetHeight,
+              child: SizedBox(
+                width: targetWidth,
+                height: targetHeight,
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: _isFrontCamera
+                      ? Matrix4.rotationY(math.pi) // Flip preview for front cam
+                      : Matrix4.identity(),
                   child: CameraPreview(_cameraController!),
                 ),
               ),
