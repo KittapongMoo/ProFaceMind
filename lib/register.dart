@@ -217,80 +217,43 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Build Camera Preview in Fullscreen Portrait Mode (Native Look)
   Widget _buildCameraPreview() {
-    if (!_isCameraInitialized ||
-        _cameraController == null ||
-        !_cameraController!.value.isInitialized) {
+    if (!_isCameraInitialized || _cameraController == null || !_cameraController!.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Calculate the size of the preview
+    // Get the screen size
     final Size screenSize = MediaQuery.of(context).size;
     final double screenWidth = screenSize.width;
     final double screenHeight = screenSize.height;
-    debugPrint("Screen Width: $screenWidth");
-    debugPrint("Screen Height: $screenHeight");
 
-    // Get device pixel ratio
-    final double devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+    // Determine camera sensor orientation
+    int sensorOrientation = _cameraController!.description.sensorOrientation;
+    bool isPortrait = sensorOrientation == 90 || sensorOrientation == 270;
 
-// Calculate actual screen size in physical pixels
-    final double actualScreenWidth = screenWidth * devicePixelRatio;
-    final double actualScreenHeight = screenHeight * devicePixelRatio;
-
-    // Get preview size (swap width and height because preview is in landscape)
-    final double previewWidth = _cameraController!.value.previewSize!.height;
-    final double previewHeight = _cameraController!.value.previewSize!.width;
-    final double previewAspectRatio = previewWidth / previewHeight;
-
-    // Set target dimensions based on full screen height
-    double targetHeight = actualScreenWidth;
-    double targetWidth = actualScreenHeight;
-
-    // If the computed width is less than the screen width, adjust to fill screen width
-    if (targetWidth < screenWidth) {
-      targetWidth = screenWidth;
-      targetHeight = targetWidth / previewAspectRatio;
+    // Rotate preview to match portrait mode
+    double rotationAngle = 0;
+    if (sensorOrientation == 90) {
+      rotationAngle = -math.pi / 2; // Rotate left
+    } else if (sensorOrientation == 270) {
+      rotationAngle = math.pi / 2; // Rotate right
     }
 
-    // Compute rotation angle based on lens direction
-    int rotationAngle = (_cameraController!.description.lensDirection ==
-        CameraLensDirection.front)
-        ? 90
-        : 90;
-
-    return ClipRect(
-      child: Transform.rotate(
-        angle: rotationAngle * math.pi / 180,
-        child: Center(
-          child: SizedBox(
-            width: screenWidth,
-            height: screenHeight,
-            child: OverflowBox(
-              alignment: Alignment.center,
-              maxWidth: targetWidth,
-              maxHeight: targetHeight,
-              child: FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: targetWidth,
-                  height: targetHeight,
-                  child: Transform(
-                    alignment: Alignment.center,
-                    transform: _isFrontCamera
-                        ? Matrix4.rotationY(math.pi) // Flip preview for front cam
-                        : Matrix4.identity(),
-                    child: CameraPreview(_cameraController!),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
+    return SizedBox(
+      width: screenWidth,
+      height: screenHeight,
+      child: Transform(
+        alignment: Alignment.center,
+        transform: _isFrontCamera
+            ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle) // Flip for front camera
+            : Matrix4.rotationZ(rotationAngle), // Rotate preview correctly
+        child: CameraPreview(_cameraController!),
       ),
     );
   }
+
+
+
 
 
   @override
