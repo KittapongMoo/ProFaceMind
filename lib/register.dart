@@ -229,6 +229,15 @@ class _RegisterPageState extends State<RegisterPage> {
     final Size screenSize = MediaQuery.of(context).size;
     final double screenWidth = screenSize.width;
     final double screenHeight = screenSize.height;
+    debugPrint("Screen Width: $screenWidth");
+    debugPrint("Screen Height: $screenHeight");
+
+    // Get device pixel ratio
+    final double devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+
+// Calculate actual screen size in physical pixels
+    final double actualScreenWidth = screenWidth * devicePixelRatio;
+    final double actualScreenHeight = screenHeight * devicePixelRatio;
 
     // Get preview size (swap width and height because preview is in landscape)
     final double previewWidth = _cameraController!.value.previewSize!.height;
@@ -236,8 +245,8 @@ class _RegisterPageState extends State<RegisterPage> {
     final double previewAspectRatio = previewWidth / previewHeight;
 
     // Set target dimensions based on full screen height
-    double targetHeight = screenHeight;
-    double targetWidth = targetHeight * previewAspectRatio;
+    double targetHeight = actualScreenWidth;
+    double targetWidth = actualScreenHeight;
 
     // If the computed width is less than the screen width, adjust to fill screen width
     if (targetWidth < screenWidth) {
@@ -248,7 +257,7 @@ class _RegisterPageState extends State<RegisterPage> {
     // Compute rotation angle based on lens direction
     int rotationAngle = (_cameraController!.description.lensDirection ==
         CameraLensDirection.front)
-        ? 270
+        ? 90
         : 90;
 
     return ClipRect(
