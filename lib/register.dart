@@ -163,7 +163,13 @@ class _RegisterPageState extends State<RegisterPage> {
         print("Error decoding image.");
         return "";
       }
+
+      // Ensure correct orientation and flip for front camera
       img.Image orientedImage = img.bakeOrientation(capturedImage);
+      if (_isFrontCamera) {
+        orientedImage = img.flipHorizontal(orientedImage); // Flip for front camera
+      }
+
       final orientedBytes = img.encodeJpg(orientedImage);
       final File newImage = await File(newPath).writeAsBytes(orientedBytes);
       print("Image saved successfully: $newPath");
@@ -173,6 +179,7 @@ class _RegisterPageState extends State<RegisterPage> {
       return "";
     }
   }
+
 
   /// Crop the detected face
   Future<void> _cropFace(CameraImage image, Face face) async {
@@ -240,7 +247,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     // Compute rotation angle based on lens direction
     int rotationAngle = (_cameraController!.description.lensDirection ==
-            CameraLensDirection.front)
+        CameraLensDirection.front)
         ? 270
         : 90;
 
@@ -255,15 +262,18 @@ class _RegisterPageState extends State<RegisterPage> {
               alignment: Alignment.center,
               maxWidth: targetWidth,
               maxHeight: targetHeight,
-              child: SizedBox(
-                width: targetWidth,
-                height: targetHeight,
-                child: Transform(
-                  alignment: Alignment.center,
-                  transform: _isFrontCamera
-                      ? Matrix4.rotationY(math.pi) // Flip preview for front cam
-                      : Matrix4.identity(),
-                  child: CameraPreview(_cameraController!),
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: targetWidth,
+                  height: targetHeight,
+                  child: Transform(
+                    alignment: Alignment.center,
+                    transform: _isFrontCamera
+                        ? Matrix4.rotationY(math.pi) // Flip preview for front cam
+                        : Matrix4.identity(),
+                    child: CameraPreview(_cameraController!),
+                  ),
                 ),
               ),
             ),
@@ -272,6 +282,7 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
     );
   }
+
 
   @override
   void dispose() {
