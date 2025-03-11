@@ -222,7 +222,7 @@ class _RegisterPageState extends State<RegisterPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Get screen size
+    // Get the screen size
     final Size screenSize = MediaQuery.of(context).size;
     final double screenWidth = screenSize.width;
     final double screenHeight = screenSize.height;
@@ -238,19 +238,27 @@ class _RegisterPageState extends State<RegisterPage> {
       rotationAngle = math.pi / 2; // Rotate right for portrait
     }
 
-    // Apply transformations:
-    // - Always flip the preview along the Y-axis (for both cameras)
-    // - Rotate to match portrait mode
     return SizedBox(
       width: screenWidth,
       height: screenHeight,
-      child: Transform(
-        alignment: Alignment.center,
-        transform: Matrix4.rotationX(math.pi) * Matrix4.rotationZ(rotationAngle), // Flip Y-axis + Rotate
-        child: CameraPreview(_cameraController!),
+      child: FittedBox(
+        fit: BoxFit.cover, // Ensure full screen coverage
+        child: SizedBox(
+          width: screenHeight, // Swap width & height because the camera is landscape by default
+          height: screenWidth,
+          child: Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle), // Flip both cameras + Rotate correctly
+            child: CameraPreview(_cameraController!),
+          ),
+        ),
       ),
     );
   }
+
+
+
+
 
 
 
