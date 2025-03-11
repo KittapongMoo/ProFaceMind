@@ -217,6 +217,10 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
+  double extraCropFactor =
+      1.0; // 1.0 = no extra crop; >1.0 = zoom in; <1.0 = zoom out
+  double verticalOffset = 0.0; // Shift the camera preview up/down if needed
+
   Widget _buildCameraPreview() {
     if (!_isCameraInitialized ||
         _cameraController == null ||
@@ -224,44 +228,83 @@ class _RegisterPageState extends State<RegisterPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // 1. Camera preview size and aspect ratio
+    // 1. Get camera preview size & aspect ratio.
+    //    Camera is typically landscape: width > height
     final previewSize = _cameraController!.value.previewSize!;
-    // The camera typically reports its size in landscape: width > height
     final double cameraAspectRatio = previewSize.width / previewSize.height;
 
-    // 2. Determine rotation based on sensor orientation
-    final int sensorOrientation = _cameraController!.description.sensorOrientation;
-    double rotationAngle = 0;
-    if (sensorOrientation == 90) {
-      rotationAngle = math.pi / 2;    // 90 degrees
-    } else if (sensorOrientation == 270) {
-      rotationAngle = -math.pi / 2;   // 270 degrees
+    // 2. Get screen size (portrait) & aspect ratio
+    final Size screenSize = MediaQuery.of(context).size;
+    final double screenWidth = screenSize.width;
+    final double screenHeight = screenSize.height;
+    final double deviceAspectRatio = screenWidth / screenHeight;
+
+    // 3. Figure out the base scale so the camera covers the screen (BoxFit.cover).
+    //    If the camera is "wider" than the device, we scale so the width matches,
+    //    which may crop top/bottom. If the camera is "taller", we scale so the
+    //    height matches, which may crop sides.
+    double baseScale;
+    if (cameraAspectRatio > deviceAspectRatio) {
+      // Camera is wider than the screen => match device width => crop top/bottom
+      baseScale = cameraAspectRatio / deviceAspectRatio;
+    } else {
+      // Camera is narrower => match device height => crop sides
+      baseScale = deviceAspectRatio / cameraAspectRatio;
     }
 
-    // 3. Check if it's the front camera
-    final bool isFrontCamera =
-        _cameraController!.description.lensDirection == CameraLensDirection.front;
+    // 4. Combine base scale with an extra crop factor
+    //    - extraCropFactor > 1.0 => further zoom in (more cropping)
+    //    - extraCropFactor < 1.0 => zoom out (letterbox)
+    final double finalScale = baseScale * extraCropFactor;
 
-    // 4. Build the transformation matrix for rotation & optional flip
+    // 5. Determine rotation based on sensor orientation
+    final int sensorOrientation =
+        _cameraController!.description.sensorOrientation;
+    double rotationAngle = 0;
+    if (sensorOrientation == 90) {
+      rotationAngle = math.pi / 2; // 90 deg
+    } else if (sensorOrientation == 270) {
+      rotationAngle = -math.pi / 2; // 270 deg
+    }
+
+    // 6. Flip horizontally if it's the front camera
+    final bool isFrontCamera = _cameraController!.description.lensDirection ==
+        CameraLensDirection.front;
+
+    // 7. Build transform (flip + rotate)
     final Matrix4 transformMatrix = isFrontCamera
         ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
         : Matrix4.rotationZ(rotationAngle);
 
-    // 5. Return a widget that preserves the camera’s aspect ratio (no cropping).
-    //    It may show letterboxing if the aspect ratios differ.
-    return Center(
-      child: AspectRatio(
-        aspectRatio: cameraAspectRatio, // Show the full camera feed
-        child: Transform(
-          alignment: Alignment.center,
-          transform: transformMatrix,
-          child: CameraPreview(_cameraController!),
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Use a parent LayoutBuilder or screen constraints
+        final double parentWidth = constraints.maxWidth;
+        final double parentHeight = constraints.maxHeight;
+
+        return SizedBox(
+          width: parentWidth,
+          height: parentHeight,
+          child: ClipRect(
+            // ClipRect ensures we don't render beyond the parent
+            child: Transform(
+              alignment: Alignment.center,
+              transform: transformMatrix
+                ..translate(0, verticalOffset) // Shift up/down if needed
+                ..scale(finalScale, finalScale), // Zoom in/out
+              child: Center(
+                // Maintain camera aspect ratio inside the transform
+                child: AspectRatio(
+                  aspectRatio: cameraAspectRatio,
+                  child: CameraPreview(_cameraController!),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
-
-
 
   @override
   void dispose() {
