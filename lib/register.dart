@@ -70,11 +70,13 @@ class _RegisterPageState extends State<RegisterPage> {
     }
     try {
       CameraDescription selectedCamera = _cameras![cameraIndex];
-      _cameraController = CameraController(
-        selectedCamera,
-        ResolutionPreset.max, // Highest resolution for best preview
-        enableAudio: false,
-      );
+      _cameraController!.startImageStream((CameraImage image) async {
+        if (!_isDetectingFaces) {
+          _isDetectingFaces = true;
+          await _detectFaces(image);
+          _isDetectingFaces = false;
+        }
+      });
       await _cameraController!.initialize();
       if (!mounted) return;
 
@@ -100,12 +102,14 @@ class _RegisterPageState extends State<RegisterPage> {
       final InputImage inputImage = _convertCameraImage(image);
       final List<Face> detectedFaces =
           await _faceDetector.processImage(inputImage);
-      setState(() {
-        _faces = detectedFaces;
-      });
-      if (detectedFaces.isNotEmpty) {
-        _cropFace(image, detectedFaces.first);
+
+      if (mounted) {
+        setState(() {
+          _faces = detectedFaces;
+        });
       }
+
+      // REMOVE: real-time cropping here
     } catch (e) {
       print("Error detecting faces: $e");
     }
@@ -136,17 +140,61 @@ class _RegisterPageState extends State<RegisterPage> {
 
   /// Capture and Save Image
   Future<void> _takePicture() async {
-    if (!_cameraController!.value.isTakingPicture) {
-      try {
-        final XFile image = await _cameraController!.takePicture();
-        final String newPath = await _saveImageToGallery(image.path);
-        setState(() {
-          _capturedImagePath = newPath;
-        });
-        print("Photo saved: $newPath");
-      } catch (e) {
-        print('Error capturing image: $e');
+    if (_cameraController!.value.isTakingPicture) return;
+
+    try {
+      final XFile imageFile = await _cameraController!.takePicture();
+      final bytes = await imageFile.readAsBytes();
+
+      img.Image? capturedImage = img.decodeImage(bytes);
+      if (capturedImage == null) return;
+
+      // Correct rotation based on camera orientation
+      final int rotation = _cameraController!.description.sensorOrientation;
+      img.Image orientedImage = (rotation == 90)
+          ? img.copyRotate(capturedImage, angle: 90)
+          : (rotation == 270)
+              ? img.copyRotate(capturedImage, angle: -90)
+              : capturedImage;
+
+      if (_isFrontCamera) {
+        orientedImage = img.flipHorizontal(orientedImage);
       }
+
+      final inputImage = InputImage.fromFilePath(imageFile.path);
+      final faces = await _faceDetector.processImage(inputImage);
+
+      if (faces.isNotEmpty) {
+        final faceRect = faces.first.boundingBox;
+
+        double scaleX =
+            orientedImage.width / _cameraController!.value.previewSize!.height;
+        double scaleY =
+            orientedImage.height / _cameraController!.value.previewSize!.width;
+
+        int x = (faceRect.left * scaleX).round().clamp(0, orientedImage.width);
+        int y = (faceRect.top * scaleY).round().clamp(0, orientedImage.height);
+        int w =
+            (faceRect.width * scaleX).round().clamp(0, orientedImage.width - x);
+        int h = (faceRect.height * scaleY)
+            .round()
+            .clamp(0, orientedImage.height - y);
+
+        img.Image croppedFace =
+            img.copyCrop(orientedImage, x: x, y: y, width: w, height: h);
+        Uint8List croppedBytes = Uint8List.fromList(img.encodeJpg(croppedFace));
+
+        setState(() {
+          _croppedFace = croppedBytes;
+          _capturedImagePath = imageFile.path;
+        });
+
+        print("Face cropped successfully");
+      } else {
+        print("No face detected in captured image");
+      }
+    } catch (e) {
+      print("Error processing image: $e");
     }
   }
 
@@ -356,9 +404,8 @@ class _RegisterPageState extends State<RegisterPage> {
               child: CustomPaint(
                 painter: FacePainter(
                   _faces,
-                  _cameraController!
-                      .value.previewSize!, // <-- pass preview size
-                  _isFrontCamera, // <-- pass front camera boolean
+                  _cameraController!.value.previewSize!,
+                  _isFrontCamera,
                 ),
               ),
             ),
