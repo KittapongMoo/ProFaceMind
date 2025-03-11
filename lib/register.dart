@@ -236,7 +236,7 @@ class _RegisterPageState extends State<RegisterPage> {
     double scale = cameraAspectRatio / screenAspectRatio;
 
     // OPTIONAL: Adjust zoom manually (1.0 = default, <1.0 zoom out, >1.0 zoom in)
-    double extraZoomFactor = 0.9;
+    double extraZoomFactor = 0.82;
     scale *= extraZoomFactor;
 
     // Determine rotation based on sensor orientation
