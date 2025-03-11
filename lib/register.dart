@@ -218,24 +218,18 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildCameraPreview() {
-    if (!_isCameraInitialized || _cameraController == null || !_cameraController!.value.isInitialized) {
+    if (!_isCameraInitialized ||
+        _cameraController == null ||
+        !_cameraController!.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // 1. Calculate camera & screen aspect ratios
+    // 1. Camera preview size and aspect ratio
     final previewSize = _cameraController!.value.previewSize!;
-    // Camera reports size in landscape: width > height
+    // The camera typically reports its size in landscape: width > height
     final double cameraAspectRatio = previewSize.width / previewSize.height;
 
-    final Size screenSize = MediaQuery.of(context).size;
-    final double screenAspectRatio = screenSize.width / screenSize.height;
-
-    // 2. Compute how much to scale the camera preview so it "covers" the screen
-    //    If cameraAspectRatio > screenAspectRatio => minimal vertical crop
-    //    If cameraAspectRatio < screenAspectRatio => minimal horizontal crop
-    final double scale = cameraAspectRatio / screenAspectRatio;
-
-    // 3. Determine rotation based on sensor orientation
+    // 2. Determine rotation based on sensor orientation
     final int sensorOrientation = _cameraController!.description.sensorOrientation;
     double rotationAngle = 0;
     if (sensorOrientation == 90) {
@@ -244,36 +238,29 @@ class _RegisterPageState extends State<RegisterPage> {
       rotationAngle = -math.pi / 2;   // 270 degrees
     }
 
-    // 4. Check if we're using the front camera (to flip horizontally)
+    // 3. Check if it's the front camera
     final bool isFrontCamera =
         _cameraController!.description.lensDirection == CameraLensDirection.front;
 
-    // 5. Build the combined transform for rotation & optional flip
+    // 4. Build the transformation matrix for rotation & optional flip
     final Matrix4 transformMatrix = isFrontCamera
         ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
         : Matrix4.rotationZ(rotationAngle);
 
-    // 6. Assemble the preview
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Transform(
+    // 5. Return a widget that preserves the camera’s aspect ratio (no cropping).
+    //    It may show letterboxing if the aspect ratios differ.
+    return Center(
+      child: AspectRatio(
+        aspectRatio: cameraAspectRatio, // Show the full camera feed
+        child: Transform(
           alignment: Alignment.center,
           transform: transformMatrix,
-          child: Transform.scale(
-            // Scale so that camera preview "covers" the screen
-            scale: scale,
-            child: Center(
-              // Use AspectRatio to maintain the camera’s aspect ratio
-              child: AspectRatio(
-                aspectRatio: cameraAspectRatio,
-                child: CameraPreview(_cameraController!),
-              ),
-            ),
-          ),
-        );
-      },
+          child: CameraPreview(_cameraController!),
+        ),
+      ),
     );
   }
+
 
 
   @override
