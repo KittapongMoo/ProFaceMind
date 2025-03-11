@@ -218,56 +218,63 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildCameraPreview() {
-    if (!_isCameraInitialized ||
-        _cameraController == null ||
-        !_cameraController!.value.isInitialized) {
+    if (!_isCameraInitialized || _cameraController == null || !_cameraController!.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Get the screen size
+    // 1. Calculate camera & screen aspect ratios
+    final previewSize = _cameraController!.value.previewSize!;
+    // Camera reports size in landscape: width > height
+    final double cameraAspectRatio = previewSize.width / previewSize.height;
+
     final Size screenSize = MediaQuery.of(context).size;
-    final double screenWidth = screenSize.width;
-    final double screenHeight = screenSize.height;
+    final double screenAspectRatio = screenSize.width / screenSize.height;
 
-    // Get camera sensor orientation (default is landscape)
-    int sensorOrientation = _cameraController!.description.sensorOrientation;
-    debugPrint("sensorOrientation: $sensorOrientation");
+    // 2. Compute how much to scale the camera preview so it "covers" the screen
+    //    If cameraAspectRatio > screenAspectRatio => minimal vertical crop
+    //    If cameraAspectRatio < screenAspectRatio => minimal horizontal crop
+    final double scale = cameraAspectRatio / screenAspectRatio;
 
-    // Compute correct rotation for portrait mode
+    // 3. Determine rotation based on sensor orientation
+    final int sensorOrientation = _cameraController!.description.sensorOrientation;
     double rotationAngle = 0;
     if (sensorOrientation == 90) {
-      rotationAngle = math.pi / 2; // Rotate left for portrait
+      rotationAngle = math.pi / 2;    // 90 degrees
     } else if (sensorOrientation == 270) {
-      rotationAngle = -math.pi / 2; // Rotate right for portrait
+      rotationAngle = -math.pi / 2;   // 270 degrees
     }
 
-    // Check if using the front camera
-    final bool isFrontCamera = _cameraController!.description.lensDirection ==
-        CameraLensDirection.front;
+    // 4. Check if we're using the front camera (to flip horizontally)
+    final bool isFrontCamera =
+        _cameraController!.description.lensDirection == CameraLensDirection.front;
 
-    // Apply horizontal flip only if it's the front camera
-    final Matrix4 transform = isFrontCamera
+    // 5. Build the combined transform for rotation & optional flip
+    final Matrix4 transformMatrix = isFrontCamera
         ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
         : Matrix4.rotationZ(rotationAngle);
 
-    return SizedBox(
-      width: screenWidth,
-      height: screenHeight,
-      child: FittedBox(
-        fit: BoxFit.cover, // Ensure full screen coverage
-        child: SizedBox(
-          // Swap width & height because the camera is landscape by default
-          width: screenHeight,
-          height: screenWidth,
-          child: Transform(
-            alignment: Alignment.center,
-            transform: transform,
-            child: CameraPreview(_cameraController!),
+    // 6. Assemble the preview
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Transform(
+          alignment: Alignment.center,
+          transform: transformMatrix,
+          child: Transform.scale(
+            // Scale so that camera preview "covers" the screen
+            scale: scale,
+            child: Center(
+              // Use AspectRatio to maintain the camera’s aspect ratio
+              child: AspectRatio(
+                aspectRatio: cameraAspectRatio,
+                child: CameraPreview(_cameraController!),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
+
 
   @override
   void dispose() {
