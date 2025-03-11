@@ -167,7 +167,8 @@ class _RegisterPageState extends State<RegisterPage> {
       // Ensure correct orientation and flip for front camera
       img.Image orientedImage = img.bakeOrientation(capturedImage);
       if (_isFrontCamera) {
-        orientedImage = img.flipHorizontal(orientedImage); // Flip for front camera
+        orientedImage =
+            img.flipHorizontal(orientedImage); // Flip for front camera
       }
 
       final orientedBytes = img.encodeJpg(orientedImage);
@@ -179,7 +180,6 @@ class _RegisterPageState extends State<RegisterPage> {
       return "";
     }
   }
-
 
   /// Crop the detected face
   Future<void> _cropFace(CameraImage image, Face face) async {
@@ -218,7 +218,9 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildCameraPreview() {
-    if (!_isCameraInitialized || _cameraController == null || !_cameraController!.value.isInitialized) {
+    if (!_isCameraInitialized ||
+        _cameraController == null ||
+        !_cameraController!.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -229,14 +231,24 @@ class _RegisterPageState extends State<RegisterPage> {
 
     // Get camera sensor orientation (default is landscape)
     int sensorOrientation = _cameraController!.description.sensorOrientation;
+    debugPrint("sensorOrientation: $sensorOrientation");
 
     // Compute correct rotation for portrait mode
     double rotationAngle = 0;
     if (sensorOrientation == 90) {
-      rotationAngle = -math.pi / 2; // Rotate left for portrait
+      rotationAngle = math.pi / 2; // Rotate left for portrait
     } else if (sensorOrientation == 270) {
-      rotationAngle = math.pi / 2; // Rotate right for portrait
+      rotationAngle = -math.pi / 2; // Rotate right for portrait
     }
+
+    // Check if using the front camera
+    final bool isFrontCamera = _cameraController!.description.lensDirection ==
+        CameraLensDirection.front;
+
+    // Apply horizontal flip only if it's the front camera
+    final Matrix4 transform = isFrontCamera
+        ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
+        : Matrix4.rotationZ(rotationAngle);
 
     return SizedBox(
       width: screenWidth,
@@ -244,28 +256,18 @@ class _RegisterPageState extends State<RegisterPage> {
       child: FittedBox(
         fit: BoxFit.cover, // Ensure full screen coverage
         child: SizedBox(
-          width: screenHeight, // Swap width & height because the camera is landscape by default
+          // Swap width & height because the camera is landscape by default
+          width: screenHeight,
           height: screenWidth,
           child: Transform(
             alignment: Alignment.center,
-            transform: Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle), // Flip both cameras + Rotate correctly
+            transform: transform,
             child: CameraPreview(_cameraController!),
           ),
         ),
       ),
     );
   }
-
-
-
-
-
-
-
-
-
-
-
 
   @override
   void dispose() {
