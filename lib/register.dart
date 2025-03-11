@@ -184,37 +184,93 @@ class _RegisterPageState extends State<RegisterPage> {
   /// Crop the detected face
   Future<void> _cropFace(CameraImage image, Face face) async {
     try {
-      final WriteBuffer allBytes = WriteBuffer();
-      for (var plane in image.planes) {
-        allBytes.putUint8List(plane.bytes);
+      // Convert CameraImage YUV420 format to RGB img.Image format
+      img.Image convertedImage = _convertYUV420ToImage(image);
+
+      // Rotate according to sensor orientation
+      final int sensorOrientation =
+          _cameraController!.description.sensorOrientation;
+      img.Image orientedImage;
+
+      if (sensorOrientation == 90) {
+        orientedImage = img.copyRotate(convertedImage, angle: 90);
+      } else if (sensorOrientation == 270) {
+        orientedImage = img.copyRotate(convertedImage, angle: -90);
+      } else {
+        orientedImage = convertedImage;
       }
-      final Uint8List bytes = allBytes.done().buffer.asUint8List();
-      img.Image? capturedImage = img.decodeImage(bytes);
-      if (capturedImage == null) return;
+
+      // Flip horizontally only for front camera
+      if (_isFrontCamera) {
+        orientedImage = img.flipHorizontal(orientedImage);
+      }
+
+      // MLKit bounding box relative to original preview dimensions
+      final previewSize = _cameraController!.value.previewSize!;
+      double scaleX = orientedImage.width / previewSize.height;
+      double scaleY = orientedImage.height / previewSize.width;
+
+      // Face bounding box
       Rect faceRect = face.boundingBox;
-      int x = faceRect.left.toInt();
-      int y = faceRect.top.toInt();
-      int w = faceRect.width.toInt();
-      int h = faceRect.height.toInt();
-      x = math.max(0, x);
-      y = math.max(0, y);
-      w = math.min(capturedImage.width - x, w);
-      h = math.min(capturedImage.height - y, h);
-      img.Image croppedFace = img.copyCrop(
-        capturedImage,
+
+      int x = (faceRect.left * scaleX).round();
+      int y = (faceRect.top * scaleY).round();
+      int w = (faceRect.width * scaleX).round();
+      int h = (faceRect.height * scaleY).round();
+
+      // Boundary checking
+      x = x.clamp(0, orientedImage.width - w);
+      y = y.clamp(0, orientedImage.height - h);
+
+      // Crop face region
+      img.Image croppedFaceImage = img.copyCrop(
+        orientedImage,
         x: x,
         y: y,
         width: w,
         height: h,
       );
-      Uint8List croppedBytes = Uint8List.fromList(img.encodeJpg(croppedFace));
+
+      Uint8List croppedBytes =
+          Uint8List.fromList(img.encodeJpg(croppedFaceImage));
+
       setState(() {
         _croppedFace = croppedBytes;
       });
+
       print("Face cropped successfully");
     } catch (e) {
       print("Error cropping face: $e");
     }
+  }
+
+// Helper function to convert CameraImage to RGB Image (required)
+  img.Image _convertYUV420ToImage(CameraImage image) {
+    final int width = image.width;
+    final int height = image.height;
+
+    final img.Image rgbImage = img.Image(width: width, height: height);
+    final plane = image.planes[0];
+
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        final uvIndex = (y ~/ 2) * image.planes[1].bytesPerRow + (x ~/ 2);
+
+        final yp = plane.bytes[y * plane.bytesPerRow + x];
+        final up = image.planes[1].bytes[uvIndex];
+        final vp = image.planes[2].bytes[uvIndex];
+
+        int r = (yp + vp * 1436 / 1024 - 179).clamp(0, 255).toInt();
+        int g = (yp - up * 46549 / 131072 + 44 - vp * 731 / 1024 + 91)
+            .clamp(0, 255)
+            .toInt();
+        int b = (yp + up * 1814 / 1024 - 227).clamp(0, 255).toInt();
+
+        rgbImage.setPixelRgb(x, y, r, g, b);
+      }
+    }
+
+    return rgbImage;
   }
 
   Widget _buildCameraPreview() {
@@ -298,7 +354,12 @@ class _RegisterPageState extends State<RegisterPage> {
           if (_isCameraInitialized)
             Positioned.fill(
               child: CustomPaint(
-                painter: FacePainter(_faces),
+                painter: FacePainter(
+                  _faces,
+                  _cameraController!
+                      .value.previewSize!, // <-- pass preview size
+                  _isFrontCamera, // <-- pass front camera boolean
+                ),
               ),
             ),
           // Switch camera button.
@@ -342,7 +403,10 @@ class _RegisterPageState extends State<RegisterPage> {
 
 class FacePainter extends CustomPainter {
   final List<Face> faces;
-  FacePainter(this.faces);
+  final Size imageSize;
+  final bool isFrontCamera;
+
+  FacePainter(this.faces, this.imageSize, this.isFrontCamera);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -350,11 +414,35 @@ class FacePainter extends CustomPainter {
       ..color = Colors.red
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0;
+
+    double scaleX = size.width / imageSize.height;
+    double scaleY = size.height / imageSize.width;
+
     for (var face in faces) {
-      canvas.drawRect(face.boundingBox, paint);
+      Rect rect = face.boundingBox;
+
+      // Scale rectangle to match preview
+      Rect scaledRect = Rect.fromLTRB(
+        rect.left * scaleX,
+        rect.top * scaleY,
+        rect.right * scaleX,
+        rect.bottom * scaleY,
+      );
+
+      // Flip horizontally for front camera
+      if (isFrontCamera) {
+        scaledRect = Rect.fromLTRB(
+          size.width - scaledRect.right,
+          scaledRect.top,
+          size.width - scaledRect.left,
+          scaledRect.bottom,
+        );
+      }
+
+      canvas.drawRect(scaledRect, paint);
     }
   }
 
   @override
-  bool shouldRepaint(FacePainter oldDelegate) => true;
+  bool shouldRepaint(covariant FacePainter oldDelegate) => true;
 }
