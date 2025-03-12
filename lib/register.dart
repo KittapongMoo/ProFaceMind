@@ -22,11 +22,10 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isCameraInitialized = false;
   bool _isFrontCamera = true;
   final FaceDetector _faceDetector = FaceDetector(
-      options: FaceDetectorOptions(performanceMode: FaceDetectorMode.accurate));
+      options: FaceDetectorOptions(performanceMode: FaceDetectorMode.fast));
   bool _isDetectingFaces = false;
   List<Face> _faces = [];
-  Uint8List? _croppedFace; // Store cropped face
-  String? _capturedImagePath; // Store the captured image path
+  String? _capturedImagePath; // Store captured image path
 
   @override
   void initState() {
@@ -70,17 +69,15 @@ class _RegisterPageState extends State<RegisterPage> {
     }
     try {
       CameraDescription selectedCamera = _cameras![cameraIndex];
-      _cameraController!.startImageStream((CameraImage image) async {
-        if (!_isDetectingFaces) {
-          _isDetectingFaces = true;
-          await _detectFaces(image);
-          _isDetectingFaces = false;
-        }
-      });
+      _cameraController = CameraController(
+        selectedCamera,
+        ResolutionPreset.medium, // Use highest resolution for preview
+        enableAudio: false,
+      );
       await _cameraController!.initialize();
       if (!mounted) return;
 
-      // Start real-time face detection.
+      // Start real-time face detection (only for overlay, no cropping).
       _cameraController!.startImageStream((CameraImage image) async {
         if (!_isDetectingFaces) {
           _isDetectingFaces = true;
@@ -96,20 +93,15 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Face Detection Using ML Kit
+  /// Face Detection Using ML Kit (only for overlay)
   Future<void> _detectFaces(CameraImage image) async {
     try {
       final InputImage inputImage = _convertCameraImage(image);
       final List<Face> detectedFaces =
-          await _faceDetector.processImage(inputImage);
-
-      if (mounted) {
-        setState(() {
-          _faces = detectedFaces;
-        });
-      }
-
-      // REMOVE: real-time cropping here
+      await _faceDetector.processImage(inputImage);
+      setState(() {
+        _faces = detectedFaces;
+      });
     } catch (e) {
       print("Error detecting faces: $e");
     }
@@ -127,8 +119,8 @@ class _RegisterPageState extends State<RegisterPage> {
     InputImageRotation rotation = sensorOrientation == 90
         ? InputImageRotation.rotation90deg
         : sensorOrientation == 270
-            ? InputImageRotation.rotation270deg
-            : InputImageRotation.rotation0deg;
+        ? InputImageRotation.rotation270deg
+        : InputImageRotation.rotation0deg;
     final metadata = InputImageMetadata(
       size: Size(image.width.toDouble(), image.height.toDouble()),
       rotation: rotation,
@@ -138,67 +130,23 @@ class _RegisterPageState extends State<RegisterPage> {
     return InputImage.fromBytes(bytes: bytes, metadata: metadata);
   }
 
-  /// Capture and Save Image
+  /// Capture and Save Image (no face cropping)
   Future<void> _takePicture() async {
-    if (_cameraController!.value.isTakingPicture) return;
-
-    try {
-      final XFile imageFile = await _cameraController!.takePicture();
-      final bytes = await imageFile.readAsBytes();
-
-      img.Image? capturedImage = img.decodeImage(bytes);
-      if (capturedImage == null) return;
-
-      // Correct rotation based on camera orientation
-      final int rotation = _cameraController!.description.sensorOrientation;
-      img.Image orientedImage = (rotation == 90)
-          ? img.copyRotate(capturedImage, angle: 90)
-          : (rotation == 270)
-              ? img.copyRotate(capturedImage, angle: -90)
-              : capturedImage;
-
-      if (_isFrontCamera) {
-        orientedImage = img.flipHorizontal(orientedImage);
-      }
-
-      final inputImage = InputImage.fromFilePath(imageFile.path);
-      final faces = await _faceDetector.processImage(inputImage);
-
-      if (faces.isNotEmpty) {
-        final faceRect = faces.first.boundingBox;
-
-        double scaleX =
-            orientedImage.width / _cameraController!.value.previewSize!.height;
-        double scaleY =
-            orientedImage.height / _cameraController!.value.previewSize!.width;
-
-        int x = (faceRect.left * scaleX).round().clamp(0, orientedImage.width);
-        int y = (faceRect.top * scaleY).round().clamp(0, orientedImage.height);
-        int w =
-            (faceRect.width * scaleX).round().clamp(0, orientedImage.width - x);
-        int h = (faceRect.height * scaleY)
-            .round()
-            .clamp(0, orientedImage.height - y);
-
-        img.Image croppedFace =
-            img.copyCrop(orientedImage, x: x, y: y, width: w, height: h);
-        Uint8List croppedBytes = Uint8List.fromList(img.encodeJpg(croppedFace));
-
+    if (!_cameraController!.value.isTakingPicture) {
+      try {
+        final XFile image = await _cameraController!.takePicture();
+        final String newPath = await _saveImageToGallery(image.path);
         setState(() {
-          _croppedFace = croppedBytes;
-          _capturedImagePath = imageFile.path;
+          _capturedImagePath = newPath;
         });
-
-        print("Face cropped successfully");
-      } else {
-        print("No face detected in captured image");
+        print("Photo saved: $newPath");
+      } catch (e) {
+        print('Error capturing image: $e');
       }
-    } catch (e) {
-      print("Error processing image: $e");
     }
   }
 
-  /// Save Image to Mobile Gallery with Correct Orientation
+  /// Save Image to Gallery with Correct Orientation
   Future<String> _saveImageToGallery(String imagePath) async {
     try {
       final Directory directory = await getExternalStorageDirectory() ??
@@ -211,14 +159,11 @@ class _RegisterPageState extends State<RegisterPage> {
         print("Error decoding image.");
         return "";
       }
-
-      // Ensure correct orientation and flip for front camera
+      // Correct orientation and flip for front camera.
       img.Image orientedImage = img.bakeOrientation(capturedImage);
       if (_isFrontCamera) {
-        orientedImage =
-            img.flipHorizontal(orientedImage); // Flip for front camera
+        orientedImage = img.flipHorizontal(orientedImage);
       }
-
       final orientedBytes = img.encodeJpg(orientedImage);
       final File newImage = await File(newPath).writeAsBytes(orientedBytes);
       print("Image saved successfully: $newPath");
@@ -229,98 +174,6 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Crop the detected face
-  Future<void> _cropFace(CameraImage image, Face face) async {
-    try {
-      // Convert CameraImage YUV420 format to RGB img.Image format
-      img.Image convertedImage = _convertYUV420ToImage(image);
-
-      // Rotate according to sensor orientation
-      final int sensorOrientation =
-          _cameraController!.description.sensorOrientation;
-      img.Image orientedImage;
-
-      if (sensorOrientation == 90) {
-        orientedImage = img.copyRotate(convertedImage, angle: 90);
-      } else if (sensorOrientation == 270) {
-        orientedImage = img.copyRotate(convertedImage, angle: -90);
-      } else {
-        orientedImage = convertedImage;
-      }
-
-      // Flip horizontally only for front camera
-      if (_isFrontCamera) {
-        orientedImage = img.flipHorizontal(orientedImage);
-      }
-
-      // MLKit bounding box relative to original preview dimensions
-      final previewSize = _cameraController!.value.previewSize!;
-      double scaleX = orientedImage.width / previewSize.height;
-      double scaleY = orientedImage.height / previewSize.width;
-
-      // Face bounding box
-      Rect faceRect = face.boundingBox;
-
-      int x = (faceRect.left * scaleX).round();
-      int y = (faceRect.top * scaleY).round();
-      int w = (faceRect.width * scaleX).round();
-      int h = (faceRect.height * scaleY).round();
-
-      // Boundary checking
-      x = x.clamp(0, orientedImage.width - w);
-      y = y.clamp(0, orientedImage.height - h);
-
-      // Crop face region
-      img.Image croppedFaceImage = img.copyCrop(
-        orientedImage,
-        x: x,
-        y: y,
-        width: w,
-        height: h,
-      );
-
-      Uint8List croppedBytes =
-          Uint8List.fromList(img.encodeJpg(croppedFaceImage));
-
-      setState(() {
-        _croppedFace = croppedBytes;
-      });
-
-      print("Face cropped successfully");
-    } catch (e) {
-      print("Error cropping face: $e");
-    }
-  }
-
-// Helper function to convert CameraImage to RGB Image (required)
-  img.Image _convertYUV420ToImage(CameraImage image) {
-    final int width = image.width;
-    final int height = image.height;
-
-    final img.Image rgbImage = img.Image(width: width, height: height);
-    final plane = image.planes[0];
-
-    for (int y = 0; y < height; y++) {
-      for (int x = 0; x < width; x++) {
-        final uvIndex = (y ~/ 2) * image.planes[1].bytesPerRow + (x ~/ 2);
-
-        final yp = plane.bytes[y * plane.bytesPerRow + x];
-        final up = image.planes[1].bytes[uvIndex];
-        final vp = image.planes[2].bytes[uvIndex];
-
-        int r = (yp + vp * 1436 / 1024 - 179).clamp(0, 255).toInt();
-        int g = (yp - up * 46549 / 131072 + 44 - vp * 731 / 1024 + 91)
-            .clamp(0, 255)
-            .toInt();
-        int b = (yp + up * 1814 / 1024 - 227).clamp(0, 255).toInt();
-
-        rgbImage.setPixelRgb(x, y, r, g, b);
-      }
-    }
-
-    return rgbImage;
-  }
-
   Widget _buildCameraPreview() {
     if (!_isCameraInitialized ||
         _cameraController == null ||
@@ -328,40 +181,27 @@ class _RegisterPageState extends State<RegisterPage> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Camera preview size reported in landscape
+    // Camera preview size (landscape) and calculations.
     final previewSize = _cameraController!.value.previewSize!;
     final double cameraAspectRatio = previewSize.width / previewSize.height;
-
-    // Screen dimensions
     final Size screenSize = MediaQuery.of(context).size;
     final double screenAspectRatio = screenSize.width / screenSize.height;
-
-    // Compute the base scale for covering the screen
     double scale = cameraAspectRatio / screenAspectRatio;
-
-    // OPTIONAL: Adjust zoom manually (1.0 = default, <1.0 zoom out, >1.0 zoom in)
     double extraZoomFactor = 0.82;
     scale *= extraZoomFactor;
-
-    // Determine rotation based on sensor orientation
     final int sensorOrientation =
         _cameraController!.description.sensorOrientation;
     double rotationAngle = 0;
     if (sensorOrientation == 90) {
-      rotationAngle = math.pi / 2; // Rotate left for portrait
+      rotationAngle = math.pi / 2;
     } else if (sensorOrientation == 270) {
-      rotationAngle = -math.pi / 2; // Rotate right for portrait
+      rotationAngle = -math.pi / 2;
     }
-
-    // Check if it's the front camera (to flip horizontally)
     final bool isFrontCamera = _cameraController!.description.lensDirection ==
         CameraLensDirection.front;
-
-    // Build transform matrix for rotation & horizontal flip ONLY for front camera
     final Matrix4 transformMatrix = isFrontCamera
         ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
         : Matrix4.rotationZ(rotationAngle);
-
     return LayoutBuilder(
       builder: (context, constraints) {
         return ClipRect(
@@ -396,7 +236,7 @@ class _RegisterPageState extends State<RegisterPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Fullscreen camera preview (under all buttons).
+          // Fullscreen camera preview.
           Positioned.fill(child: _buildCameraPreview()),
           // Face detection overlay.
           if (_isCameraInitialized)
@@ -431,7 +271,7 @@ class _RegisterPageState extends State<RegisterPage> {
               onPressed: _takePicture,
             ),
           ),
-          // Display captured image.
+          // Display captured image thumbnail.
           if (_capturedImagePath != null)
             Positioned(
               bottom: 50,
@@ -467,8 +307,7 @@ class FacePainter extends CustomPainter {
 
     for (var face in faces) {
       Rect rect = face.boundingBox;
-
-      // Scale rectangle to match preview
+      // Scale rectangle to match preview.
       Rect scaledRect = Rect.fromLTRB(
         rect.left * scaleX,
         rect.top * scaleY,
@@ -476,7 +315,7 @@ class FacePainter extends CustomPainter {
         rect.bottom * scaleY,
       );
 
-      // Flip horizontally for front camera
+      // Flip horizontally for front camera.
       if (isFrontCamera) {
         scaledRect = Rect.fromLTRB(
           size.width - scaledRect.right,
@@ -485,7 +324,6 @@ class FacePainter extends CustomPainter {
           scaledRect.bottom,
         );
       }
-
       canvas.drawRect(scaledRect, paint);
     }
   }
