@@ -71,7 +71,7 @@ class _RegisterPageState extends State<RegisterPage> {
       CameraDescription selectedCamera = _cameras![cameraIndex];
       _cameraController = CameraController(
         selectedCamera,
-        ResolutionPreset.medium, // Use highest resolution for preview
+        ResolutionPreset.max, // Use highest resolution for preview
         enableAudio: false,
       );
       await _cameraController!.initialize();
