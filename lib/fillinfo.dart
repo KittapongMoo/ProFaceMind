@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 class FillInfoPage extends StatefulWidget {
-  const FillInfoPage({Key? key}) : super(key: key);
+  final int userId; // (1) Add this field
+
+  // (2) Update constructor to require userId
+  const FillInfoPage({Key? key, required this.userId}) : super(key: key);
 
   @override
   _FillInfoPageState createState() => _FillInfoPageState();
@@ -25,7 +28,10 @@ class _FillInfoPageState extends State<FillInfoPage> {
   final TextEditingController relationController = TextEditingController(text: 'หลานของคุณ');
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext buildContext) {
+    // You can access the userId like this if needed:
+    // int currentUserId = widget.userId;
+
     return Scaffold(
       body: Column(
         children: [
@@ -38,7 +44,7 @@ class _FillInfoPageState extends State<FillInfoPage> {
                 child: PageView.builder(
                   controller: _pageController,
                   itemCount: imagePaths.length,
-                  itemBuilder: (context, index) {
+                  itemBuilder: (localCtx, index) {
                     return Image.asset(
                       imagePaths[index], // 🔹 ใช้ภาพจาก List
                       fit: BoxFit.cover,
@@ -77,7 +83,7 @@ class _FillInfoPageState extends State<FillInfoPage> {
               children: List.generate(imagePaths.length, (index) {
                 return AnimatedBuilder(
                   animation: _pageController,
-                  builder: (context, child) {
+                  builder: (animCtx, child) {
                     double selected = _pageController.hasClients ? _pageController.page ?? 0 : 0;
                     return Container(
                       margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -144,7 +150,7 @@ class _FillInfoPageState extends State<FillInfoPage> {
                     height: 50,
                     child: ElevatedButton(
                       onPressed: () {
-                        // TODO: เพิ่มฟังก์ชันบันทึกข้อมูล
+                        // TODO: บันทึกข้อมูล (ใช้ widget.userId เพื่ออัปเดตตารางใน Database)
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,

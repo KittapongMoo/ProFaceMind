@@ -91,11 +91,8 @@ class _SecondPageState extends State<SecondPage> {
                 _buildNavigationButton('ตั้งค่าเบอร์โทรฉุกเฉิน', Colors.red, const SetPhoneNumber()),
                 _buildNavigationButton('ดูตำแหน่งแผนที่', Colors.green, const Setmap()),
                 _buildNavigationButton('เปิดกล้อง', Colors.blueAccent, const CameraPage()),
-
-                const SizedBox(height: 20),
-
                 // 🔹 ปุ่มไปหน้า "กรอกข้อมูลรูปภาพ"
-                _buildNavigationButton('กรอกข้อมูลรูปภาพ', Colors.purple, const FillInfoPage()),
+                // _buildNavigationButton('กรอกข้อมูลรูปภาพ', Colors.purple, const FillInfoPage()),
               ],
             ),
           );
