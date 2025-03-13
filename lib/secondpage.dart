@@ -4,6 +4,7 @@ import 'setmap.dart'; // แผนที่
 import 'camera.dart'; // กล้อง
 import 'ownerinfo.dart'; // ข้อมูลผู้ใช้
 import 'setphonenum.dart'; // ตั้งค่าเบอร์ฉุกเฉิน
+import 'fillinfo.dart'; // กรอกข้อมูลรูปภาพ
 
 class SecondPage extends StatefulWidget {
   const SecondPage({Key? key}) : super(key: key);
@@ -66,11 +67,7 @@ class _SecondPageState extends State<SecondPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '📌 ข้อมูลผู้ใช้:',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
+                _buildSectionTitle('📌 ข้อมูลผู้ใช้'),
                 _buildInfoTile('ชื่อเล่น', data['nickname']!),
                 _buildInfoTile('ชื่อจริง', data['firstname']!),
                 _buildInfoTile('นามสกุล', data['lastname']!),
@@ -79,62 +76,26 @@ class _SecondPageState extends State<SecondPage> {
                 _buildInfoTile('น้ำหนัก', data['weight']!),
                 _buildInfoTile('โรคประจำตัว', data['condition']!),
 
-                const SizedBox(height: 30),
-
-                const Text(
-                  '📌 ข้อมูลเบอร์โทรฉุกเฉิน:',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
+                _buildSectionTitle('📌 ข้อมูลเบอร์โทรฉุกเฉิน'),
                 _buildInfoTile('ชื่อ', data['emergency_name']!),
                 _buildInfoTile('ความสัมพันธ์', data['emergency_relation']!),
                 _buildInfoTile('เบอร์โทร', data['emergency_phone']!),
 
-                const SizedBox(height: 30),
-
-                const Text(
-                  '📌 ข้อมูลตำแหน่งที่เลือก:',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
+                _buildSectionTitle('📌 ข้อมูลตำแหน่งที่เลือก'),
                 _buildInfoTile('ละติจูด', data['latitude']!),
                 _buildInfoTile('ลองจิจูด', data['longitude']!),
 
                 const SizedBox(height: 40),
 
-                // 🔹 ปุ่มไปหน้า "ตั้งค่าผู้ใช้"
-                _buildNavigationButton(
-                  'ตั้งค่าข้อมูลผู้ใช้',
-                  Colors.orange,
-                  const Ownerinfo(),
-                ),
+                _buildNavigationButton('ตั้งค่าข้อมูลผู้ใช้', Colors.orange, const Ownerinfo()),
+                _buildNavigationButton('ตั้งค่าเบอร์โทรฉุกเฉิน', Colors.red, const SetPhoneNumber()),
+                _buildNavigationButton('ดูตำแหน่งแผนที่', Colors.green, const Setmap()),
+                _buildNavigationButton('เปิดกล้อง', Colors.blueAccent, const CameraPage()),
 
                 const SizedBox(height: 20),
 
-                // 🔹 ปุ่มไปหน้า "ตั้งค่าเบอร์โทรฉุกเฉิน"
-                _buildNavigationButton(
-                  'ตั้งค่าเบอร์โทรฉุกเฉิน',
-                  Colors.red,
-                  const SetPhoneNumber(),
-                ),
-
-                const SizedBox(height: 20),
-
-                // 🔹 ปุ่มไปหน้า "แผนที่"
-                _buildNavigationButton(
-                  'ดูตำแหน่งแผนที่',
-                  Colors.green,
-                  const Setmap(),
-                ),
-
-                const SizedBox(height: 20),
-
-                // 🔹 ปุ่มไปหน้า "กล้อง"
-                _buildNavigationButton(
-                  'เปิดกล้อง',
-                  Colors.blueAccent,
-                  const CameraPage(),
-                ),
+                // 🔹 ปุ่มไปหน้า "กรอกข้อมูลรูปภาพ"
+                _buildNavigationButton('กรอกข้อมูลรูปภาพ', Colors.purple, const FillInfoPage()),
               ],
             ),
           );
@@ -143,12 +104,29 @@ class _SecondPageState extends State<SecondPage> {
     );
   }
 
+  /// **📌 Widget สำหรับหัวข้อแต่ละส่วน**
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 10),
+      child: Text(
+        title,
+        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
+      ),
+    );
+  }
+
   /// **📌 Widget แสดงข้อมูลแต่ละรายการ**
   Widget _buildInfoTile(String title, String value) {
+    bool hasData = value != 'ไม่พบข้อมูล';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
         children: [
+          Icon(
+            hasData ? Icons.check_circle : Icons.warning_amber_rounded,
+            color: hasData ? Colors.green : Colors.red,
+          ),
+          const SizedBox(width: 8),
           Expanded(
             flex: 3,
             child: Text(
@@ -160,7 +138,10 @@ class _SecondPageState extends State<SecondPage> {
             flex: 5,
             child: Text(
               value,
-              style: const TextStyle(fontSize: 16, color: Colors.black87),
+              style: TextStyle(
+                fontSize: 16,
+                color: hasData ? Colors.black87 : Colors.red,
+              ),
             ),
           ),
         ],
