@@ -61,9 +61,9 @@ class _RegisterPageState extends State<RegisterPage> {
         double g = img.getGreen(pixel).toDouble();
         double b = img.getBlue(pixel).toDouble();
         // Normalize the pixel values.
-        convertedBytes[pixelIndex++] = (r - 127.5) / 127.5;
-        convertedBytes[pixelIndex++] = (g - 127.5) / 127.5;
-        convertedBytes[pixelIndex++] = (b - 127.5) / 127.5;
+        convertedBytes[pixelIndex++] = (r - 127.5) / 128.0;
+        convertedBytes[pixelIndex++] = (g - 127.5) / 128.0;
+        convertedBytes[pixelIndex++] = (b - 127.5) / 128.0;
       }
     }
     return convertedBytes.buffer.asUint8List();
@@ -440,7 +440,7 @@ class _RegisterPageState extends State<RegisterPage> {
       final img.Image resizedImage =
           img.copyResize(decodedImage, width: 112, height: 112);
       final Uint8List processedBytes =
-          _imageToByteListFloat32(resizedImage, 112, 127.5, 127.5);
+          _imageToByteListFloat32(resizedImage, 112, 127.5, 128.0);
 
       List<double> vector = await _runFaceRecognition(processedBytes);
       print("Face vector: $vector"); // Add this line to inspect the vector
