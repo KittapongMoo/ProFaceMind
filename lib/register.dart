@@ -49,6 +49,25 @@ class _RegisterPageState extends State<RegisterPage> {
   // ImagePicker for gallery selection
   final ImagePicker _picker = ImagePicker();
 
+  Uint8List _imageToByteListFloat32(img.Image image, int inputSize, double mean, double std) {
+    // Create a buffer for 1 image, of shape (inputSize, inputSize, 3)
+    var convertedBytes = Float32List(1 * inputSize * inputSize * 3);
+    int pixelIndex = 0;
+    for (int y = 0; y < inputSize; y++) {
+      for (int x = 0; x < inputSize; x++) {
+        int pixel = image.getPixel(x, y);
+        double r = img.getRed(pixel).toDouble();
+        double g = img.getGreen(pixel).toDouble();
+        double b = img.getBlue(pixel).toDouble();
+        // Normalize the pixel values.
+        convertedBytes[pixelIndex++] = (r - mean) / std;
+        convertedBytes[pixelIndex++] = (g - mean) / std;
+        convertedBytes[pixelIndex++] = (b - mean) / std;
+      }
+    }
+    return convertedBytes.buffer.asUint8List();
+  }
+
   // Improved conversion function for camera images
   InputImage? _convertCameraImage(CameraImage image, CameraDescription camera) {
     try {
@@ -417,8 +436,7 @@ class _RegisterPageState extends State<RegisterPage> {
       // Resize to the expected input size for MobileFaceNet (usually 112x112)
       final img.Image resizedImage =
           img.copyResize(decodedImage, width: 112, height: 112);
-      final List<int> processedImageBytes = img.encodePng(resizedImage);
-      final Uint8List processedBytes = Uint8List.fromList(processedImageBytes);
+      final Uint8List processedBytes = _imageToByteListFloat32(resizedImage, 112, 127.5, 128);
 
       List<double> vector = await _runFaceRecognition(processedBytes);
 
