@@ -49,7 +49,8 @@ class _RegisterPageState extends State<RegisterPage> {
   // ImagePicker for gallery selection
   final ImagePicker _picker = ImagePicker();
 
-  Uint8List _imageToByteListFloat32(img.Image image, int inputSize, double mean, double std) {
+  Uint8List _imageToByteListFloat32(
+      img.Image image, int inputSize, double mean, double std) {
     // Create a buffer for 1 image, of shape (inputSize, inputSize, 3)
     var convertedBytes = Float32List(1 * inputSize * inputSize * 3);
     int pixelIndex = 0;
@@ -60,9 +61,9 @@ class _RegisterPageState extends State<RegisterPage> {
         double g = img.getGreen(pixel).toDouble();
         double b = img.getBlue(pixel).toDouble();
         // Normalize the pixel values.
-        convertedBytes[pixelIndex++] = (r - mean) / std;
-        convertedBytes[pixelIndex++] = (g - mean) / std;
-        convertedBytes[pixelIndex++] = (b - mean) / std;
+        convertedBytes[pixelIndex++] = (r - 127.5) / 127.5;
+        convertedBytes[pixelIndex++] = (g - 127.5) / 127.5;
+        convertedBytes[pixelIndex++] = (b - 127.5) / 127.5;
       }
     }
     return convertedBytes.buffer.asUint8List();
@@ -75,7 +76,8 @@ class _RegisterPageState extends State<RegisterPage> {
       // Calculate the size of the Y plane.
       final int ySize = image.planes[0].bytes.length;
       // The U and V planes.
-      final int uvSize = image.planes[1].bytes.length + image.planes[2].bytes.length;
+      final int uvSize =
+          image.planes[1].bytes.length + image.planes[2].bytes.length;
       final Uint8List nv21 = Uint8List(ySize + uvSize);
 
       // Copy the Y plane as-is.
@@ -96,8 +98,10 @@ class _RegisterPageState extends State<RegisterPage> {
         final int rowOffset2 = row * image.planes[2].bytesPerRow;
         for (int col = 0; col < uvWidth; col++) {
           // In NV21 the order is V then U.
-          nv21[offset++] = image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
-          nv21[offset++] = image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
+          nv21[offset++] =
+              image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
+          nv21[offset++] =
+              image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
         }
       }
 
@@ -124,7 +128,6 @@ class _RegisterPageState extends State<RegisterPage> {
       return null;
     }
   }
-
 
   // Helper function to get the image rotation
   InputImageRotation _getInputImageRotation(int sensorOrientation) {
@@ -436,9 +439,11 @@ class _RegisterPageState extends State<RegisterPage> {
       // Resize to the expected input size for MobileFaceNet (usually 112x112)
       final img.Image resizedImage =
           img.copyResize(decodedImage, width: 112, height: 112);
-      final Uint8List processedBytes = _imageToByteListFloat32(resizedImage, 112, 127.5, 128);
+      final Uint8List processedBytes =
+          _imageToByteListFloat32(resizedImage, 112, 127.5, 127.5);
 
       List<double> vector = await _runFaceRecognition(processedBytes);
+      print("Face vector: $vector"); // Add this line to inspect the vector
 
       // Check if vector contains valid values
       bool isValidVector = vector.any((value) => value != 0.0);
