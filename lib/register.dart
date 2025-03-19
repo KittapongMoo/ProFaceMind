@@ -40,7 +40,7 @@ class _RegisterPageState extends State<RegisterPage> {
   );
   bool _isDetectingFaces = false;
   List<Face> _faces = [];
-  bool _processingImage = true;
+  bool _processingImage = false;
 
   // List to store the face vectors (each from one image)
   List<List<double>> _faceVectors = [];
