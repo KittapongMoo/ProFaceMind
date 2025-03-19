@@ -34,7 +34,8 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isFrontCamera = true;
   final FaceDetector _faceDetector = FaceDetector(
     options: FaceDetectorOptions(
-      performanceMode: FaceDetectorMode.accurate, // accurate for better detection
+      performanceMode:
+          FaceDetectorMode.accurate, // accurate for better detection
       enableTracking: true,
     ),
   );
@@ -60,7 +61,8 @@ class _RegisterPageState extends State<RegisterPage> {
     final imageRotation = _getInputImageRotation(camera.sensorOrientation);
     if (imageRotation == null) return null;
 
-    final inputImageFormat = InputImageFormatValue.fromRawValue(image.format.raw);
+    final inputImageFormat =
+        InputImageFormatValue.fromRawValue(image.format.raw);
     if (inputImageFormat == null) return null;
 
     final metadata = InputImageMetadata(
@@ -134,8 +136,8 @@ class _RegisterPageState extends State<RegisterPage> {
       _cameras = await availableCameras();
       if (_cameras != null && _cameras!.isNotEmpty) {
         // Find the front camera
-        int frontCameraIndex = _cameras!
-            .indexWhere((camera) => camera.lensDirection == CameraLensDirection.front);
+        int frontCameraIndex = _cameras!.indexWhere(
+            (camera) => camera.lensDirection == CameraLensDirection.front);
         await _setCamera(frontCameraIndex != -1 ? frontCameraIndex : 0);
       }
     } catch (e) {
@@ -153,8 +155,10 @@ class _RegisterPageState extends State<RegisterPage> {
 
     int cameraIndex = 0;
     for (int i = 0; i < _cameras!.length; i++) {
-      if ((_isFrontCamera && _cameras![i].lensDirection == CameraLensDirection.front) ||
-          (!_isFrontCamera && _cameras![i].lensDirection == CameraLensDirection.back)) {
+      if ((_isFrontCamera &&
+              _cameras![i].lensDirection == CameraLensDirection.front) ||
+          (!_isFrontCamera &&
+              _cameras![i].lensDirection == CameraLensDirection.back)) {
         cameraIndex = i;
         break;
       }
@@ -167,7 +171,8 @@ class _RegisterPageState extends State<RegisterPage> {
     _isDetectingFaces = true;
 
     try {
-      final inputImage = _convertCameraImage(cameraImage, _cameraController!.description);
+      final inputImage =
+          _convertCameraImage(cameraImage, _cameraController!.description);
       if (inputImage == null) {
         _isDetectingFaces = false;
         return;
@@ -287,12 +292,10 @@ class _RegisterPageState extends State<RegisterPage> {
   /// Capture a picture using the camera.
   Future<void> _takePicture() async {
     if (_processingImage) return;
-
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
       _showErrorPopup("Camera is not initialized");
       return;
     }
-
     if (_cameraController!.value.isTakingPicture) return;
 
     setState(() {
@@ -302,18 +305,20 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       _showProgressIndicator("Processing image...");
 
-      // Stop the stream before taking picture
+      // Stop the image stream before taking a picture.
       await _cameraController!.stopImageStream();
 
-      // Wait a bit for the stream to stop
-      await Future.delayed(Duration(milliseconds: 200));
+      // Wait longer to ensure the image stream has fully stopped.
+      await Future.delayed(const Duration(milliseconds: 500));
 
+      // Capture the picture.
       final XFile imageFile = await _cameraController!.takePicture();
+      print("Picture taken: ${imageFile.path}");
 
-      // Process the captured image
+      // Process the captured image.
       await _processCapturedImage(File(imageFile.path));
 
-      // Restart the stream
+      // Restart the image stream.
       _cameraController!.startImageStream((CameraImage cameraImage) {
         _detectFacesFromCamera(cameraImage);
       });
@@ -336,7 +341,8 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
-      final XFile? imageFile = await _picker.pickImage(source: ImageSource.gallery);
+      final XFile? imageFile =
+          await _picker.pickImage(source: ImageSource.gallery);
       if (imageFile != null) {
         _showProgressIndicator("Processing image...");
         await _processCapturedImage(File(imageFile.path));
@@ -379,7 +385,8 @@ class _RegisterPageState extends State<RegisterPage> {
       }
 
       // Resize to the expected input size for MobileFaceNet (usually 112x112)
-      final img.Image resizedImage = img.copyResize(decodedImage, width: 112, height: 112);
+      final img.Image resizedImage =
+          img.copyResize(decodedImage, width: 112, height: 112);
       final List<int> processedImageBytes = img.encodePng(resizedImage);
       final Uint8List processedBytes = Uint8List.fromList(processedImageBytes);
 
@@ -607,7 +614,8 @@ class _RegisterPageState extends State<RegisterPage> {
                   SizedBox(width: 5),
                   _faceVectors.length >= 5
                       ? Icon(Icons.check_circle, color: Colors.green, size: 20)
-                      : Icon(Icons.circle_outlined, color: Colors.white, size: 20),
+                      : Icon(Icons.circle_outlined,
+                          color: Colors.white, size: 20),
                 ],
               ),
             ),
@@ -641,7 +649,8 @@ class _RegisterPageState extends State<RegisterPage> {
     scale *= extraZoomFactor;
 
     // Determine rotation based on sensor orientation
-    final int sensorOrientation = _cameraController!.description.sensorOrientation;
+    final int sensorOrientation =
+        _cameraController!.description.sensorOrientation;
     double rotationAngle = 0;
     if (sensorOrientation == 90) {
       rotationAngle = math.pi / 2;
@@ -650,8 +659,8 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     // Check if it is front camera to mirror horizontally
-    final bool isFrontCamera =
-        _cameraController!.description.lensDirection == CameraLensDirection.front;
+    final bool isFrontCamera = _cameraController!.description.lensDirection ==
+        CameraLensDirection.front;
 
     // Build a transform matrix that mirrors if front camera
     // plus rotates based on sensor orientation
@@ -715,7 +724,6 @@ class _RegisterPageState extends State<RegisterPage> {
       },
     );
   }
-
 }
 
 class FacePainter extends CustomPainter {
