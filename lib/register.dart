@@ -51,32 +51,61 @@ class _RegisterPageState extends State<RegisterPage> {
 
   // Improved conversion function for camera images
   InputImage? _convertCameraImage(CameraImage image, CameraDescription camera) {
-    final WriteBuffer allBytes = WriteBuffer();
-    for (Plane plane in image.planes) {
-      allBytes.putUint8List(plane.bytes);
+    try {
+      // Convert YUV420 to NV21.
+      // Calculate the size of the Y plane.
+      final int ySize = image.planes[0].bytes.length;
+      // The U and V planes.
+      final int uvSize = image.planes[1].bytes.length + image.planes[2].bytes.length;
+      final Uint8List nv21 = Uint8List(ySize + uvSize);
+
+      // Copy the Y plane as-is.
+      nv21.setRange(0, ySize, image.planes[0].bytes);
+
+      // Many devices provide U and V in separate planes.
+      // NV21 requires that the chroma components are interleaved as V then U.
+      // Note: Some devices may swap U and V; you might need to adjust if you see color issues.
+      int offset = ySize;
+      final int uvPixelStride = image.planes[1].bytesPerPixel!; // normally 2
+      final int uvRowStride = image.planes[1].bytesPerRow;
+      // The height and width for the UV planes.
+      final int uvHeight = image.height ~/ 2;
+      final int uvWidth = image.width ~/ 2;
+
+      for (int row = 0; row < uvHeight; row++) {
+        final int rowOffset1 = row * image.planes[1].bytesPerRow;
+        final int rowOffset2 = row * image.planes[2].bytesPerRow;
+        for (int col = 0; col < uvWidth; col++) {
+          // In NV21 the order is V then U.
+          nv21[offset++] = image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
+          nv21[offset++] = image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
+        }
+      }
+
+      final imageSize = Size(image.width.toDouble(), image.height.toDouble());
+      final imageRotation = _getInputImageRotation(camera.sensorOrientation);
+      if (imageRotation == null) return null;
+
+      // Create metadata explicitly using NV21.
+      final metadata = InputImageMetadata(
+        size: imageSize,
+        rotation: imageRotation,
+        // We set the format explicitly to NV21.
+        format: InputImageFormat.nv21,
+        // For NV21, the bytesPerRow can be taken from the Y plane.
+        bytesPerRow: image.planes[0].bytesPerRow,
+      );
+
+      return InputImage.fromBytes(
+        bytes: nv21,
+        metadata: metadata,
+      );
+    } catch (e) {
+      print("Error converting camera image: $e");
+      return null;
     }
-    final bytes = allBytes.done().buffer.asUint8List();
-
-    final imageSize = Size(image.width.toDouble(), image.height.toDouble());
-    final imageRotation = _getInputImageRotation(camera.sensorOrientation);
-    if (imageRotation == null) return null;
-
-    final inputImageFormat =
-        InputImageFormatValue.fromRawValue(image.format.raw);
-    if (inputImageFormat == null) return null;
-
-    final metadata = InputImageMetadata(
-      size: imageSize,
-      rotation: imageRotation,
-      format: inputImageFormat,
-      bytesPerRow: image.planes[0].bytesPerRow,
-    );
-
-    return InputImage.fromBytes(
-      bytes: bytes,
-      metadata: metadata,
-    );
   }
+
 
   // Helper function to get the image rotation
   InputImageRotation _getInputImageRotation(int sensorOrientation) {
