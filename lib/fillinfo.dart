@@ -28,7 +28,7 @@ class _FillInfoPageState extends State<FillInfoPage> {
   final TextEditingController relationController = TextEditingController(text: 'หลานของคุณ');
 
   @override
-  Widget build(BuildContext buildContext) {
+  Widget build(BuildContext context) {
     // You can access the userId like this if needed:
     // int currentUserId = widget.userId;
 

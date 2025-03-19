@@ -4,11 +4,15 @@ import 'Ownerinfo.dart';
 import 'secondpage.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'register.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
-  runApp(const MyApp());
+  runApp(MaterialApp(
+    navigatorKey: navigatorKey,
+    home: RegisterPage(),
+  ));
 }
 
 class MyApp extends StatelessWidget {
