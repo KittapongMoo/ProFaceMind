@@ -257,7 +257,8 @@ class _RegisterPageState extends State<RegisterPage> {
   /// Validate that the given image file contains at least one face.
   Future<bool> _validateFace(File imageFile) async {
     try {
-      final InputImage inputImage = InputImage.fromFile(imageFile);
+      // Use fromFilePath so that the EXIF rotation is handled.
+      final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
       final List<Face> faces = await _faceDetector.processImage(inputImage);
       return faces.isNotEmpty;
     } catch (e) {
@@ -771,8 +772,8 @@ class FacePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
-      ..color = Colors.green
-      ..strokeWidth = 3
+      ..color = Colors.red
+      ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
     for (var face in faces) {
