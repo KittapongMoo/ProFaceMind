@@ -224,14 +224,70 @@ class _RegisterPageState extends State<RegisterPage> {
       _showErrorPopup("Can't use this picture");
       return;
     }
-    final Uint8List imageBytes = await imageFile.readAsBytes();
+
+    // Save image locally
+    final Directory appDir = await getApplicationDocumentsDirectory();
+    final String fileName = 'user_face_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final String newPath = join(appDir.path, fileName);
+    final File savedImage = await imageFile.copy(newPath);
+
+    final Uint8List imageBytes = await savedImage.readAsBytes();
     List<double> vector = await _runFaceRecognition(imageBytes);
-    _faceVectors.add(vector);
+
+    setState(() {
+      _faceVectors.add(vector);
+    });
+
     print("Captured image processed. Count: ${_faceVectors.length}/5");
+
     if (_faceVectors.length >= 5) {
-      await _registerUser(); // No context needed here!
+      await _registerUserWithImages();
     }
   }
+
+  Future<void> _registerUserWithImages() async {
+    List<double> averageVector = List.filled(128, 0.0);
+    for (var vector in _faceVectors) {
+      for (int i = 0; i < vector.length; i++) {
+        averageVector[i] += vector[i];
+      }
+    }
+    for (int i = 0; i < averageVector.length; i++) {
+      averageVector[i] /= _faceVectors.length;
+    }
+
+    final db = await _getDatabase();
+    int userId = await db.insert('users', {
+      'face_vector': jsonEncode(averageVector),
+      'nickname': '',
+      'name': '',
+      'relation': '',
+    });
+
+    // Save image paths clearly associated with this user
+    final Directory appDir = await getApplicationDocumentsDirectory();
+    final images = Directory(appDir.path)
+        .listSync()
+        .where((file) => file.path.contains('user_face_'))
+        .toList();
+
+    for (var imageFile in images) {
+      await db.insert('user_images', {
+        'user_id': userId,
+        'image_path': imageFile.path,
+      });
+    }
+
+    print("User registered with id: $userId");
+
+    navigatorKey.currentState!.pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => FillInfoPage(userId: userId),
+      ),
+    );
+  }
+
+
 
   /// Use TFLite to run the face recognition model and return the face vector.
   Future<List<double>> _runFaceRecognition(Uint8List imageBytes) async {
@@ -285,17 +341,27 @@ class _RegisterPageState extends State<RegisterPage> {
       version: 1,
       onCreate: (Database db, int version) async {
         await db.execute('''
-          CREATE TABLE users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            face_vector TEXT,
-            nickname TEXT,
-            name TEXT,
-            relation TEXT
-          )
-        ''');
+        CREATE TABLE users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          face_vector TEXT,
+          nickname TEXT,
+          name TEXT,
+          relation TEXT
+        )
+      ''');
+
+        await db.execute('''
+        CREATE TABLE user_images (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          image_path TEXT,
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+      ''');
       },
     );
   }
+
 
   /// Build the camera preview.
   @override
@@ -366,7 +432,7 @@ class _RegisterPageState extends State<RegisterPage> {
     final double screenAspectRatio = screenSize.width / screenSize.height;
 
     double scale = cameraAspectRatio / screenAspectRatio;
-    double extraZoomFactor = 0.82;
+    double extraZoomFactor = 0.62;
     scale *= extraZoomFactor;
 
     final int sensorOrientation =
