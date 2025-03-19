@@ -12,6 +12,7 @@ import 'package:tflite/tflite.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'dart:math' as math;
 
 import 'fillinfo.dart'; // Make sure FillInfoPage({required this.userId}) is defined
 
@@ -39,7 +40,7 @@ class _RegisterPageState extends State<RegisterPage> {
   );
   bool _isDetectingFaces = false;
   List<Face> _faces = [];
-  bool _processingImage = false;
+  bool _processingImage = true;
 
   // List to store the face vectors (each from one image)
   List<List<double>> _faceVectors = [];
@@ -533,7 +534,7 @@ class _RegisterPageState extends State<RegisterPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Positioned.fill(child: _buildCameraPreview()),
+          Positioned.fill(child: _buildCameraPreview(context)),
           // Instructions at the top
           Positioned(
             top: 50,
@@ -616,57 +617,105 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  Widget _buildCameraPreview() {
+  Widget _buildCameraPreview(BuildContext buildContext) {
     if (!_isCameraInitialized ||
         _cameraController == null ||
         !_cameraController!.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
 
+    // The camera's preview size
     final previewSize = _cameraController!.value.previewSize!;
     final double cameraAspectRatio = previewSize.width / previewSize.height;
 
+    // The screen size and aspect ratio
+    final Size screenSize = MediaQuery.of(buildContext).size;
+    final double screenAspectRatio = screenSize.width / screenSize.height;
+
+    // Compute initial scale
+    double scale = cameraAspectRatio / screenAspectRatio;
+
+    // Optional extra zoom factor
+    double extraZoomFactor = 0.82;
+    // First multiply the scale by 0.82
+    scale *= extraZoomFactor;
+
+    // Determine rotation based on sensor orientation
+    final int sensorOrientation = _cameraController!.description.sensorOrientation;
+    double rotationAngle = 0;
+    if (sensorOrientation == 90) {
+      rotationAngle = math.pi / 2;
+    } else if (sensorOrientation == 270) {
+      rotationAngle = -math.pi / 2;
+    }
+
+    // Check if it is front camera to mirror horizontally
+    final bool isFrontCamera =
+        _cameraController!.description.lensDirection == CameraLensDirection.front;
+
+    // Build a transform matrix that mirrors if front camera
+    // plus rotates based on sensor orientation
+    final Matrix4 transformMatrix = isFrontCamera
+        ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
+        : Matrix4.rotationZ(rotationAngle);
+
     return LayoutBuilder(
       builder: (layoutContext, constraints) {
-        return Center(
-          child: AspectRatio(
-            aspectRatio: cameraAspectRatio,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                CameraPreview(_cameraController!),
-                CustomPaint(
-                  painter: FacePainter(
-                    faces: _faces,
-                    imageSize: Size(
-                      _cameraController!.value.previewSize!.height,
-                      _cameraController!.value.previewSize!.width,
-                    ),
-                    isFrontCamera: _isFrontCamera,
-                    screenSize: constraints.biggest,
-                  ),
-                ),
-                // Face overlay guide
-                Center(
-                  child: Container(
-                    width: constraints.maxWidth * 0.7,
-                    height: constraints.maxWidth * 0.7,
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.5),
-                        width: 2,
+        return ClipRect(
+          child: Transform.scale(
+            // Apply the scale again so total factor is scale * extraZoomFactor
+            scale: scale * extraZoomFactor,
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: cameraAspectRatio,
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: transformMatrix,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Camera preview
+                      CameraPreview(_cameraController!),
+
+                      // Draw bounding boxes for detected faces
+                      CustomPaint(
+                        painter: FacePainter(
+                          faces: _faces,
+                          imageSize: Size(
+                            // Note: swap width/height here if needed
+                            previewSize.height,
+                            previewSize.width,
+                          ),
+                          isFrontCamera: isFrontCamera,
+                          screenSize: constraints.biggest,
+                        ),
                       ),
-                      shape: BoxShape.circle,
-                    ),
+
+                      // Optional face overlay circle
+                      Center(
+                        child: Container(
+                          width: constraints.maxWidth * 0.7,
+                          height: constraints.maxWidth * 0.7,
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.5),
+                              width: 2,
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         );
       },
     );
   }
+
 }
 
 class FacePainter extends CustomPainter {
