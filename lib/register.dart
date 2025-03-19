@@ -8,11 +8,11 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img;
-import 'package:tflite/tflite.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'dart:math' as math;
+import 'package:tflite_flutter/tflite_flutter.dart';
 
 import 'fillinfo.dart'; // Make sure FillInfoPage({required this.userId}) is defined
 
@@ -148,33 +148,36 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   void initState() {
     super.initState();
-    // Force portrait orientation.
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeCamera();
     });
-    _loadModel();
+    _loadModel(); // Call the new function correctly
   }
 
   @override
   void dispose() {
     _faceDetector.close();
     _cameraController?.dispose();
-    Tflite.close();
     super.dispose();
   }
+
+  Interpreter? interpreter;
 
   /// Load MobileFaceNet Model via TFLite
   Future<void> _loadModel() async {
     try {
-      String? res = await Tflite.loadModel(
-        model: "assets/MobileFaceNet.tflite",
-      );
-      print("MobileFaceNet model loaded: $res");
+      // Explicitly load asset data first
+      final modelData = await rootBundle.load('assets/MobileFaceNet.tflite');
+      final buffer = modelData.buffer;
+
+      interpreter = Interpreter.fromBuffer(buffer.asUint8List());
+      print('✅ TFLite model loaded successfully from buffer!');
     } catch (e) {
-      print("Error loading model: $e");
+      print('❌ Error loading model: $e');
     }
   }
+
 
   /// Initialize Camera
   Future<void> _initializeCamera() async {
@@ -443,7 +446,7 @@ class _RegisterPageState extends State<RegisterPage> {
           _imageToByteListFloat32(resizedImage, 112, 127.5, 128.0);
 
       List<double> vector = await _runFaceRecognition(processedBytes);
-      print("Face vector: $vector"); // Add this line to inspect the vector
+      print("😀Face vector: $vector"); // Add this line to inspect the vector
 
       // Check if vector contains valid values
       bool isValidVector = vector.any((value) => value != 0.0);
@@ -471,6 +474,11 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _registerUserWithImages() async {
     try {
       _showProgressIndicator("Registering user...");
+
+      // Stop camera stream explicitly before navigation
+      if (_cameraController != null && _cameraController!.value.isStreamingImages) {
+        await _cameraController!.stopImageStream();
+      }
 
       // Compute average vector
       List<double> averageVector = List.filled(128, 0.0);
@@ -508,14 +516,15 @@ class _RegisterPageState extends State<RegisterPage> {
       print("User registered with id: $userId");
       _hideDialog();
 
-      // Navigate to FillInfoPage using the global navigator context
+      // Navigate safely to FillInfoPage using global navigator key
       if (navigatorKey.currentContext != null) {
-        Navigator.pushReplacement(
-          navigatorKey.currentContext!,
+        Navigator.of(navigatorKey.currentContext!).pushReplacement(
           MaterialPageRoute(
             builder: (_) => FillInfoPage(userId: userId),
           ),
         );
+      } else {
+        print('❌ Navigation failed: navigatorKey context is null');
       }
     } catch (e) {
       _hideDialog();
@@ -524,28 +533,21 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Use TFLite to run the face recognition model and return the face vector.
+  /// Run face recognition using tflite_flutter
   Future<List<double>> _runFaceRecognition(Uint8List imageBytes) async {
+    if (interpreter == null) {
+      print("Interpreter not initialized");
+      return List.filled(128, 0.0);
+    }
+
     try {
-      var recognitions = await Tflite.runModelOnBinary(
-        binary: imageBytes,
-        numResults: 1,
-        threshold: 0.05,
-      );
+      // Input and output buffer definition
+      var input = imageBytes.buffer.asFloat32List().reshape([1, 112, 112, 3]);
+      var output = List.filled(1 * 128, 0).reshape([1, 128]);
 
-      if (recognitions == null || recognitions.isEmpty) {
-        print("No recognitions returned from model");
-        return List.filled(128, 0.0);
-      }
+      interpreter!.run(input, output);
 
-      if (!recognitions.first.containsKey("output") ||
-          recognitions.first["output"] == null ||
-          recognitions.first["output"].isEmpty) {
-        print("No output in recognition result");
-        return List.filled(128, 0.0);
-      }
-
-      return List<double>.from(recognitions.first["output"]);
+      return List<double>.from(output[0]);
     } catch (e) {
       print("Error running face recognition: $e");
       return List.filled(128, 0.0);

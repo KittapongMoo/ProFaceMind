@@ -11,6 +11,10 @@ android {
     compileSdkVersion 35 // ใช้เวอร์ชันที่อัปเดตล่าสุด
     ndkVersion = flutter.ndkVersion
 
+    aaptOptions {
+        noCompress 'tflite'
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
@@ -22,12 +26,15 @@ android {
 
     defaultConfig {
         applicationId "dev.kittapong.facemind" // ต้องตรงกับ namespace
-        minSdkVersion 21 // ตั้งค่าให้รองรับ Android 5.0+
+        minSdkVersion 26 // ตั้งค่าให้รองรับ Android 5.0+
         targetSdkVersion 35 // ใช้เวอร์ชันล่าสุดของ Android
-        versionCode flutter.versionCode
-        versionName flutter.versionName
+        versionCode 1
+        versionName "1.0"
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = project.hasProperty("GOOGLE_MAPS_API_KEY") ? GOOGLE_MAPS_API_KEY : ""
 
+        ndk {
+            abiFilters "x86_64", "arm64-v8a", "armeabi-v7a"
+        }
     }
 
     buildTypes {
@@ -39,4 +46,8 @@ android {
 
 flutter {
     source "../.."
+}
+
+dependencies {
+    implementation 'org.tensorflow:tensorflow-lite:2.15.0' // 👈 Add this explicitly
 }
