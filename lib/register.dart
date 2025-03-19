@@ -38,6 +38,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   // List to store the face vectors (each from one image)
   List<List<double>> _faceVectors = [];
+
   // ImagePicker for gallery selection
   final ImagePicker _picker = ImagePicker();
 
@@ -89,6 +90,53 @@ class _RegisterPageState extends State<RegisterPage> {
     await _setCamera(_isFrontCamera ? 1 : 0);
   }
 
+  Future<void> _detectFacesFromCamera(CameraImage cameraImage) async {
+    if (_isDetectingFaces) return;
+    _isDetectingFaces = true;
+
+    try {
+      final WriteBuffer allBytes = WriteBuffer();
+      for (var plane in cameraImage.planes) {
+        allBytes.putUint8List(plane.bytes);
+      }
+
+      final bytes = allBytes.done().buffer.asUint8List();
+
+      final Size imageSize = Size(
+        cameraImage.width.toDouble(),
+        cameraImage.height.toDouble(),
+      );
+
+      final camera = _cameraController!.description;
+      final imageRotation =
+          InputImageRotationValue.fromRawValue(camera.sensorOrientation)!;
+
+      final inputImageFormat =
+          InputImageFormatValue.fromRawValue(cameraImage.format.raw)!;
+
+      final inputImage = InputImage.fromBytes(
+        bytes: bytes,
+        metadata: InputImageMetadata(
+          size: imageSize,
+          rotation: imageRotation,
+          format: inputImageFormat,
+          bytesPerRow: cameraImage.planes[0].bytesPerRow,
+        ),
+      );
+
+      final faces = await _faceDetector.processImage(inputImage);
+      if (mounted) {
+        setState(() {
+          _faces = faces;
+        });
+      }
+    } catch (e) {
+      print("Error detecting faces: $e");
+    } finally {
+      _isDetectingFaces = false;
+    }
+  }
+
   /// Set Camera by Index
   Future<void> _setCamera(int cameraIndex) async {
     if (_cameraController != null) {
@@ -98,10 +146,16 @@ class _RegisterPageState extends State<RegisterPage> {
       CameraDescription selectedCamera = _cameras![cameraIndex];
       _cameraController = CameraController(
         selectedCamera,
-        ResolutionPreset.max, // Use highest resolution for preview
+        ResolutionPreset.medium, // Medium resolution to avoid lag
         enableAudio: false,
       );
       await _cameraController!.initialize();
+
+      // Add this to start image stream:
+      _cameraController!.startImageStream((CameraImage cameraImage) {
+        _detectFacesFromCamera(cameraImage);
+      });
+
       if (!mounted) return;
       setState(() {
         _isCameraInitialized = true;
@@ -300,9 +354,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildCameraPreview(BuildContext buildContext) {
-    if (!_isCameraInitialized ||
-        _cameraController == null ||
-        !_cameraController!.value.isInitialized) {
+    if (!_isCameraInitialized || _cameraController == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -310,40 +362,43 @@ class _RegisterPageState extends State<RegisterPage> {
     final double cameraAspectRatio = previewSize.width / previewSize.height;
     final Size screenSize = MediaQuery.of(buildContext).size;
     final double screenAspectRatio = screenSize.width / screenSize.height;
+
     double scale = cameraAspectRatio / screenAspectRatio;
-    double extraZoomFactor = 0.82;
-    scale *= extraZoomFactor;
-    final int sensorOrientation =
-        _cameraController!.description.sensorOrientation;
-    double rotationAngle = 0;
-    if (sensorOrientation == 90) {
-      rotationAngle = math.pi / 2;
-    } else if (sensorOrientation == 270) {
-      rotationAngle = -math.pi / 2;
+    if (scale < 1) {
+      scale = 1 / scale;
     }
+
     final bool isFrontCamera = _cameraController!.description.lensDirection ==
         CameraLensDirection.front;
-    final Matrix4 transformMatrix = isFrontCamera
-        ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
-        : Matrix4.rotationZ(rotationAngle);
-    return LayoutBuilder(
-      builder: (layoutContext, constraints) {
-        return ClipRect(
-          child: Transform.scale(
-            scale: scale * extraZoomFactor,
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: cameraAspectRatio,
-                child: Transform(
+
+    return ClipRect(
+      child: Transform.scale(
+        scale: scale,
+        child: Center(
+          child: AspectRatio(
+            aspectRatio: previewSize.width / previewSize.height,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Transform(
                   alignment: Alignment.center,
-                  transform: transformMatrix,
+                  transform: isFrontCamera
+                      ? Matrix4.rotationY(math.pi)
+                      : Matrix4.identity(),
                   child: CameraPreview(_cameraController!),
                 ),
-              ),
+                CustomPaint(
+                  painter: FacePainter(
+                    faces: _faces,
+                    imageSize: previewSize,
+                    isFrontCamera: isFrontCamera,
+                  ),
+                ),
+              ],
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -353,17 +408,20 @@ class FacePainter extends CustomPainter {
   final Size imageSize;
   final bool isFrontCamera;
 
-  FacePainter(this.faces, this.imageSize, this.isFrontCamera);
+  FacePainter(
+      {required this.faces,
+      required this.imageSize,
+      required this.isFrontCamera});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..color = Colors.red
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
+    final paint = Paint()
+      ..color = Colors.greenAccent
+      ..strokeWidth = 3.0
+      ..style = PaintingStyle.stroke;
 
-    double scaleX = size.width / imageSize.height;
-    double scaleY = size.height / imageSize.width;
+    final scaleX = size.width / imageSize.height;
+    final scaleY = size.height / imageSize.width;
 
     for (var face in faces) {
       Rect rect = face.boundingBox;
@@ -382,10 +440,11 @@ class FacePainter extends CustomPainter {
           scaledRect.bottom,
         );
       }
+
       canvas.drawRect(scaledRect, paint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant FacePainter oldDelegate) => true;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
