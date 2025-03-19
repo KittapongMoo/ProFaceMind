@@ -354,7 +354,9 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildCameraPreview(BuildContext buildContext) {
-    if (!_isCameraInitialized || _cameraController == null) {
+    if (!_isCameraInitialized ||
+        _cameraController == null ||
+        !_cameraController!.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -364,41 +366,55 @@ class _RegisterPageState extends State<RegisterPage> {
     final double screenAspectRatio = screenSize.width / screenSize.height;
 
     double scale = cameraAspectRatio / screenAspectRatio;
-    if (scale < 1) {
-      scale = 1 / scale;
+    double extraZoomFactor = 0.82;
+    scale *= extraZoomFactor;
+
+    final int sensorOrientation =
+        _cameraController!.description.sensorOrientation;
+    double rotationAngle = 0;
+    if (sensorOrientation == 90) {
+      rotationAngle = math.pi / 2;
+    } else if (sensorOrientation == 270) {
+      rotationAngle = -math.pi / 2;
     }
 
     final bool isFrontCamera = _cameraController!.description.lensDirection ==
         CameraLensDirection.front;
 
-    return ClipRect(
-      child: Transform.scale(
-        scale: scale,
-        child: Center(
-          child: AspectRatio(
-            aspectRatio: previewSize.width / previewSize.height,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Transform(
-                  alignment: Alignment.center,
-                  transform: isFrontCamera
-                      ? Matrix4.rotationY(math.pi)
-                      : Matrix4.identity(),
-                  child: CameraPreview(_cameraController!),
+    final Matrix4 transformMatrix = isFrontCamera
+        ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
+        : Matrix4.rotationZ(rotationAngle);
+
+    return LayoutBuilder(
+      builder: (layoutContext, constraints) {
+        return ClipRect(
+          child: Transform.scale(
+            scale: scale,
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: cameraAspectRatio,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Transform(
+                      alignment: Alignment.center,
+                      transform: transformMatrix,
+                      child: CameraPreview(_cameraController!),
+                    ),
+                    CustomPaint(
+                      painter: FacePainter(
+                        faces: _faces,
+                        imageSize: previewSize,
+                        isFrontCamera: _isFrontCamera,
+                      ),
+                    ),
+                  ],
                 ),
-                CustomPaint(
-                  painter: FacePainter(
-                    faces: _faces,
-                    imageSize: previewSize,
-                    isFrontCamera: isFrontCamera,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -408,16 +424,17 @@ class FacePainter extends CustomPainter {
   final Size imageSize;
   final bool isFrontCamera;
 
-  FacePainter(
-      {required this.faces,
-      required this.imageSize,
-      required this.isFrontCamera});
+  FacePainter({
+    required this.faces,
+    required this.imageSize,
+    required this.isFrontCamera,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
+    final Paint paint = Paint()
       ..color = Colors.greenAccent
-      ..strokeWidth = 3.0
+      ..strokeWidth = 3
       ..style = PaintingStyle.stroke;
 
     final scaleX = size.width / imageSize.height;
@@ -425,6 +442,7 @@ class FacePainter extends CustomPainter {
 
     for (var face in faces) {
       Rect rect = face.boundingBox;
+
       Rect scaledRect = Rect.fromLTRB(
         rect.left * scaleX,
         rect.top * scaleY,
@@ -441,10 +459,17 @@ class FacePainter extends CustomPainter {
         );
       }
 
-      canvas.drawRect(scaledRect, paint);
+      canvas.drawRect(
+          scaledRect,
+          Paint()
+            ..color = Colors.greenAccent
+            ..strokeWidth = 3.0
+            ..style = PaintingStyle.stroke);
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant FacePainter oldDelegate) {
+    return oldDelegate.faces != faces;
+  }
 }
