@@ -13,6 +13,7 @@ import 'package:tflite/tflite.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'dart:ui';
 
 import 'fillinfo.dart'; // Make sure FillInfoPage({required this.userId}) is defined
 
@@ -41,6 +42,38 @@ class _RegisterPageState extends State<RegisterPage> {
 
   // ImagePicker for gallery selection
   final ImagePicker _picker = ImagePicker();
+
+  InputImage? _convertCameraImage(CameraImage image, CameraDescription camera) {
+    final WriteBuffer allBytes = WriteBuffer();
+    for (Plane plane in image.planes) {
+      allBytes.putUint8List(plane.bytes);
+    }
+    final bytes = allBytes.done().buffer.asUint8List();
+
+    final Size imageSize = Size(image.width.toDouble(), image.height.toDouble());
+
+    final inputImageRotation =
+    InputImageRotationValue.fromRawValue(camera.sensorOrientation);
+    if (inputImageRotation == null) return null;
+
+    final inputImageFormat =
+    InputImageFormatValue.fromRawValue(image.format.raw);
+    if (inputImageFormat == null) return null;
+
+    // Create metadata without planeData
+    final metadata = InputImageMetadata(
+      size: imageSize,
+      rotation: inputImageRotation,
+      format: inputImageFormat,
+      bytesPerRow: image.planes[0].bytesPerRow,
+    );
+
+    return InputImage.fromBytes(
+      bytes: bytes,
+      metadata: metadata,
+    );
+  }
+
 
   @override
   void initState() {
@@ -95,36 +128,15 @@ class _RegisterPageState extends State<RegisterPage> {
     _isDetectingFaces = true;
 
     try {
-      final WriteBuffer allBytes = WriteBuffer();
-      for (var plane in cameraImage.planes) {
-        allBytes.putUint8List(plane.bytes);
+      final inputImage =
+          _convertCameraImage(cameraImage, _cameraController!.description);
+      if (inputImage == null) {
+        _isDetectingFaces = false;
+        return;
       }
 
-      final bytes = allBytes.done().buffer.asUint8List();
-
-      final Size imageSize = Size(
-        cameraImage.width.toDouble(),
-        cameraImage.height.toDouble(),
-      );
-
-      final camera = _cameraController!.description;
-      final imageRotation =
-          InputImageRotationValue.fromRawValue(camera.sensorOrientation)!;
-
-      final inputImageFormat =
-          InputImageFormatValue.fromRawValue(cameraImage.format.raw)!;
-
-      final inputImage = InputImage.fromBytes(
-        bytes: bytes,
-        metadata: InputImageMetadata(
-          size: imageSize,
-          rotation: imageRotation,
-          format: inputImageFormat,
-          bytesPerRow: cameraImage.planes[0].bytesPerRow,
-        ),
-      );
-
       final faces = await _faceDetector.processImage(inputImage);
+
       if (mounted) {
         setState(() {
           _faces = faces;
@@ -227,7 +239,8 @@ class _RegisterPageState extends State<RegisterPage> {
 
     // Save image locally
     final Directory appDir = await getApplicationDocumentsDirectory();
-    final String fileName = 'user_face_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final String fileName =
+        'user_face_${DateTime.now().millisecondsSinceEpoch}.jpg';
     final String newPath = join(appDir.path, fileName);
     final File savedImage = await imageFile.copy(newPath);
 
@@ -286,8 +299,6 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
     );
   }
-
-
 
   /// Use TFLite to run the face recognition model and return the face vector.
   Future<List<double>> _runFaceRecognition(Uint8List imageBytes) async {
@@ -361,7 +372,6 @@ class _RegisterPageState extends State<RegisterPage> {
       },
     );
   }
-
 
   /// Build the camera preview.
   @override
