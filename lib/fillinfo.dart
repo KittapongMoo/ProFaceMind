@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
 
 class FillInfoPage extends StatefulWidget {
   final int userId; // (1) Add this field
@@ -14,18 +18,59 @@ class _FillInfoPageState extends State<FillInfoPage> {
   bool isEditing = false;
   final PageController _pageController = PageController();
 
-  // 🔹 จำลองรูปภาพที่ได้จาก register.dart (ในอนาคตสามารถส่ง List<String> ที่มาจาก register.dart ได้)
-  final List<String> imagePaths = [
-    'assets/profile1.jpg',
-    'assets/profile2.jpg',
-    'assets/profile3.jpg',
-    'assets/profile4.jpg',
-    'assets/profile5.jpg',
-  ];
+  List<String> imagePaths = [];
 
-  final TextEditingController nicknameController = TextEditingController(text: '-');
-  final TextEditingController nameController = TextEditingController(text: 'ณภัทร เสียงสมบุญ');
-  final TextEditingController relationController = TextEditingController(text: 'หลานของคุณ');
+  final TextEditingController nicknameController =
+      TextEditingController(text: '');
+  final TextEditingController nameController = TextEditingController(text: '');
+  final TextEditingController relationController =
+      TextEditingController(text: '');
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, 'facemind.db');
+    final db = await openDatabase(path);
+
+    // Fetch user data
+    final userResult = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [widget.userId],
+    );
+
+    if (userResult.isNotEmpty) {
+      final user = userResult.first;
+      nicknameController.text = user['nickname'] as String? ?? '-';
+      nameController.text = user['name'] as String? ?? '';
+      relationController.text = user['relation'] as String? ?? '';
+
+      // 🆔 Print the ID and user information clearly
+      print('🆔 User ID: ${widget.userId}');
+      print('🙋 Nickname: ${nicknameController.text}');
+      print('🙋 Name: ${nameController.text}');
+      print('🙋 Relation: ${relationController.text}');
+      print('📷 Primary Image: ${user['primary_image']}');
+    } else {
+      print('❌ No user found with ID: ${widget.userId}');
+    }
+
+    // Fetch user images
+    final imageResult = await db.query(
+      'user_images',
+      where: 'user_id = ?',
+      whereArgs: [widget.userId],
+    );
+
+    setState(() {
+      imagePaths = imageResult.map((e) => e['image_path'] as String).toList();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,23 +86,26 @@ class _FillInfoPageState extends State<FillInfoPage> {
               SizedBox(
                 width: double.infinity,
                 height: 250,
-                child: PageView.builder(
-                  controller: _pageController,
-                  itemCount: imagePaths.length,
-                  itemBuilder: (localCtx, index) {
-                    return Image.asset(
-                      imagePaths[index], // 🔹 ใช้ภาพจาก List
-                      fit: BoxFit.cover,
-                    );
-                  },
-                ),
+                child: imagePaths.isNotEmpty
+                    ? PageView.builder(
+                        controller: _pageController,
+                        itemCount: imagePaths.length,
+                        itemBuilder: (localCtx, index) {
+                          return Image.file(
+                            File(imagePaths[index]),
+                            fit: BoxFit.cover,
+                          );
+                        },
+                      )
+                    : const Center(child: CircularProgressIndicator()),
               ),
               // 🔹 ปุ่มย้อนกลับ
               Positioned(
                 top: 40,
                 left: 16,
                 child: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 30),
+                  icon: const Icon(Icons.arrow_back,
+                      color: Colors.white, size: 30),
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
@@ -66,7 +114,8 @@ class _FillInfoPageState extends State<FillInfoPage> {
                 top: 40,
                 right: 16,
                 child: IconButton(
-                  icon: const Icon(Icons.volume_up, color: Colors.white, size: 30),
+                  icon: const Icon(Icons.volume_up,
+                      color: Colors.white, size: 30),
                   onPressed: () {
                     // TODO: ใส่ฟังก์ชันอ่านออกเสียง
                   },
@@ -121,12 +170,16 @@ class _FillInfoPageState extends State<FillInfoPage> {
                         child: Center(
                           child: Text(
                             'ข้อมูล',
-                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+                            style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87),
                           ),
                         ),
                       ),
                       IconButton(
-                        icon: Icon(isEditing ? Icons.check : Icons.edit, color: Colors.blue),
+                        icon: Icon(isEditing ? Icons.check : Icons.edit,
+                            color: Colors.blue),
                         onPressed: () {
                           setState(() {
                             isEditing = !isEditing;
@@ -136,12 +189,9 @@ class _FillInfoPageState extends State<FillInfoPage> {
                     ],
                   ),
                   const SizedBox(height: 20),
-
-                  // 🔹 ช่องข้อมูลที่สามารถแก้ไขได้
                   _buildEditableField('ชื่อเล่น', nicknameController, isEditing),
                   _buildEditableField('ชื่อ', nameController, isEditing),
                   _buildEditableField('ความสัมพันธ์', relationController, isEditing),
-
                   const Spacer(),
 
                   // 🔹 ปุ่ม "ยืนยัน"
@@ -149,8 +199,18 @@ class _FillInfoPageState extends State<FillInfoPage> {
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: () {
-                        // TODO: บันทึกข้อมูล (ใช้ widget.userId เพื่ออัปเดตตารางใน Database)
+                      onPressed: () async {
+                        final db = await openDatabase(join(await getDatabasesPath(), 'facemind.db'));
+                        await db.update(
+                          'users',
+                          {
+                            'nickname': nicknameController.text,
+                            'name': nameController.text,
+                            'relation': relationController.text,
+                          },
+                          where: 'id = ?',
+                          whereArgs: [widget.userId],
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
@@ -174,16 +234,14 @@ class _FillInfoPageState extends State<FillInfoPage> {
   }
 
   /// **📌 Widget ช่องข้อมูลที่แก้ไขได้เมื่อกดไอคอนดินสอ**
-  Widget _buildEditableField(String label, TextEditingController controller, bool isEditable) {
+  Widget _buildEditableField(
+      String label, TextEditingController controller, bool isEditable) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$label :',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
+          Text('$label :', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 5),
           TextField(
             controller: controller,

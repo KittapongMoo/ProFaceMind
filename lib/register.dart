@@ -13,12 +13,13 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'dart:math' as math;
 import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:facemind/main.dart';
 
 import 'fillinfo.dart'; // Make sure FillInfoPage({required this.userId}) is defined
 
 /// Make sure you set this in main.dart:
 /// MaterialApp(navigatorKey: navigatorKey, home: RegisterPage())
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+// final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -471,67 +472,65 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _registerUserWithImages() async {
-    try {
-      _showProgressIndicator("Registering user...");
+  try {
+    _showProgressIndicator("Registering user...");
 
-      // Stop camera stream explicitly before navigation
-      if (_cameraController != null &&
-          _cameraController!.value.isStreamingImages) {
-        await _cameraController!.stopImageStream();
-      }
-
-      // Compute average vector
-      List<double> averageVector = List.filled(128, 0.0);
-      for (var vector in _faceVectors) {
-        for (int i = 0; i < vector.length; i++) {
-          averageVector[i] += vector[i];
-        }
-      }
-      for (int i = 0; i < averageVector.length; i++) {
-        averageVector[i] /= _faceVectors.length;
-      }
-
-      final db = await _getDatabase();
-      int userId = await db.insert('users', {
-        'face_vector': jsonEncode(averageVector),
-        'nickname': '',
-        'name': '',
-        'relation': '',
-      });
-
-      // Save image paths associated with this user
-      final Directory appDir = await getApplicationDocumentsDirectory();
-      final images = Directory(appDir.path)
-          .listSync()
-          .where((file) => file.path.contains('user_face_'))
-          .toList();
-
-      for (var imageFile in images) {
-        await db.insert('user_images', {
-          'user_id': userId,
-          'image_path': imageFile.path,
-        });
-      }
-
-      print("User registered with id: $userId");
-      _hideDialog();
-
-      // Navigate safely to FillInfoPage using global navigator key
-      if (navigatorKey.currentContext != null) {
-        Navigator.of(navigatorKey.currentContext!).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => FillInfoPage(userId: userId),
-          ),
-        );
-      } else {
-        print('❌ Navigation failed: navigatorKey context is null');
-      }
-    } catch (e) {
-      _hideDialog();
-      print('Error registering user: $e');
-      _showErrorPopup("Error registering user: $e");
+    if (_cameraController != null &&
+        _cameraController!.value.isStreamingImages) {
+      await _cameraController!.stopImageStream();
     }
+
+    List<double> averageVector = List.filled(128, 0.0);
+    for (var vector in _faceVectors) {
+      for (int i = 0; i < vector.length; i++) {
+        averageVector[i] += vector[i];
+      }
+    }
+    for (int i = 0; i < averageVector.length; i++) {
+      averageVector[i] /= _faceVectors.length;
+    }
+
+    final db = await _getDatabase();
+    final Directory appDir = await getApplicationDocumentsDirectory();
+    final images = Directory(appDir.path)
+        .listSync()
+        .where((file) => file.path.contains('user_face_'))
+        .toList();
+
+    int userId = await db.insert('users', {
+      'face_vector': jsonEncode(averageVector),
+      'nickname': '',
+      'name': '',
+      'relation': '',
+      'primary_image': images.isNotEmpty ? images.first.path : '',
+    });
+
+    for (var imageFile in images) {
+      await db.insert('user_images', {
+        'user_id': userId,
+        'image_path': imageFile.path,
+      });
+    }
+
+    print("User registered with id: $userId");
+    _hideDialog();
+
+    if (navigatorKey.currentContext != null) {
+      Navigator.of(navigatorKey.currentContext!).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => FillInfoPage(userId: userId),
+        ),
+      );
+    } else {
+      print('❌ Navigation failed: navigatorKey context is null');
+    }
+  } catch (e) {
+    _hideDialog();
+    print('❌Error registering user: $e');
+    _showErrorPopup("Error registering user: $e");
   }
+}
+
 
   /// Run face recognition using tflite_flutter
   Future<List<double>> _runFaceRecognition(Uint8List imageBytes) async {
@@ -556,38 +555,42 @@ class _RegisterPageState extends State<RegisterPage> {
 
   /// Initialize and return the local SQLite database.
   Future<Database> _getDatabase() async {
-    try {
-      String dbPath = await getDatabasesPath();
-      String path = join(dbPath, 'facemind.db');
-      return openDatabase(
-        path,
-        version: 1,
-        onCreate: (Database db, int version) async {
-          await db.execute('''
-            CREATE TABLE users (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              face_vector TEXT,
-              nickname TEXT,
-              name TEXT,
-              relation TEXT
-            )
-          ''');
+  String dbPath = await getDatabasesPath();
+  String path = join(dbPath, 'facemind.db');
+  return openDatabase(
+    path,
+    version: 2, // 🔴 Increase version number here!
+    onCreate: (Database db, int version) async {
+      // Create initial database
+      await db.execute('''
+        CREATE TABLE users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          face_vector TEXT,
+          nickname TEXT,
+          name TEXT,
+          relation TEXT,
+          primary_image TEXT
+        )
+      ''');
 
-          await db.execute('''
-            CREATE TABLE user_images (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              user_id INTEGER,
-              image_path TEXT,
-              FOREIGN KEY(user_id) REFERENCES users(id)
-            )
-          ''');
-        },
-      );
-    } catch (e) {
-      print("Error getting database: $e");
-      throw e;
-    }
-  }
+      await db.execute('''
+        CREATE TABLE user_images (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          image_path TEXT,
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+      ''');
+    },
+    onUpgrade: (Database db, int oldVersion, int newVersion) async {
+      if (oldVersion == 1 && newVersion == 2) {
+        // Add the new column to existing users table
+        await db.execute('ALTER TABLE users ADD COLUMN primary_image TEXT');
+      }
+    },
+  );
+}
+
 
   /// Build the camera preview.
   @override
