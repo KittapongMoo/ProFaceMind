@@ -9,10 +9,7 @@ import 'register.dart';
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
-  runApp(MaterialApp(
-    navigatorKey: navigatorKey,
-    home: RegisterPage(),
-  ));
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -64,22 +61,24 @@ class PersonalInfoPage extends StatelessWidget {
                     child: Align(
                       alignment: Alignment(0, -0.5),
                       child: Stack(
-                        alignment: Alignment.center, // Ensures both icons overlap perfectly
+                        alignment: Alignment
+                            .center, // Ensures both icons overlap perfectly
                         children: [
                           Icon(
                             Icons.circle,
-                            size: MediaQuery.of(context).size.width * 0.85, // Bigger for background
+                            size: MediaQuery.of(context).size.width *
+                                0.85, // Bigger for background
                             color: Colors.grey[400], // Gray color (background)
                           ),
                           Icon(
                             Icons.account_circle,
-                            size: MediaQuery.of(context).size.width * 0.85, // Slightly smaller for foreground
+                            size: MediaQuery.of(context).size.width *
+                                0.85, // Slightly smaller for foreground
                             color: Colors.white, // White color (foreground)
                           ),
                         ],
                       ),
                     ),
-
                   ),
                 ),
               ],
@@ -89,7 +88,6 @@ class PersonalInfoPage extends StatelessWidget {
           // Bottom Section (Fixed at Bottom)
           Align(
             alignment: Alignment.bottomCenter,
-
             child: Container(
               padding: const EdgeInsets.only(top: 20, bottom: 40),
               width: double.infinity,
