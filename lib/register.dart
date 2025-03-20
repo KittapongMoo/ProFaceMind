@@ -178,7 +178,6 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-
   /// Initialize Camera
   Future<void> _initializeCamera() async {
     final permission = await Permission.camera.request();
@@ -476,7 +475,8 @@ class _RegisterPageState extends State<RegisterPage> {
       _showProgressIndicator("Registering user...");
 
       // Stop camera stream explicitly before navigation
-      if (_cameraController != null && _cameraController!.value.isStreamingImages) {
+      if (_cameraController != null &&
+          _cameraController!.value.isStreamingImages) {
         await _cameraController!.stopImageStream();
       }
 
@@ -752,21 +752,6 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                           isFrontCamera: isFrontCamera,
                           screenSize: constraints.biggest,
-                        ),
-                      ),
-
-                      // Optional face overlay circle
-                      Center(
-                        child: Container(
-                          width: constraints.maxWidth * 0.7,
-                          height: constraints.maxWidth * 0.7,
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.5),
-                              width: 2,
-                            ),
-                            shape: BoxShape.circle,
-                          ),
                         ),
                       ),
                     ],
