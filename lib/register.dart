@@ -425,9 +425,14 @@ class _RegisterPageState extends State<RegisterPage> {
 
       // Save image locally
       final Directory appDir = await getApplicationDocumentsDirectory();
+      final Directory userDir = Directory('${appDir.path}/temp_faces');
+      if (!userDir.existsSync()) {
+        userDir.createSync(recursive: true);
+      }
+
       final String fileName =
           'user_face_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final String newPath = join(appDir.path, fileName);
+      final String newPath = join(userDir.path, fileName);
       final File savedImage = await imageFile.copy(newPath);
 
       // Convert to proper format for TFLite
@@ -492,10 +497,10 @@ class _RegisterPageState extends State<RegisterPage> {
 
     final db = await _getDatabase();
     final Directory appDir = await getApplicationDocumentsDirectory();
-    final images = Directory(appDir.path)
-        .listSync()
-        .where((file) => file.path.contains('user_face_'))
-        .toList();
+    final Directory userDir = Directory('${appDir.path}/temp_faces');
+
+    // Fetch only current session images
+    final images = userDir.listSync().toList();
 
     int userId = await db.insert('users', {
       'face_vector': jsonEncode(averageVector),
@@ -505,12 +510,23 @@ class _RegisterPageState extends State<RegisterPage> {
       'primary_image': images.isNotEmpty ? images.first.path : '',
     });
 
+    // Move images from temp_faces to user-specific folder
+    final Directory finalUserDir = Directory('${appDir.path}/user_$userId');
+    if (!finalUserDir.existsSync()) {
+      finalUserDir.createSync(recursive: true);
+    }
+
     for (var imageFile in images) {
+      String newFilePath = join(finalUserDir.path, basename(imageFile.path));
+      File newFile = await File(imageFile.path).copy(newFilePath);
       await db.insert('user_images', {
         'user_id': userId,
-        'image_path': imageFile.path,
+        'image_path': newFile.path,
       });
+      imageFile.deleteSync(); // Clean temp file after moving
     }
+
+    _faceVectors.clear();
 
     print("User registered with id: $userId");
     _hideDialog();
