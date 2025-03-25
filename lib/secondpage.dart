@@ -8,7 +8,7 @@ import 'ownerinfo.dart'; // ข้อมูลผู้ใช้
 import 'setphonenum.dart'; // ตั้งค่าเบอร์ฉุกเฉิน
 import 'fillinfo.dart'; // กรอกข้อมูลรูปภาพ
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
+import 'package:path/path.dart' as p;
 
 class SecondPage extends StatefulWidget {
   const SecondPage({Key? key}) : super(key: key);
@@ -24,8 +24,12 @@ class _SecondPageState extends State<SecondPage> {
   @override
   void initState() {
     super.initState();
+    _loadData();
+  }
+
+  // Helper to load data
+  void _loadData() {
     _savedInformation = _loadSavedInformation();
-    // _usersFuture = _loadUsers();
     _usersFuture = _loadUsersWithImages();
   }
 
@@ -103,7 +107,7 @@ class _SecondPageState extends State<SecondPage> {
   /// Opens the existing database without re-creating it.
   Future<Database> _getDatabase() async {
     String dbPath = await getDatabasesPath();
-    String path = join(dbPath, 'facemind.db');
+    String path = p.join(dbPath, 'facemind.db');
     return openDatabase(path);
   }
 
@@ -304,17 +308,21 @@ class _SecondPageState extends State<SecondPage> {
               },
             ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 10),
 
             // Navigation Buttons Section
             _buildNavigationButton(
                 'ตั้งค่าข้อมูลผู้ใช้', Colors.orange, const Ownerinfo()),
+            const SizedBox(height: 10),
             _buildNavigationButton(
                 'ตั้งค่าเบอร์โทรฉุกเฉิน', Colors.red, const SetPhoneNumber()),
+            const SizedBox(height: 10),
             _buildNavigationButton(
                 'ดูตำแหน่งแผนที่', Colors.green, const Setmap()),
+            const SizedBox(height: 10),
             _buildNavigationButton(
                 'เปิดกล้อง', Colors.blueAccent, const CameraPage()),
+            const SizedBox(height: 25),
             // ปุ่มไปหน้า "กรอกข้อมูลรูปภาพ" ถ้าต้องการใช้งานเพิ่มได้
             // _buildNavigationButton('กรอกข้อมูลรูปภาพ', Colors.purple, const FillInfoPage()),
           ],
@@ -374,9 +382,16 @@ class _SecondPageState extends State<SecondPage> {
     return Center(
       child: ElevatedButton(
         onPressed: () {
-          navigatorKey.currentState?.push(
-            MaterialPageRoute(builder: (context) => page),
-          );
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => page),
+          ).then((_) {
+            // This code runs when the pushed route is popped,
+            // regardless of whether the user tapped the in‑app back button or the device’s back button.
+            setState(() {
+              _loadData();
+            });
+          });
         },
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
