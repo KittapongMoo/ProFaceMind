@@ -36,7 +36,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final FaceDetector _faceDetector = FaceDetector(
     options: FaceDetectorOptions(
       performanceMode:
-          FaceDetectorMode.accurate, // accurate for better detection
+      FaceDetectorMode.accurate, // accurate for better detection
       enableTracking: true,
     ),
   );
@@ -100,9 +100,9 @@ class _RegisterPageState extends State<RegisterPage> {
         for (int col = 0; col < uvWidth; col++) {
           // In NV21 the order is V then U.
           nv21[offset++] =
-              image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
+          image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
           nv21[offset++] =
-              image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
+          image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
         }
       }
 
@@ -191,7 +191,7 @@ class _RegisterPageState extends State<RegisterPage> {
       if (_cameras != null && _cameras!.isNotEmpty) {
         // Find the front camera
         int frontCameraIndex = _cameras!.indexWhere(
-            (camera) => camera.lensDirection == CameraLensDirection.front);
+                (camera) => camera.lensDirection == CameraLensDirection.front);
         await _setCamera(frontCameraIndex != -1 ? frontCameraIndex : 0);
       }
     } catch (e) {
@@ -210,7 +210,7 @@ class _RegisterPageState extends State<RegisterPage> {
     int cameraIndex = 0;
     for (int i = 0; i < _cameras!.length; i++) {
       if ((_isFrontCamera &&
-              _cameras![i].lensDirection == CameraLensDirection.front) ||
+          _cameras![i].lensDirection == CameraLensDirection.front) ||
           (!_isFrontCamera &&
               _cameras![i].lensDirection == CameraLensDirection.back)) {
         cameraIndex = i;
@@ -226,7 +226,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       final inputImage =
-          _convertCameraImage(cameraImage, _cameraController!.description);
+      _convertCameraImage(cameraImage, _cameraController!.description);
       if (inputImage == null) {
         _isDetectingFaces = false;
         return;
@@ -397,7 +397,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       final XFile? imageFile =
-          await _picker.pickImage(source: ImageSource.gallery);
+      await _picker.pickImage(source: ImageSource.gallery);
       if (imageFile != null) {
         _showProgressIndicator("Processing image...");
         await _processCapturedImage(File(imageFile.path));
@@ -446,9 +446,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
       // Resize to the expected input size for MobileFaceNet (usually 112x112)
       final img.Image resizedImage =
-          img.copyResize(decodedImage, width: 112, height: 112);
+      img.copyResize(decodedImage, width: 112, height: 112);
       final Uint8List processedBytes =
-          _imageToByteListFloat32(resizedImage, 112, 127.5, 128.0);
+      _imageToByteListFloat32(resizedImage, 112, 127.5, 128.0);
 
       List<double> vector = await _runFaceRecognition(processedBytes);
       print("😀Face vector: $vector"); // Add this line to inspect the vector
@@ -477,75 +477,75 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _registerUserWithImages() async {
-  try {
-    _showProgressIndicator("Registering user...");
+    try {
+      _showProgressIndicator("Registering user...");
 
-    if (_cameraController != null &&
-        _cameraController!.value.isStreamingImages) {
-      await _cameraController!.stopImageStream();
-    }
-
-    List<double> averageVector = List.filled(128, 0.0);
-    for (var vector in _faceVectors) {
-      for (int i = 0; i < vector.length; i++) {
-        averageVector[i] += vector[i];
+      if (_cameraController != null &&
+          _cameraController!.value.isStreamingImages) {
+        await _cameraController!.stopImageStream();
       }
-    }
-    for (int i = 0; i < averageVector.length; i++) {
-      averageVector[i] /= _faceVectors.length;
-    }
 
-    final db = await _getDatabase();
-    final Directory appDir = await getApplicationDocumentsDirectory();
-    final Directory userDir = Directory('${appDir.path}/temp_faces');
+      List<double> averageVector = List.filled(128, 0.0);
+      for (var vector in _faceVectors) {
+        for (int i = 0; i < vector.length; i++) {
+          averageVector[i] += vector[i];
+        }
+      }
+      for (int i = 0; i < averageVector.length; i++) {
+        averageVector[i] /= _faceVectors.length;
+      }
 
-    // Fetch only current session images
-    final images = userDir.listSync().toList();
+      final db = await _getDatabase();
+      final Directory appDir = await getApplicationDocumentsDirectory();
+      final Directory userDir = Directory('${appDir.path}/temp_faces');
 
-    int userId = await db.insert('users', {
-      'face_vector': jsonEncode(averageVector),
-      'nickname': '',
-      'name': '',
-      'relation': '',
-      'primary_image': images.isNotEmpty ? images.first.path : '',
-    });
+      // Fetch only current session images
+      final images = userDir.listSync().toList();
 
-    // Move images from temp_faces to user-specific folder
-    final Directory finalUserDir = Directory('${appDir.path}/user_$userId');
-    if (!finalUserDir.existsSync()) {
-      finalUserDir.createSync(recursive: true);
-    }
-
-    for (var imageFile in images) {
-      String newFilePath = join(finalUserDir.path, basename(imageFile.path));
-      File newFile = await File(imageFile.path).copy(newFilePath);
-      await db.insert('user_images', {
-        'user_id': userId,
-        'image_path': newFile.path,
+      int userId = await db.insert('users', {
+        'face_vector': jsonEncode(averageVector),
+        'nickname': '',
+        'name': '',
+        'relation': '',
+        'primary_image': images.isNotEmpty ? images.first.path : '',
       });
-      imageFile.deleteSync(); // Clean temp file after moving
+
+      // Move images from temp_faces to user-specific folder
+      final Directory finalUserDir = Directory('${appDir.path}/user_$userId');
+      if (!finalUserDir.existsSync()) {
+        finalUserDir.createSync(recursive: true);
+      }
+
+      for (var imageFile in images) {
+        String newFilePath = join(finalUserDir.path, basename(imageFile.path));
+        File newFile = await File(imageFile.path).copy(newFilePath);
+        await db.insert('user_images', {
+          'user_id': userId,
+          'image_path': newFile.path,
+        });
+        imageFile.deleteSync(); // Clean temp file after moving
+      }
+
+      _faceVectors.clear();
+
+      print("User registered with id: $userId");
+      _hideDialog();
+
+      if (navigatorKey.currentContext != null) {
+        Navigator.of(navigatorKey.currentContext!).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => FillInfoPage(userId: userId),
+          ),
+        );
+      } else {
+        print('❌ Navigation failed: navigatorKey context is null');
+      }
+    } catch (e) {
+      _hideDialog();
+      print('❌Error registering user: $e');
+      _showErrorPopup("Error registering user: $e");
     }
-
-    _faceVectors.clear();
-
-    print("User registered with id: $userId");
-    _hideDialog();
-
-    if (navigatorKey.currentContext != null) {
-      Navigator.of(navigatorKey.currentContext!).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => FillInfoPage(userId: userId),
-        ),
-      );
-    } else {
-      print('❌ Navigation failed: navigatorKey context is null');
-    }
-  } catch (e) {
-    _hideDialog();
-    print('❌Error registering user: $e');
-    _showErrorPopup("Error registering user: $e");
   }
-}
 
 
   /// Run face recognition using tflite_flutter
@@ -571,14 +571,14 @@ class _RegisterPageState extends State<RegisterPage> {
 
   /// Initialize and return the local SQLite database.
   Future<Database> _getDatabase() async {
-  String dbPath = await getDatabasesPath();
-  String path = join(dbPath, 'facemind.db');
-  return openDatabase(
-    path,
-    version: 2, // 🔴 Increase version number here!
-    onCreate: (Database db, int version) async {
-      // Create initial database
-      await db.execute('''
+    String dbPath = await getDatabasesPath();
+    String path = join(dbPath, 'facemind.db');
+    return openDatabase(
+      path,
+      version: 2, // 🔴 Increase version number here!
+      onCreate: (Database db, int version) async {
+        // Create initial database
+        await db.execute('''
         CREATE TABLE users (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           face_vector TEXT,
@@ -589,7 +589,7 @@ class _RegisterPageState extends State<RegisterPage> {
         )
       ''');
 
-      await db.execute('''
+        await db.execute('''
         CREATE TABLE user_images (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           user_id INTEGER,
@@ -597,15 +597,15 @@ class _RegisterPageState extends State<RegisterPage> {
           FOREIGN KEY(user_id) REFERENCES users(id)
         )
       ''');
-    },
-    onUpgrade: (Database db, int oldVersion, int newVersion) async {
-      if (oldVersion == 1 && newVersion == 2) {
-        // Add the new column to existing users table
-        await db.execute('ALTER TABLE users ADD COLUMN primary_image TEXT');
-      }
-    },
-  );
-}
+      },
+      onUpgrade: (Database db, int oldVersion, int newVersion) async {
+        if (oldVersion == 1 && newVersion == 2) {
+          // Add the new column to existing users table
+          await db.execute('ALTER TABLE users ADD COLUMN primary_image TEXT');
+        }
+      },
+    );
+  }
 
 
   /// Build the camera preview.
@@ -689,7 +689,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   _faceVectors.length >= 5
                       ? Icon(Icons.check_circle, color: Colors.green, size: 20)
                       : Icon(Icons.circle_outlined,
-                          color: Colors.white, size: 20),
+                      color: Colors.white, size: 20),
                 ],
               ),
             ),
