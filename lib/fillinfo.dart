@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'camera.dart';
 
 class FillInfoPage extends StatefulWidget {
   final int userId; // (1) Add this field
@@ -16,7 +17,7 @@ class FillInfoPage extends StatefulWidget {
 }
 
 class _FillInfoPageState extends State<FillInfoPage> {
-  bool isEditing = false;
+  bool isEditing = true;
   final PageController _pageController = PageController();
 
   List<String> imagePaths = [];
@@ -34,47 +35,46 @@ class _FillInfoPageState extends State<FillInfoPage> {
   }
 
   Future<void> _loadUserData() async {
-  final dbPath = await getDatabasesPath();
-  final path = join(dbPath, 'facemind.db');
-  final db = await openDatabase(path);
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, 'facemind.db');
+    final db = await openDatabase(path);
 
-  // Fetch user data
-  final userResult = await db.query(
-    'users',
-    where: 'id = ?',
-    whereArgs: [widget.userId],
-  );
+    // Fetch user data
+    final userResult = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [widget.userId],
+    );
 
-  if (userResult.isNotEmpty) {
-    final user = userResult.first;
-    nicknameController.text = user['nickname'] as String? ?? '-';
-    nameController.text = user['name'] as String? ?? '';
-    relationController.text = user['relation'] as String? ?? '';
+    if (userResult.isNotEmpty) {
+      final user = userResult.first;
+      nicknameController.text = user['nickname'] as String? ?? '-';
+      nameController.text = user['name'] as String? ?? '';
+      relationController.text = user['relation'] as String? ?? '';
 
-    List<dynamic> faceVector = jsonDecode(user['face_vector'] as String);
+      List<dynamic> faceVector = jsonDecode(user['face_vector'] as String);
 
-    print('🆔 User ID: ${widget.userId}');
-    print('🙋 Nickname: ${nicknameController.text}');
-    print('🙋 Name: ${nameController.text}');
-    print('🙋 Relation: ${relationController.text}');
-    print('📷 Primary Image: ${user['primary_image']}');
-    print('🧬 Face Vector: $faceVector');
-  } else {
-    print('❌ No user found with ID: ${widget.userId}');
+      print('🆔 User ID: ${widget.userId}');
+      print('🙋 Nickname: ${nicknameController.text}');
+      print('🙋 Name: ${nameController.text}');
+      print('🙋 Relation: ${relationController.text}');
+      print('📷 Primary Image: ${user['primary_image']}');
+      print('🧬 Face Vector: $faceVector');
+    } else {
+      print('❌ No user found with ID: ${widget.userId}');
+    }
+
+    // 🔴 CLEARLY FETCH ONLY IMAGES WITH THE CURRENT USER ID
+    final imageResult = await db.query(
+      'user_images',
+      where: 'user_id = ?',
+      whereArgs: [widget.userId],
+    );
+
+    setState(() {
+      imagePaths = imageResult.map((e) => e['image_path'] as String).toList();
+    });
   }
-
-  // 🔴 CLEARLY FETCH ONLY IMAGES WITH THE CURRENT USER ID
-  final imageResult = await db.query(
-    'user_images',
-    where: 'user_id = ?',
-    whereArgs: [widget.userId],
-  );
-
-  setState(() {
-    imagePaths = imageResult.map((e) => e['image_path'] as String).toList();
-  });
-}
-
 
   @override
   Widget build(BuildContext context) {
@@ -95,9 +95,21 @@ class _FillInfoPageState extends State<FillInfoPage> {
                         controller: _pageController,
                         itemCount: imagePaths.length,
                         itemBuilder: (localCtx, index) {
-                          return Image.file(
-                            File(imagePaths[index]),
-                            fit: BoxFit.cover,
+                          return GestureDetector(
+                            onTap: () {
+                              // Navigate to full image view when tapped.
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => FullImagePage(
+                                      imagePath: imagePaths[index]),
+                                ),
+                              );
+                            },
+                            child: Image.file(
+                              File(imagePaths[index]),
+                              fit: BoxFit.cover,
+                            ),
                           );
                         },
                       )
@@ -113,18 +125,6 @@ class _FillInfoPageState extends State<FillInfoPage> {
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
-              // 🔹 ปุ่มลำโพง
-              Positioned(
-                top: 40,
-                right: 16,
-                child: IconButton(
-                  icon: const Icon(Icons.volume_up,
-                      color: Colors.white, size: 30),
-                  onPressed: () {
-                    // TODO: ใส่ฟังก์ชันอ่านออกเสียง
-                  },
-                ),
-              ),
             ],
           ),
 
@@ -137,14 +137,18 @@ class _FillInfoPageState extends State<FillInfoPage> {
                 return AnimatedBuilder(
                   animation: _pageController,
                   builder: (animCtx, child) {
-                    double selected = _pageController.hasClients ? _pageController.page ?? 0 : 0;
+                    double selected = _pageController.hasClients
+                        ? _pageController.page ?? 0
+                        : 0;
                     return Container(
                       margin: const EdgeInsets.symmetric(horizontal: 4),
                       width: (index == selected.round()) ? 12 : 8,
                       height: 8,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: (index == selected.round()) ? Colors.blue : Colors.grey,
+                        color: (index == selected.round())
+                            ? Colors.blue
+                            : Colors.grey,
                       ),
                     );
                   },
@@ -181,21 +185,14 @@ class _FillInfoPageState extends State<FillInfoPage> {
                           ),
                         ),
                       ),
-                      IconButton(
-                        icon: Icon(isEditing ? Icons.check : Icons.edit,
-                            color: Colors.blue),
-                        onPressed: () {
-                          setState(() {
-                            isEditing = !isEditing;
-                          });
-                        },
-                      ),
                     ],
                   ),
                   const SizedBox(height: 20),
-                  _buildEditableField('ชื่อเล่น', nicknameController, isEditing),
+                  _buildEditableField(
+                      'ชื่อเล่น', nicknameController, isEditing),
                   _buildEditableField('ชื่อ', nameController, isEditing),
-                  _buildEditableField('ความสัมพันธ์', relationController, isEditing),
+                  _buildEditableField(
+                      'ความสัมพันธ์', relationController, isEditing),
                   const Spacer(),
 
                   // 🔹 ปุ่ม "ยืนยัน"
@@ -204,7 +201,8 @@ class _FillInfoPageState extends State<FillInfoPage> {
                     height: 50,
                     child: ElevatedButton(
                       onPressed: () async {
-                        final db = await openDatabase(join(await getDatabasesPath(), 'facemind.db'));
+                        final db = await openDatabase(
+                            join(await getDatabasesPath(), 'facemind.db'));
                         await db.update(
                           'users',
                           {
@@ -215,10 +213,16 @@ class _FillInfoPageState extends State<FillInfoPage> {
                           where: 'id = ?',
                           whereArgs: [widget.userId],
                         );
+                        // Navigate to CameraPage after confirm.
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const CameraPage()),
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                       child: const Text(
                         'ยืนยัน',
@@ -245,7 +249,9 @@ class _FillInfoPageState extends State<FillInfoPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('$label :', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text('$label :',
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 5),
           TextField(
             controller: controller,
@@ -260,6 +266,31 @@ class _FillInfoPageState extends State<FillInfoPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class FullImagePage extends StatelessWidget {
+  final String imagePath;
+  const FullImagePage({Key? key, required this.imagePath}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Full Image"),
+        backgroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      backgroundColor: Colors.black,
+      body: Center(
+        child: InteractiveViewer(
+          child: Image.file(File(imagePath)),
+        ),
       ),
     );
   }

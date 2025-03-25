@@ -7,9 +7,11 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'register.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
 void main() {
-  runApp(const MyApp());
+  runApp(const MyApp(
+  ));
 }
 
 class MyApp extends StatelessWidget {
@@ -34,6 +36,7 @@ class MyApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
+      navigatorObservers: [routeObserver],
     );
   }
 }
