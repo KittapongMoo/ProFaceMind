@@ -813,17 +813,20 @@ class FacePainter extends CustomPainter {
     final double scaleX = size.height / imageSize.width;
     final double scaleY = size.width / imageSize.height;
 
+    // Define a horizontal offset to move the bounding boxes to the left.
+    const double offsetX = 20.0; // adjust this value as needed
+
     for (var face in faces) {
-      double left = face.boundingBox.left * scaleX;
+      double left = face.boundingBox.left * scaleX - offsetX;
       double top = face.boundingBox.top * scaleY;
-      double right = face.boundingBox.right * scaleX;
+      double right = face.boundingBox.right * scaleX - offsetX;
       double bottom = face.boundingBox.bottom * scaleY;
 
-      // if (isFrontCamera) {
-      //   final double temp = left;
-      //   left = size.height - right;
-      //   right = size.height - temp;
-      // }
+      if (isFrontCamera) {
+        final double temp = left;
+        left = size.height - right;
+        right = size.height - temp;
+      }
 
       final Rect scaledRect = Rect.fromLTRB(left, top, right, bottom);
       canvas.drawRect(scaledRect, paint);
