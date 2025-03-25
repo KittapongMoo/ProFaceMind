@@ -782,6 +782,10 @@ class FacePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+
+    canvas.save();
+    canvas.rotate(-math.pi / 2);
+
     final Paint paint = Paint()
       ..color = Colors.red
       ..strokeWidth = 1.5
