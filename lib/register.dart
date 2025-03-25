@@ -787,7 +787,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
 class FacePainter extends CustomPainter {
   final List<Face> faces;
-  // imageSize is passed as Size(previewSize.height, previewSize.width)
+  // imageSize here is passed as Size(previewSize.height, previewSize.width)
   final Size imageSize;
   final bool isFrontCamera;
   final Size screenSize;
@@ -806,34 +806,38 @@ class FacePainter extends CustomPainter {
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
-    // For a 90° clockwise rotation:
-    //   - The rotated image dimensions are: width = imageSize.height and height = imageSize.width.
-    //   - The scale factors are computed accordingly.
+    // Because the preview is rotated 90° clockwise, the rotated image dimensions are:
+    // width' = imageSize.height, height' = imageSize.width.
+    // Therefore, our scaling factors are swapped.
     final double scaleX = size.width / imageSize.height;
     final double scaleY = size.height / imageSize.width;
 
+    // For each detected face, apply a 90° clockwise transformation.
+    // The transform for a point (x, y) becomes:
+    //   x' = y
+    //   y' = (originalWidth) - x
+    // where originalWidth is imageSize.width.
     for (var face in faces) {
-      // Apply the 90° clockwise rotation transformation:
-      // For any point (x, y) in the original coordinate,
-      // the rotated point becomes: (y, originalWidth - x)
-      // (Here, originalWidth is the width of the image before rotation,
-      // which in our case is imageSize.width when the imageSize is passed as (previewSize.height, previewSize.width)).
-      double left = face.boundingBox.top;
-      double top = imageSize.width - face.boundingBox.right;
-      double right = face.boundingBox.bottom;
-      double bottom = imageSize.width - face.boundingBox.left;
+      // Transform the top-left and bottom-right corners of the bounding box.
+      double transformedLeft = face.boundingBox.top;
+      double transformedTop = imageSize.width - face.boundingBox.right;
+      double transformedRight = face.boundingBox.bottom;
+      double transformedBottom = imageSize.width - face.boundingBox.left;
 
-      // IMPORTANT:
-      // For front camera, do NOT mirror these values because the preview is already mirrored.
-      // (If you kept a mirror transformation here, the bounding box would flip to the opposite side.)
+      // Scale the transformed coordinates to the widget size.
+      double left = transformedLeft * scaleX;
+      double top = transformedTop * scaleY;
+      double right = transformedRight * scaleX;
+      double bottom = transformedBottom * scaleY;
 
-      // Now scale the coordinates to match the widget's size.
-      final double scaledLeft = left * scaleX;
-      final double scaledTop = top * scaleY;
-      final double scaledRight = right * scaleX;
-      final double scaledBottom = bottom * scaleY;
+      // If using the front camera, mirror horizontally.
+      if (isFrontCamera) {
+        double temp = top;
+        top = size.width - bottom;
+        bottom = size.width - temp;
+      }
 
-      final Rect rect = Rect.fromLTRB(scaledLeft, scaledTop, scaledRight, scaledBottom);
+      final Rect rect = Rect.fromLTRB(left, top, right, bottom);
       canvas.drawRect(rect, paint);
     }
   }
@@ -843,4 +847,3 @@ class FacePainter extends CustomPainter {
     return oldDelegate.faces != faces;
   }
 }
-
