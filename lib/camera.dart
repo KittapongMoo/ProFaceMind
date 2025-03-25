@@ -7,6 +7,10 @@ import 'package:permission_handler/permission_handler.dart';
 import 'navigation.dart';
 import 'profile.dart';
 import 'register.dart'; // ✅ Ensure RegisterPage is imported
+import 'package:shared_preferences/shared_preferences.dart';
+import 'setphonenum.dart';
+
+
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -176,28 +180,111 @@ class _CameraPageState extends State<CameraPage> {
               backgroundColor: Colors.red,
               child: IconButton(
                 icon: const Icon(Icons.phone, color: Colors.white),
-                onPressed: () {
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  final name = prefs.getString('emergency_name') ?? 'ไม่พบชื่อ';
+                  final relation = prefs.getString('emergency_relation') ?? 'ไม่พบความสัมพันธ์';
+                  final phone = prefs.getString('emergency_phone') ?? 'ไม่พบเบอร์โทร';
+
                   showDialog(
                     context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text("เบอร์โทรศัพท์ฉุกเฉิน"),
-                      content: const Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text("นายสมพร (ลูกชาย)"),
-                          Text("093 - 478 - 9323",
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                        ],
+                    barrierDismissible: true,
+                    builder: (context) => Dialog(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text("ปิด"),
+                      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 100),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // ✅ หัวข้อ + ปุ่มปิด
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                const Text(
+                                  'เบอร์โทรศัพท์ฉุกเฉิน',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF1A2A43),
+                                  ),
+                                ),
+                                const Spacer(),
+                                GestureDetector(
+                                  onTap: () => Navigator.pop(context),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: Icon(Icons.close, size: 22, color: Colors.grey),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // ▶️ ฝั่งซ้าย: ชื่อและความสัมพันธ์ + เบอร์
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '$name ($relation)',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          color: Color(0xFF6B7280),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4), // ✅ ลดความห่าง
+                                      Text(
+                                        phone,
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF6B7280),
+                                          letterSpacing: 1.2,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                // ▶️ ฝั่งขวา: ปุ่มแก้ไข
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => const SetPhoneNumber()),
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(left: 8, top: 2),
+                                    child: CircleAvatar(
+                                      radius: 25,
+                                      backgroundColor: Colors.blue,
+                                      child: const Icon(Icons.edit, size: 25, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+
+                              ],
+                            ),
+
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   );
+
+
                 },
+
               ),
             ),
           ),
