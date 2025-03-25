@@ -718,7 +718,7 @@ class _RegisterPageState extends State<RegisterPage> {
     double scale = cameraAspectRatio / screenAspectRatio;
 
     // Optional extra zoom factor
-    double extraZoomFactor = 0.82;
+    double extraZoomFactor = 0.72;
     // First multiply the scale by 0.82
     scale *= extraZoomFactor;
 
