@@ -699,7 +699,7 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  Widget _buildCameraPreview(BuildContext context) {
+  Widget _buildCameraPreview(BuildContext buildContext) {
     if (!_isCameraInitialized ||
         _cameraController == null ||
         !_cameraController!.value.isInitialized) {
@@ -710,61 +710,79 @@ class _RegisterPageState extends State<RegisterPage> {
     final previewSize = _cameraController!.value.previewSize!;
     final double cameraAspectRatio = previewSize.width / previewSize.height;
 
-  // Mirror horizontally if it's the front camera.
-  final bool isFrontCamera =
-      _cameraController!.description.lensDirection == CameraLensDirection.front;
+    // The screen size and aspect ratio
+    final Size screenSize = MediaQuery.of(buildContext).size;
+    final double screenAspectRatio = screenSize.width / screenSize.height;
 
-  // We can rotate the preview based on sensorOrientation,
-  // but often the camera plugin does this for you.
-  // If you see a sideways preview, you might do:
-  final int sensorOrientation = _cameraController!.description.sensorOrientation;
-  double rotationAngle = 0;
-  if (sensorOrientation == 90) {
-    rotationAngle = math.pi / 2;
-  } else if (sensorOrientation == 270) {
-    rotationAngle = -math.pi / 2;
-  }
+    // Compute initial scale
+    double scale = cameraAspectRatio / screenAspectRatio;
 
-  // Build the transform
-  final Matrix4 transformMatrix = isFrontCamera
-      ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
-      : Matrix4.rotationZ(rotationAngle);
+    // Optional extra zoom factor
+    double extraZoomFactor = 0.72;
+    // First multiply the scale by 0.82
+    scale *= extraZoomFactor;
 
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      return ClipRect(
-        child: Transform(
-          alignment: Alignment.center,
-          transform: transformMatrix,
-          child: AspectRatio(
-            aspectRatio: cameraAspectRatio,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                CameraPreview(_cameraController!),
+    // Determine rotation based on sensor orientation
+    final int sensorOrientation =
+        _cameraController!.description.sensorOrientation;
+    double rotationAngle = 0;
+    if (sensorOrientation == 90) {
+      rotationAngle = math.pi / 2;
+    } else if (sensorOrientation == 270) {
+      rotationAngle = -math.pi / 2;
+    }
 
-                // Overlays face bounding boxes
-                CustomPaint(
-                  painter: FacePainter(
-                    faces: _faces,
-                    // If sensor orientation is 90 or 270,
-                    // you likely need to swap width/height:
-                    imageSize: (sensorOrientation == 90 || sensorOrientation == 270)
-                      ? Size(previewSize.height, previewSize.width)
-                      : Size(previewSize.width, previewSize.height),
-                    isFrontCamera: isFrontCamera,
-                    screenSize: constraints.biggest,
+    // Check if it is front camera to mirror horizontally
+    final bool isFrontCamera = _cameraController!.description.lensDirection ==
+        CameraLensDirection.front;
+
+    // Build a transform matrix that mirrors if front camera
+    // plus rotates based on sensor orientation
+    final Matrix4 transformMatrix = isFrontCamera
+        ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
+        : Matrix4.rotationZ(rotationAngle);
+
+    return LayoutBuilder(
+      builder: (layoutContext, constraints) {
+        return ClipRect(
+          child: Transform.scale(
+            // Apply the scale again so total factor is scale * extraZoomFactor
+            scale: scale * extraZoomFactor,
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: cameraAspectRatio,
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: transformMatrix,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Camera preview
+                      CameraPreview(_cameraController!),
+
+                      // Draw bounding boxes for detected faces
+                      CustomPaint(
+                        painter: FacePainter(
+                          faces: _faces,
+                          imageSize: Size(
+                            // Note: swap width/height here if needed
+                            previewSize.height,
+                            previewSize.width,
+                          ),
+                          isFrontCamera: isFrontCamera,
+                          screenSize: constraints.biggest,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      );
-    },
-  );
-}
-
+        );
+      },
+    );
+  }
 }
 
 class FacePainter extends CustomPainter {
@@ -782,10 +800,6 @@ class FacePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-
-    canvas.save();
-    canvas.rotate(-math.pi / 2);
-
     final Paint paint = Paint()
       ..color = Colors.red
       ..strokeWidth = 1.5
@@ -802,11 +816,11 @@ class FacePainter extends CustomPainter {
       double bottom = face.boundingBox.bottom * scaleY;
 
       // Mirror if front camera
-      // if (isFrontCamera) {
-      //   final double temp = left;
-      //   left = size.width - right;
-      //   right = size.width - temp;
-      // }
+      if (isFrontCamera) {
+        final double temp = left;
+        left = size.width - right;
+        right = size.width - temp;
+      }
 
       final Rect scaledRect = Rect.fromLTRB(left, top, right, bottom);
       canvas.drawRect(scaledRect, paint);
