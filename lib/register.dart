@@ -819,11 +819,11 @@ class FacePainter extends CustomPainter {
       double right = face.boundingBox.right * scaleX;
       double bottom = face.boundingBox.bottom * scaleY;
 
-      if (isFrontCamera) {
-        final double temp = left;
-        left = size.height - right;
-        right = size.height - temp;
-      }
+      // if (isFrontCamera) {
+      //   final double temp = left;
+      //   left = size.height - right;
+      //   right = size.height - temp;
+      // }
 
       final Rect scaledRect = Rect.fromLTRB(left, top, right, bottom);
       canvas.drawRect(scaledRect, paint);
