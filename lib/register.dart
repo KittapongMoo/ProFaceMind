@@ -813,33 +813,51 @@ class FacePainter extends CustomPainter {
   // imageSize is passed as Size(previewSize.height, previewSize.width)
   final Size imageSize;
   final bool isFrontCamera;
-  final Size screenSize;
 
   FacePainter({
     required this.faces,
     required this.imageSize,
     required this.isFrontCamera,
-    required this.screenSize,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
       ..color = Colors.red
-      ..strokeWidth = 1.5
+      ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke;
 
-    // Calculate scale factors based on the rotated image dimensions.
-    final double scaleX = size.width / imageSize.height;
-    final double scaleY = size.height / imageSize.width;
+    // In this setup:
+    // rotatedImageWidth corresponds to the original image’s width (previewSize.height)
+    // rotatedImageHeight corresponds to the original image’s height (previewSize.width)
+    final double rotatedImageWidth = imageSize.width;
+    final double rotatedImageHeight = imageSize.height;
 
-    // Use the same coordinate mapping regardless of camera
+    // Compute scale factors from the rotated image coordinate space to the canvas.
+    final double scaleX = size.width / rotatedImageWidth;
+    final double scaleY = size.height / rotatedImageHeight;
+
     for (var face in faces) {
-      // Using the rotated coordinate system:
-      double left = face.boundingBox.top * scaleX;
-      double right = face.boundingBox.bottom * scaleX;
-      double top = face.boundingBox.left * scaleY;
-      double bottom = face.boundingBox.right * scaleY;
+      double left, top, right, bottom;
+
+      if (isFrontCamera) {
+        // For the front camera:
+        // • Horizontal: mirror the x‑values using the canvas width.
+        // • Vertical: flip the y‑axis so that upward movement in the detection space
+        //   (i.e. a smaller “right” value) maps to upward movement on screen.
+        left = size.width - (face.boundingBox.bottom * scaleX);
+        right = size.width - (face.boundingBox.top * scaleX);
+        top = size.height - ((rotatedImageWidth - face.boundingBox.right) * scaleY);
+        bottom = size.height - ((rotatedImageWidth - face.boundingBox.left) * scaleY);
+      } else {
+        // For the back camera:
+        // • Horizontal: flip the x‑axis (swap left/right) by subtracting from canvas width.
+        // • Vertical: use the rotated mapping directly.
+        left = size.width - (face.boundingBox.top * scaleX);
+        right = size.width - (face.boundingBox.bottom * scaleX);
+        top = (rotatedImageWidth - face.boundingBox.right) * scaleY;
+        bottom = (rotatedImageWidth - face.boundingBox.left) * scaleY;
+      }
 
       final Rect rect = Rect.fromLTRB(left, top, right, bottom);
       canvas.drawRect(rect, paint);
@@ -851,6 +869,7 @@ class FacePainter extends CustomPainter {
     return oldDelegate.faces != faces;
   }
 }
+
 
 
 
