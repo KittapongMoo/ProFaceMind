@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,12 +11,12 @@ import 'profile.dart';
 import 'register.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'setphonenum.dart';
-
-// Import your new allregister.dart page
 import 'allregister.dart';
-
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+
+// Import ML Kit face detection:
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -33,13 +34,21 @@ class _CameraPageState extends State<CameraPage> {
   File? _galleryImage;
   int _sensorOrientation = 0;
 
+  // Face detection fields.
+  final FaceDetector _faceDetector = FaceDetector(
+    options: FaceDetectorOptions(
+      performanceMode: FaceDetectorMode.accurate,
+      enableTracking: true,
+    ),
+  );
+  bool _isDetectingFaces = false;
+  List<Face> _faces = [];
+
   @override
   void initState() {
     super.initState();
-    // Lock the app orientation to portrait only
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-    ]);
+    // Lock orientation to portrait.
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeCamera();
     });
@@ -51,13 +60,11 @@ class _CameraPageState extends State<CameraPage> {
       if (_cameras!.isNotEmpty) {
         CameraDescription selectedCamera = _isFrontCamera
             ? _cameras!.firstWhere(
-              (camera) => camera.lensDirection == CameraLensDirection.front,
-          orElse: () => _cameras!.first,
-        )
+                (camera) => camera.lensDirection == CameraLensDirection.front,
+            orElse: () => _cameras!.first)
             : _cameras!.firstWhere(
-              (camera) => camera.lensDirection == CameraLensDirection.back,
-          orElse: () => _cameras!.first,
-        );
+                (camera) => camera.lensDirection == CameraLensDirection.back,
+            orElse: () => _cameras!.first);
 
         _cameraController = CameraController(
           selectedCamera,
@@ -65,11 +72,19 @@ class _CameraPageState extends State<CameraPage> {
           enableAudio: false,
         );
         await _cameraController!.initialize();
+
+        // Lock preview to portrait.
+        await _cameraController!
+            .lockCaptureOrientation(DeviceOrientation.portraitUp);
+
+        // Start image stream for face detection.
+        _cameraController!.startImageStream((CameraImage cameraImage) {
+          if (!_isDetectingFaces) {
+            _detectFacesFromCamera(cameraImage);
+          }
+        });
+
         if (!mounted) return;
-
-        // Lock preview to portrait mode.
-        await _cameraController!.lockCaptureOrientation(DeviceOrientation.portraitUp);
-
         setState(() {
           _isCameraInitialized = true;
           _sensorOrientation = selectedCamera.sensorOrientation;
@@ -77,6 +92,91 @@ class _CameraPageState extends State<CameraPage> {
       }
     } catch (e) {
       print('Error initializing camera: $e');
+    }
+  }
+
+  /// Convert a [CameraImage] in YUV420 format to an [InputImage] for ML Kit.
+  InputImage? _convertCameraImage(
+      CameraImage image, CameraDescription camera) {
+    try {
+      final int ySize = image.planes[0].bytes.length;
+      final int uvSize = image.planes[1].bytes.length + image.planes[2].bytes.length;
+      final Uint8List nv21 = Uint8List(ySize + uvSize);
+
+      // Copy Y plane.
+      nv21.setRange(0, ySize, image.planes[0].bytes);
+
+      int offset = ySize;
+      final int uvPixelStride = image.planes[1].bytesPerPixel!;
+      final int uvRowStride = image.planes[1].bytesPerRow;
+      final int uvHeight = image.height ~/ 2;
+      final int uvWidth = image.width ~/ 2;
+
+      for (int row = 0; row < uvHeight; row++) {
+        final int rowOffset1 = row * image.planes[1].bytesPerRow;
+        final int rowOffset2 = row * image.planes[2].bytesPerRow;
+        for (int col = 0; col < uvWidth; col++) {
+          nv21[offset++] =
+          image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
+          nv21[offset++] =
+          image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
+        }
+      }
+
+      final imageSize = Size(image.width.toDouble(), image.height.toDouble());
+      // Get rotation based on sensor orientation.
+      InputImageRotation imageRotation;
+      switch (camera.sensorOrientation) {
+        case 0:
+          imageRotation = InputImageRotation.rotation0deg;
+          break;
+        case 90:
+          imageRotation = InputImageRotation.rotation90deg;
+          break;
+        case 180:
+          imageRotation = InputImageRotation.rotation180deg;
+          break;
+        case 270:
+          imageRotation = InputImageRotation.rotation270deg;
+          break;
+        default:
+          imageRotation = InputImageRotation.rotation0deg;
+      }
+
+      final metadata = InputImageMetadata(
+        size: imageSize,
+        rotation: imageRotation,
+        format: InputImageFormat.nv21,
+        bytesPerRow: image.planes[0].bytesPerRow,
+      );
+
+      return InputImage.fromBytes(bytes: nv21, metadata: metadata);
+    } catch (e) {
+      print("Error converting camera image: $e");
+      return null;
+    }
+  }
+
+  /// Process the camera image to detect faces.
+  Future<void> _detectFacesFromCamera(CameraImage cameraImage) async {
+    _isDetectingFaces = true;
+    try {
+      final inputImage =
+      _convertCameraImage(cameraImage, _cameraController!.description);
+      if (inputImage == null) {
+        _isDetectingFaces = false;
+        return;
+      }
+      final faces = await _faceDetector.processImage(inputImage);
+      if (mounted) {
+        setState(() {
+          _faces = faces;
+        });
+      }
+    } catch (e) {
+      print("Error detecting faces: $e");
+    } finally {
+      _isDetectingFaces = false;
     }
   }
 
@@ -105,6 +205,7 @@ class _CameraPageState extends State<CameraPage> {
   @override
   void dispose() {
     _cameraController?.dispose();
+    _faceDetector.close();
     super.dispose();
   }
 
@@ -192,10 +293,26 @@ class _CameraPageState extends State<CameraPage> {
             child: Center(
               child: AspectRatio(
                 aspectRatio: cameraAspectRatio,
-                child: Transform(
-                  alignment: Alignment.center,
-                  transform: transformMatrix,
-                  child: CameraPreview(_cameraController!),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Camera preview.
+                    Transform(
+                      alignment: Alignment.center,
+                      transform: transformMatrix,
+                      child: CameraPreview(_cameraController!),
+                    ),
+                    // Face painting overlay.
+                    CustomPaint(
+                      painter: FacePainter(
+                        faces: _faces,
+                        // Swap width/height if needed.
+                        imageSize: Size(previewSize.height, previewSize.width),
+                        isFrontCamera: isFrontCamera,
+                        screenSize: constraints.biggest,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -210,10 +327,9 @@ class _CameraPageState extends State<CameraPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // Camera preview
-          Positioned.fill(
-            child: _buildCameraPreview(context),
-          ),
+          // Camera preview with face paint overlay.
+          Positioned.fill(child: _buildCameraPreview(context)),
+          // The rest of your UI (buttons, navigation, etc.)
           // Profile button (top-left)
           Positioned(
             top: 40,
@@ -259,7 +375,7 @@ class _CameraPageState extends State<CameraPage> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Title and close button
+                            // Title and close button.
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
@@ -349,7 +465,7 @@ class _CameraPageState extends State<CameraPage> {
               ),
             ),
           ),
-          // Bottom row with register, last image, map
+          // Bottom row with register, last image, map.
           Positioned(
             bottom: 80,
             left: 20,
@@ -358,7 +474,7 @@ class _CameraPageState extends State<CameraPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Register button (left)
+                // Register button.
                 FloatingActionButton(
                   heroTag: 'register',
                   backgroundColor: Colors.blue,
@@ -370,14 +486,13 @@ class _CameraPageState extends State<CameraPage> {
                     );
                   },
                 ),
-                // Center widget: Tappable rectangle that navigates to AllRegisterPage
+                // Tappable rectangle for last image.
                 FutureBuilder<String?>(
                   future: _getLastImagePath(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return GestureDetector(
                         onTap: () {
-                          // Navigate to the AllRegisterPage on tap
                           Navigator.push(
                             context,
                             MaterialPageRoute(builder: (_) => const AllRegisterPage()),
@@ -395,7 +510,6 @@ class _CameraPageState extends State<CameraPage> {
                       );
                     }
                     if (snapshot.hasData && snapshot.data != null) {
-                      // There's a last image in the DB
                       return GestureDetector(
                         onTap: () {
                           Navigator.push(
@@ -416,7 +530,6 @@ class _CameraPageState extends State<CameraPage> {
                         ),
                       );
                     }
-                    // No image found: show placeholder
                     return GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -438,7 +551,7 @@ class _CameraPageState extends State<CameraPage> {
                     );
                   },
                 ),
-                // Map button (right)
+                // Map button.
                 FloatingActionButton(
                   heroTag: 'map',
                   backgroundColor: Colors.green,
@@ -456,5 +569,83 @@ class _CameraPageState extends State<CameraPage> {
         ],
       ),
     );
+  }
+}
+
+/// A custom painter that rotates the face bounding boxes 90° clockwise and mirrors them.
+/// It draws the boxes over the preview based on the provided face detection results.
+class FacePainter extends CustomPainter {
+  final List<Face> faces;
+  final Size imageSize;
+  final bool isFrontCamera;
+  final Size screenSize;
+
+  FacePainter({
+    required this.faces,
+    required this.imageSize,
+    required this.isFrontCamera,
+    required this.screenSize,
+  });
+
+  /// Rotates a rectangle 90° clockwise.
+  /// Transformation: (x, y) => (y, originalWidth - x)
+  Rect _rotateRect90(Rect rect, Size originalSize) {
+    double newLeft = rect.top;
+    double newTop = originalSize.width - rect.right;
+    double newRight = rect.bottom;
+    double newBottom = originalSize.width - rect.left;
+    return Rect.fromLTRB(newLeft, newTop, newRight, newBottom);
+  }
+
+  /// Mirrors a rectangle both horizontally and vertically in the rotated coordinate system.
+  Rect _mirrorRectBoth(Rect rect, double mirrorWidth, double mirrorHeight) {
+    return Rect.fromLTRB(
+      mirrorWidth - rect.right,
+      mirrorHeight - rect.bottom,
+      mirrorWidth - rect.left,
+      mirrorHeight - rect.top,
+    );
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..color = Colors.red
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    // After a 90° clockwise rotation, the effective dimensions swap.
+    // rotatedWidth becomes the original image height and rotatedHeight becomes the original image width.
+    double rotatedWidth = imageSize.height;
+    double rotatedHeight = imageSize.width;
+
+    // Scale factors to map rotated coordinates to the canvas.
+    final double scaleX = size.width / rotatedWidth;
+    final double scaleY = size.height / rotatedHeight;
+
+    for (var face in faces) {
+      // Rotate the face bounding box.
+      Rect rotatedRect = _rotateRect90(face.boundingBox, imageSize);
+
+      // For front camera, mirror both horizontally and vertically.
+      if (isFrontCamera) {
+        rotatedRect = _mirrorRectBoth(rotatedRect, rotatedWidth, rotatedHeight);
+      }
+
+      // Scale the rotated (and mirrored) rectangle.
+      Rect scaledRect = Rect.fromLTRB(
+        rotatedRect.left * scaleX,
+        rotatedRect.top * scaleY,
+        rotatedRect.right * scaleX,
+        rotatedRect.bottom * scaleY,
+      );
+
+      canvas.drawRect(scaledRect, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant FacePainter oldDelegate) {
+    return oldDelegate.faces != faces;
   }
 }
