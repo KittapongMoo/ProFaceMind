@@ -508,28 +508,44 @@ class _RegisterPageState extends State<RegisterPage> {
       // Sort the images by last modified time (oldest first)
       imagesList.sort((a, b) => a.statSync().modified.compareTo(b.statSync().modified));
 
+      // Insert user with a placeholder for primary_image
       int userId = await db.insert('users', {
         'face_vector': jsonEncode(averageVector),
         'nickname': '',
         'name': '',
         'relation': '',
-        'primary_image': imagesList.isNotEmpty ? imagesList.first.path : '',
+        'primary_image': '', // Temporary, will update later
       });
 
-      // Move images from temp_faces to user-specific folder
+      // Create a final folder for this user
       final Directory finalUserDir = Directory('${appDir.path}/user_$userId');
       if (!finalUserDir.existsSync()) {
         finalUserDir.createSync(recursive: true);
       }
 
+      // Move images from temp_faces to user-specific folder
+      // Also, collect the new file paths.
+      List<String> finalImagePaths = [];
       for (var imageFile in imagesList) {
         String newFilePath = join(finalUserDir.path, basename(imageFile.path));
         File newFile = await File(imageFile.path).copy(newFilePath);
+        finalImagePaths.add(newFile.path);
         await db.insert('user_images', {
           'user_id': userId,
           'image_path': newFile.path,
         });
         imageFile.deleteSync(); // Clean temp file after moving
+      }
+
+      // Update the user record with the new primary image path,
+      // using the first image from the sorted finalImagePaths list.
+      if (finalImagePaths.isNotEmpty) {
+        await db.update(
+          'users',
+          {'primary_image': finalImagePaths.first},
+          where: 'id = ?',
+          whereArgs: [userId],
+        );
       }
 
       _faceVectors.clear();
@@ -552,6 +568,7 @@ class _RegisterPageState extends State<RegisterPage> {
       _showErrorPopup("Error registering user: $e");
     }
   }
+
 
 
   /// Run face recognition using tflite_flutter

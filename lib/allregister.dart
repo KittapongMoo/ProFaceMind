@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 
-/// A page that shows all registered people in a 3-column grid,
-/// displaying each person's primary face image and nickname.
 class AllRegisterPage extends StatefulWidget {
   const AllRegisterPage({Key? key}) : super(key: key);
 
@@ -28,19 +26,29 @@ class _AllRegisterPageState extends State<AllRegisterPage> {
     return openDatabase(
       path,
       version: 2,
-      // If you have onCreate or onUpgrade, include them here.
     );
   }
 
-  /// Loads the user records from the 'users' table.
-  /// We'll only need 'id', 'nickname', and 'primary_image'.
+  /// Loads the user records along with the first (oldest) image from user_images.
   Future<List<Map<String, dynamic>>> _loadUsers() async {
     final db = await _getDatabase();
-    return db.query(
-      'users',
-      columns: ['id', 'nickname', 'primary_image'],
-      orderBy: 'id DESC',
-    );
+    // This query returns each user's id, nickname, and the first image.
+    // If primary_image is set (non-empty) it takes precedence; otherwise, it uses the minimum image_path from user_images.
+    final List<Map<String, dynamic>> results = await db.rawQuery('''
+      SELECT 
+        u.id, 
+        u.nickname, 
+        CASE 
+          WHEN u.primary_image IS NOT NULL AND u.primary_image <> '' 
+          THEN u.primary_image 
+          ELSE MIN(ui.image_path)
+        END AS first_image
+      FROM users u
+      LEFT JOIN user_images ui ON ui.user_id = u.id
+      GROUP BY u.id
+      ORDER BY u.id DESC
+    ''');
+    return results;
   }
 
   @override
@@ -53,60 +61,62 @@ class _AllRegisterPageState extends State<AllRegisterPage> {
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _usersFuture,
         builder: (context, snapshot) {
-          // Loading state
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          // Error state
           if (snapshot.hasError) {
             return const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'));
           }
-          // No data or empty
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(child: Text('ยังไม่มีการลงทะเบียนผู้ใช้'));
           }
 
-          // We have data
           final users = snapshot.data!;
 
-          // Build a GridView with 3 columns
           return Padding(
             padding: const EdgeInsets.all(16.0),
             child: GridView.builder(
               itemCount: users.length,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,    // 3 columns
+                crossAxisCount: 3,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 0.7, // Adjust for circle + nickname text
+                childAspectRatio: 0.7,
               ),
               itemBuilder: (context, index) {
                 final user = users[index];
                 final nickname = user['nickname'] ?? '';
-                final primaryImage = user['primary_image'] as String?;
+                final firstImage = user['first_image'] as String?;
 
-                // Build circle avatar or placeholder
-                Widget avatarWidget;
-                if (primaryImage != null &&
-                    primaryImage.isNotEmpty &&
-                    File(primaryImage).existsSync()) {
-                  avatarWidget = CircleAvatar(
-                    radius: 40,
-                    backgroundImage: FileImage(File(primaryImage)),
+                Widget imageWidget;
+                if (firstImage != null &&
+                    firstImage.isNotEmpty &&
+                    File(firstImage).existsSync()) {
+                  imageWidget = ClipRRect(
+                    borderRadius: BorderRadius.circular(27), // rounded corners
+                    child: Image.file(
+                      File(firstImage),
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                    ),
                   );
                 } else {
-                  // If no image, show a gray circle with an icon
-                  avatarWidget = const CircleAvatar(
-                    radius: 40,
-                    backgroundColor: Colors.grey,
-                    child: Icon(Icons.person, color: Colors.white),
+                  imageWidget = Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.grey,
+                      borderRadius: BorderRadius.circular(27),
+                    ),
+                    child: const Icon(Icons.person, color: Colors.white),
                   );
                 }
 
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    avatarWidget,
+                    imageWidget,
                     const SizedBox(height: 8),
                     Text(
                       nickname,
