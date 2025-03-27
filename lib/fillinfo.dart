@@ -82,163 +82,174 @@ class _FillInfoPageState extends State<FillInfoPage> {
     // int currentUserId = widget.userId;
 
     return Scaffold(
-      body: Column(
-        children: [
-          // 🔹 แสดงรูปภาพ 5 รูปแบบเลื่อนดูได้
-          Stack(
-            children: [
-              SizedBox(
-                width: double.infinity,
-                height: 250,
-                child: imagePaths.isNotEmpty
-                    ? PageView.builder(
-                        controller: _pageController,
-                        itemCount: imagePaths.length,
-                        itemBuilder: (localCtx, index) {
-                          return GestureDetector(
-                            onTap: () {
-                              // Navigate to full image view when tapped.
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => FullImagePage(
-                                      imagePath: imagePaths[index]),
-                                ),
-                              );
-                            },
-                            child: Image.file(
-                              File(imagePaths[index]),
-                              fit: BoxFit.cover,
-                            ),
-                          );
-                        },
-                      )
-                    : const Center(child: CircularProgressIndicator()),
-              ),
-              // 🔹 ปุ่มย้อนกลับ
-              Positioned(
-                top: 40,
-                left: 16,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back,
-                      color: Colors.white, size: 30),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ),
-            ],
-          ),
-
-          // 🔹 แสดง indicator บอกว่ากำลังดูรูปที่เท่าไร
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(imagePaths.length, (index) {
-                return AnimatedBuilder(
-                  animation: _pageController,
-                  builder: (animCtx, child) {
-                    double selected = _pageController.hasClients
-                        ? _pageController.page ?? 0
-                        : 0;
-                    return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      width: (index == selected.round()) ? 12 : 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: (index == selected.round())
-                            ? Colors.blue
-                            : Colors.grey,
-                      ),
-                    );
-                  },
-                );
-              }),
-            ),
-          ),
-
-          // 🔹 ส่วนข้อมูล
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 🔹 หัวข้อ "ข้อมูล" อยู่ตรงกลาง + ปุ่มแก้ไขอยู่ขวา
-                  Row(
+      resizeToAvoidBottomInset: true,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
                     children: [
+                      // 🔝 รูปภาพส่วนบน
+                      Stack(
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            height: 250,
+                            child: imagePaths.isNotEmpty
+                                ? PageView.builder(
+                              controller: _pageController,
+                              itemCount: imagePaths.length,
+                              itemBuilder: (context, index) {
+                                return GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => FullImagePage(
+                                          imagePath: imagePaths[index],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Image.file(
+                                    File(imagePaths[index]),
+                                    fit: BoxFit.cover,
+                                  ),
+                                );
+                              },
+                            )
+                                : const Center(child: CircularProgressIndicator()),
+                          ),
+                          Positioned(
+                            top: 40,
+                            left: 16,
+                            child: IconButton(
+                              icon: const Icon(Icons.arrow_back,
+                                  color: Colors.white, size: 30),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // 🔘 Indicator
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(imagePaths.length, (index) {
+                            return AnimatedBuilder(
+                              animation: _pageController,
+                              builder: (context, child) {
+                                double selected = _pageController.hasClients
+                                    ? _pageController.page ?? 0
+                                    : 0;
+                                return Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                                  width: (index == selected.round()) ? 12 : 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: (index == selected.round())
+                                        ? Colors.blue
+                                        : Colors.grey,
+                                  ),
+                                );
+                              },
+                            );
+                          }),
+                        ),
+                      ),
+
+                      // 🔽 เนื้อหาข้อมูล
                       Expanded(
-                        child: Center(
-                          child: Text(
-                            'ข้อมูล',
-                            style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87),
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(30),
+                              topRight: Radius.circular(30),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Center(
+                                      child: Text(
+                                        'ข้อมูล',
+                                        style: TextStyle(
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                              _buildEditableField('ชื่อเล่น', nicknameController, isEditing),
+                              _buildEditableField('ชื่อ', nameController, isEditing),
+                              _buildEditableField('ความสัมพันธ์', relationController, isEditing),
+
+                              const SizedBox(height: 20),
+
+                              SizedBox(
+                                width: double.infinity,
+                                height: 50,
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    final db = await openDatabase(
+                                        join(await getDatabasesPath(), 'facemind.db'));
+                                    await db.update(
+                                      'users',
+                                      {
+                                        'nickname': nicknameController.text,
+                                        'name': nameController.text,
+                                        'relation': relationController.text,
+                                      },
+                                      where: 'id = ?',
+                                      whereArgs: [widget.userId],
+                                    );
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => const CameraPage()),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'ยืนยัน',
+                                    style: TextStyle(fontSize: 18, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 20),
+                            ],
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  _buildEditableField(
-                      'ชื่อเล่น', nicknameController, isEditing),
-                  _buildEditableField('ชื่อ', nameController, isEditing),
-                  _buildEditableField(
-                      'ความสัมพันธ์', relationController, isEditing),
-                  const Spacer(),
-
-                  // 🔹 ปุ่ม "ยืนยัน"
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final db = await openDatabase(
-                            join(await getDatabasesPath(), 'facemind.db'));
-                        await db.update(
-                          'users',
-                          {
-                            'nickname': nicknameController.text,
-                            'name': nameController.text,
-                            'relation': relationController.text,
-                          },
-                          where: 'id = ?',
-                          whereArgs: [widget.userId],
-                        );
-                        // Navigate to CameraPage after confirm.
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => const CameraPage()),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text(
-                        'ยืนยัน',
-                        style: TextStyle(fontSize: 18, color: Colors.white),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-                ],
+                ),
               ),
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
+
   }
 
   /// **📌 Widget ช่องข้อมูลที่แก้ไขได้เมื่อกดไอคอนดินสอ**
