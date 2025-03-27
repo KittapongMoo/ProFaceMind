@@ -44,6 +44,8 @@ class _CameraPageState extends State<CameraPage> {
   bool _isDetectingFaces = false;
   List<Face> _faces = [];
 
+  Future<String?>? _lastImageFuture;
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +54,7 @@ class _CameraPageState extends State<CameraPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeCamera();
     });
+    _lastImageFuture = _getLastImagePath();
   }
 
   Future<void> _initializeCamera() async {
@@ -488,7 +491,8 @@ class _CameraPageState extends State<CameraPage> {
                 ),
                 // Tappable rectangle for last image.
                 FutureBuilder<String?>(
-                  future: _getLastImagePath(),
+                  // Use the cached future.
+                  future: _lastImageFuture,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return GestureDetector(
@@ -510,6 +514,7 @@ class _CameraPageState extends State<CameraPage> {
                       );
                     }
                     if (snapshot.hasData && snapshot.data != null) {
+                      // There is a last image.
                       return GestureDetector(
                         onTap: () {
                           Navigator.push(
@@ -530,6 +535,7 @@ class _CameraPageState extends State<CameraPage> {
                         ),
                       );
                     }
+                    // No image found: show a placeholder.
                     return GestureDetector(
                       onTap: () {
                         Navigator.push(
