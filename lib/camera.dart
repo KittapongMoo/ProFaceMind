@@ -593,14 +593,21 @@ class FacePainter extends CustomPainter {
     required this.screenSize,
   });
 
-  /// Rotates a rectangle +90° clockwise.
-  /// Transformation: (x, y) => (y, originalWidth - x)
-  Rect _rotatePlus90(Rect rect, Size originalSize) {
-    double newLeft = rect.top;
-    double newTop = originalSize.width - rect.right;
-    double newRight = rect.bottom;
-    double newBottom = originalSize.width - rect.left;
-    return Rect.fromLTRB(newLeft, newTop, newRight, newBottom);
+  /// Rotates a rectangle 180° (i.e. two consecutive 90° clockwise rotations).
+  /// For a point (x, y) in the original image, the transformation becomes:
+  /// newX = originalWidth - x, newY = originalHeight - y.
+  /// For a bounding box, this translates to:
+  /// newLeft = originalWidth - rect.right,
+  /// newTop = originalHeight - rect.bottom,
+  /// newRight = originalWidth - rect.left,
+  /// newBottom = originalHeight - rect.top.
+  Rect _rotatePlus180(Rect rect, Size originalSize) {
+    return Rect.fromLTRB(
+      originalSize.width - rect.right,
+      originalSize.height - rect.bottom,
+      originalSize.width - rect.left,
+      originalSize.height - rect.top,
+    );
   }
 
   /// Rotates a rectangle -90° (counterclockwise).
@@ -613,6 +620,16 @@ class FacePainter extends CustomPainter {
     return Rect.fromLTRB(newLeft, newTop, newRight, newBottom);
   }
 
+  /// Mirrors a rectangle horizontally (left/right) in the rotated coordinate system.
+  Rect _mirrorRectHorizontally(Rect rect, double mirrorWidth) {
+    return Rect.fromLTRB(
+      mirrorWidth - rect.right,
+      rect.top,
+      mirrorWidth - rect.left,
+      rect.bottom,
+    );
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
@@ -620,27 +637,32 @@ class FacePainter extends CustomPainter {
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
-    // After a 90° rotation, the effective dimensions swap:
-    // rotatedWidth becomes the original image height,
-    // rotatedHeight becomes the original image width.
-    double rotatedWidth = imageSize.height;
-    double rotatedHeight = imageSize.width;
-
     Rect rotatedRect;
+    double rotatedWidth, rotatedHeight;
+    if (!isFrontCamera) {
+      // Back camera: rotate 180° (i.e. two 90° rotations).
+      rotatedRect = _rotatePlus180(face.boundingBox, imageSize);
+      // 180° rotation retains the original dimensions.
+      rotatedWidth = imageSize.width;
+      rotatedHeight = imageSize.height;
+    } else {
+      // Front camera: rotate -90° then mirror horizontally.
+      rotatedRect = _rotateMinus90(face.boundingBox, imageSize);
+      // After -90° rotation, dimensions swap.
+      rotatedWidth = imageSize.height;
+      rotatedHeight = imageSize.width;
+      // Mirror horizontally using the rotated width.
+      rotatedRect = _mirrorRectHorizontally(rotatedRect, rotatedWidth);
+    }
+
+    // Scale factors to map rotated coordinates to the canvas.
+    final double scaleX = size.width / rotatedWidth;
+    final double scaleY = size.height / rotatedHeight;
+
+    // For each face, draw the scaled rectangle.
     for (var face in faces) {
-      if (!isFrontCamera) {
-        // Back camera: rotate +90°
-        rotatedRect = _rotatePlus90(face.boundingBox, imageSize);
-      } else {
-        // Front camera: rotate -90° (without mirroring)
-        rotatedRect = _rotateMinus90(face.boundingBox, imageSize);
-      }
-
-      // Scale factors to map the rotated coordinates to the canvas.
-      final double scaleX = size.width / rotatedWidth;
-      final double scaleY = size.height / rotatedHeight;
-
-      // Scale the rotated rectangle to the canvas dimensions.
+      // (If multiple faces, consider applying the transformation per face)
+      // Here, we've already transformed face.boundingBox above.
       Rect scaledRect = Rect.fromLTRB(
         rotatedRect.left * scaleX,
         rotatedRect.top * scaleY,
@@ -657,4 +679,5 @@ class FacePainter extends CustomPainter {
     return oldDelegate.faces != faces;
   }
 }
+
 
