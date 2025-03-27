@@ -499,15 +499,21 @@ class _RegisterPageState extends State<RegisterPage> {
       final Directory appDir = await getApplicationDocumentsDirectory();
       final Directory userDir = Directory('${appDir.path}/temp_faces');
 
-      // Fetch only current session images
-      final images = userDir.listSync().toList();
+      // Fetch only current session images and filter for Files.
+      final List<FileSystemEntity> imagesList = userDir
+          .listSync()
+          .whereType<File>()
+          .toList();
+
+      // Sort the images by last modified time (oldest first)
+      imagesList.sort((a, b) => a.statSync().modified.compareTo(b.statSync().modified));
 
       int userId = await db.insert('users', {
         'face_vector': jsonEncode(averageVector),
         'nickname': '',
         'name': '',
         'relation': '',
-        'primary_image': images.isNotEmpty ? images.first.path : '',
+        'primary_image': imagesList.isNotEmpty ? imagesList.first.path : '',
       });
 
       // Move images from temp_faces to user-specific folder
@@ -516,7 +522,7 @@ class _RegisterPageState extends State<RegisterPage> {
         finalUserDir.createSync(recursive: true);
       }
 
-      for (var imageFile in images) {
+      for (var imageFile in imagesList) {
         String newFilePath = join(finalUserDir.path, basename(imageFile.path));
         File newFile = await File(imageFile.path).copy(newFilePath);
         await db.insert('user_images', {
