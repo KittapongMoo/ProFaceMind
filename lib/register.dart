@@ -783,11 +783,11 @@ class _RegisterPageState extends State<RegisterPage> {
                       CustomPaint(
                         painter: FacePainter(
                           faces: _faces,
-                          imageSize: Size(
-                            // Note: swap width/height here if needed
-                            previewSize.height,
-                            previewSize.width,
-                          ),
+                          // If sensor orientation is 90 or 270,
+                          // you likely need to swap width/height:
+                          imageSize: (sensorOrientation == 90 || sensorOrientation == 270)
+                              ? Size(previewSize.height, previewSize.width)
+                              : Size(previewSize.width, previewSize.height),
                           isFrontCamera: isFrontCamera,
                           screenSize: constraints.biggest,
                         ),
@@ -819,6 +819,10 @@ class FacePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+
+    canvas.save();
+    canvas.rotate(-math.pi / 2);
+
     final Paint paint = Paint()
       ..color = Colors.red
       ..strokeWidth = 1.5
@@ -835,11 +839,11 @@ class FacePainter extends CustomPainter {
       double bottom = face.boundingBox.bottom * scaleY;
 
       // Mirror if front camera
-      if (isFrontCamera) {
-        final double temp = left;
-        left = size.width - right;
-        right = size.width - temp;
-      }
+      // if (isFrontCamera) {
+      //   final double temp = left;
+      //   left = size.width - right;
+      //   right = size.width - temp;
+      // }
 
       final Rect scaledRect = Rect.fromLTRB(left, top, right, bottom);
       canvas.drawRect(scaledRect, paint);
