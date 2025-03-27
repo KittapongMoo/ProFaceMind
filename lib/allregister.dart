@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
+import 'personinfo.dart'; // Import your PersonInfoPage
 
 class AllRegisterPage extends StatefulWidget {
   const AllRegisterPage({Key? key}) : super(key: key);
@@ -88,44 +89,59 @@ class _AllRegisterPageState extends State<AllRegisterPage> {
                 final nickname = user['nickname'] ?? '';
                 final firstImage = user['first_image'] as String?;
 
-                Widget imageWidget;
-                if (firstImage != null &&
-                    firstImage.isNotEmpty &&
-                    File(firstImage).existsSync()) {
-                  imageWidget = ClipRRect(
-                    borderRadius: BorderRadius.circular(27), // rounded corners
-                    child: Image.file(
-                      File(firstImage),
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                    ),
-                  );
-                } else {
-                  imageWidget = Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: Colors.grey,
-                      borderRadius: BorderRadius.circular(27),
-                    ),
-                    child: const Icon(Icons.person, color: Colors.white),
-                  );
-                }
-
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    imageWidget,
-                    const SizedBox(height: 8),
-                    Text(
-                      nickname,
-                      style: const TextStyle(fontSize: 16),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                // Wrap the grid item in a GestureDetector to handle taps.
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PersonInfoPage(userId: user['id']),
+                      ),
+                    ).then((result) {
+                      if (result == true) {
+                        setState(() {
+                          _usersFuture = _loadUsers();
+                        });
+                      }
+                    });
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Use a rectangle with rounded edges for the image.
+                      if (firstImage != null &&
+                          firstImage.isNotEmpty &&
+                          File(firstImage).existsSync())
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(27),
+                          child: Image.file(
+                            File(firstImage),
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      else
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: Colors.grey,
+                            borderRadius: BorderRadius.circular(27),
+                          ),
+                          child:
+                          const Icon(Icons.person, color: Colors.white),
+                        ),
+                      const SizedBox(height: 8),
+                      Text(
+                        nickname,
+                        style: const TextStyle(fontSize: 16),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 );
               },
             ),
