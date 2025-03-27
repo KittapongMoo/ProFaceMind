@@ -829,28 +829,30 @@ class FacePainter extends CustomPainter {
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
-    // After a 90° clockwise rotation:
-    //   - The rotated image width becomes imageSize.height
-    //   - The rotated image height becomes imageSize.width
+    // Calculate scale factors based on the rotated image dimensions.
     final double scaleX = size.width / imageSize.height;
     final double scaleY = size.height / imageSize.width;
 
+    // Loop through each detected face.
     for (var face in faces) {
-      // For vertical coordinates (y axis) the transformation is the same for both cameras.
-      double top = (imageSize.width - face.boundingBox.right) * scaleY;
-      double bottom = (imageSize.width - face.boundingBox.left) * scaleY;
+      double left, top, right, bottom;
 
-      double left, right;
       if (isFrontCamera) {
-        // For front camera, swap left/right:
-        // In the rotated coordinate system, x comes from the original face.boundingBox values.
-        // We mirror horizontally using the rotated image width (imageSize.height).
-        left = (imageSize.height - face.boundingBox.bottom) * scaleX;
-        right = (imageSize.height - face.boundingBox.top) * scaleX;
+        // For front camera:
+        // First compute the coordinates using the rotated coordinate system.
+        double originalLeft = face.boundingBox.top * scaleX;
+        double originalRight = face.boundingBox.bottom * scaleX;
+        top = (imageSize.width - face.boundingBox.right) * scaleY;
+        bottom = (imageSize.width - face.boundingBox.left) * scaleY;
+        // Then mirror the x-coordinates relative to the screen width.
+        left = size.width - originalRight;
+        right = size.width - originalLeft;
       } else {
-        // For back camera use the rotated coordinates directly.
+        // For back camera, use the rotated coordinates directly.
         left = face.boundingBox.top * scaleX;
         right = face.boundingBox.bottom * scaleX;
+        top = (imageSize.width - face.boundingBox.right) * scaleY;
+        bottom = (imageSize.width - face.boundingBox.left) * scaleY;
       }
 
       final Rect rect = Rect.fromLTRB(left, top, right, bottom);
@@ -863,4 +865,6 @@ class FacePainter extends CustomPainter {
     return oldDelegate.faces != faces;
   }
 }
+
+
 
