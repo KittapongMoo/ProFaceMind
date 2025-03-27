@@ -7,9 +7,15 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'navigation.dart';
 import 'profile.dart';
-import 'register.dart'; // Ensure RegisterPage is imported
+import 'register.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'setphonenum.dart';
+
+// Import your new allregister.dart page
+import 'allregister.dart';
+
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -34,7 +40,6 @@ class _CameraPageState extends State<CameraPage> {
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeCamera();
     });
@@ -44,7 +49,6 @@ class _CameraPageState extends State<CameraPage> {
     try {
       _cameras = await availableCameras();
       if (_cameras!.isNotEmpty) {
-        // Select camera based on _isFrontCamera flag.
         CameraDescription selectedCamera = _isFrontCamera
             ? _cameras!.firstWhere(
               (camera) => camera.lensDirection == CameraLensDirection.front,
@@ -90,29 +94,6 @@ class _CameraPageState extends State<CameraPage> {
     }
   }
 
-  Future<void> _pickImage() async {
-    final status = await Permission.photos.request();
-    if (!status.isGranted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ต้องอนุญาตให้เข้าถึงรูปภาพก่อน')),
-      );
-      return;
-    }
-    try {
-      final pickedFile =
-      await ImagePicker().pickImage(source: ImageSource.gallery);
-      if (pickedFile != null) {
-        setState(() {
-          _galleryImage = File(pickedFile.path);
-        });
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
-      );
-    }
-  }
-
   void _switchCamera() async {
     setState(() {
       _isFrontCamera = !_isFrontCamera;
@@ -127,8 +108,53 @@ class _CameraPageState extends State<CameraPage> {
     super.dispose();
   }
 
-  /// This method builds the camera preview using scaling and rotation similar
-  /// to your second code sample.
+  Future<Database> _getDatabase() async {
+    String dbPath = await getDatabasesPath();
+    String path = join(dbPath, 'facemind.db');
+    return openDatabase(
+      path,
+      version: 2,
+      onCreate: (Database db, int version) async {
+        await db.execute('''
+          CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            face_vector TEXT,
+            nickname TEXT,
+            name TEXT,
+            relation TEXT,
+            primary_image TEXT
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE user_images (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            image_path TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+          )
+        ''');
+      },
+      onUpgrade: (Database db, int oldVersion, int newVersion) async {
+        if (oldVersion == 1 && newVersion == 2) {
+          await db.execute('ALTER TABLE users ADD COLUMN primary_image TEXT');
+        }
+      },
+    );
+  }
+
+  Future<String?> _getLastImagePath() async {
+    final db = await _getDatabase();
+    final List<Map<String, dynamic>> result = await db.query(
+      'user_images',
+      orderBy: 'id DESC',
+      limit: 1,
+    );
+    if (result.isNotEmpty) {
+      return result.first['image_path'] as String?;
+    }
+    return null;
+  }
+
   Widget _buildCameraPreview(BuildContext context) {
     if (!_isCameraInitialized ||
         _cameraController == null ||
@@ -141,7 +167,6 @@ class _CameraPageState extends State<CameraPage> {
     final Size screenSize = MediaQuery.of(context).size;
     final double screenAspectRatio = screenSize.width / screenSize.height;
     double scale = cameraAspectRatio / screenAspectRatio;
-    // Optional extra zoom factor – adjust as needed.
     double extraZoomFactor = 0.72;
     scale *= extraZoomFactor;
 
@@ -185,11 +210,11 @@ class _CameraPageState extends State<CameraPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // Use the updated camera preview.
+          // Camera preview
           Positioned.fill(
             child: _buildCameraPreview(context),
           ),
-          // Profile button
+          // Profile button (top-left)
           Positioned(
             top: 40,
             left: 20,
@@ -206,6 +231,7 @@ class _CameraPageState extends State<CameraPage> {
               ),
             ),
           ),
+          // Phone button (top-right)
           Positioned(
             top: 40,
             right: 20,
@@ -233,7 +259,7 @@ class _CameraPageState extends State<CameraPage> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Header with title and close button.
+                            // Title and close button
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
@@ -311,18 +337,28 @@ class _CameraPageState extends State<CameraPage> {
               ),
             ),
           ),
+          // Flip camera button (top center)
+          Positioned(
+            top: 40,
+            left: MediaQuery.of(context).size.width / 2 - 25,
+            child: CircleAvatar(
+              backgroundColor: Colors.white,
+              child: IconButton(
+                icon: const Icon(Icons.flip_camera_ios, color: Colors.black),
+                onPressed: _switchCamera,
+              ),
+            ),
+          ),
+          // Bottom row with register, last image, map
           Positioned(
             bottom: 80,
             left: 20,
-            child: Column(
+            right: 20,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                FloatingActionButton(
-                  heroTag: 'flipCamera',
-                  backgroundColor: Colors.grey,
-                  child: const Icon(Icons.flip_camera_ios),
-                  onPressed: _switchCamera,
-                ),
-                const SizedBox(height: 16),
+                // Register button (left)
                 FloatingActionButton(
                   heroTag: 'register',
                   backgroundColor: Colors.blue,
@@ -334,7 +370,75 @@ class _CameraPageState extends State<CameraPage> {
                     );
                   },
                 ),
-                const SizedBox(height: 16),
+                // Center widget: Tappable rectangle that navigates to AllRegisterPage
+                FutureBuilder<String?>(
+                  future: _getLastImagePath(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return GestureDetector(
+                        onTap: () {
+                          // Navigate to the AllRegisterPage on tap
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const AllRegisterPage()),
+                          );
+                        },
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.grey,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Center(child: CircularProgressIndicator()),
+                        ),
+                      );
+                    }
+                    if (snapshot.hasData && snapshot.data != null) {
+                      // There's a last image in the DB
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const AllRegisterPage()),
+                          );
+                        },
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            image: DecorationImage(
+                              image: FileImage(File(snapshot.data!)),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    // No image found: show placeholder
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AllRegisterPage()),
+                        );
+                      },
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: Colors.grey,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Center(
+                          child: Icon(Icons.image, color: Colors.white),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                // Map button (right)
                 FloatingActionButton(
                   heroTag: 'map',
                   backgroundColor: Colors.green,
@@ -347,16 +451,6 @@ class _CameraPageState extends State<CameraPage> {
                   },
                 ),
               ],
-            ),
-          ),
-          Positioned(
-            bottom: 30,
-            left: MediaQuery.of(context).size.width / 2 - 30,
-            child: FloatingActionButton(
-              heroTag: 'capture',
-              backgroundColor: Colors.black,
-              child: const Icon(Icons.camera_alt),
-              onPressed: _takePicture,
             ),
           ),
         ],
