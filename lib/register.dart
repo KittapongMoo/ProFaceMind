@@ -806,11 +806,11 @@ class _RegisterPageState extends State<RegisterPage> {
 
 class FacePainter extends CustomPainter {
   final List<Face> faces;
-  /// The raw camera preview size (width, height) as provided by _cameraController!.value.previewSize.
+  /// The raw image size from the camera preview (e.g. _cameraController!.value.previewSize)
   final Size rawImageSize;
-  /// The sensor orientation in degrees (commonly 90 or 270).
+  /// The sensor orientation (usually 90 in portrait mode)
   final int sensorOrientation;
-  /// Whether the camera used is the front camera.
+  /// True if the camera is front‑facing.
   final bool isFrontCamera;
 
   FacePainter({
@@ -820,86 +820,43 @@ class FacePainter extends CustomPainter {
     required this.isFrontCamera,
   });
 
-  /// Transforms a face bounding box from the raw image coordinate system
-  /// into the canvas coordinate system.
-  ///
-  /// For a sensor orientation of 90° (portrait mode), the raw image (w, h)
-  /// is rotated 90° clockwise. In that case, a point (x, y) transforms to:
-  ///    newX = (rawHeight - y)
-  ///    newY = x
-  ///
-  /// Then the box is scaled to the canvas size.
-  Rect _transformRect(Face face, Size canvasSize) {
-    double scaleX, scaleY;
-    Rect rawBox = face.boundingBox;
-
-    if (sensorOrientation == 90) {
-      // In portrait mode (90°), let:
-      //   rawWidth  = w, rawHeight = h.
-      // Then a raw point (x, y) becomes (h - y, x).
-      // So the transformed bounding box becomes:
-      //   left   = (rawHeight - rawBox.bottom)
-      //   top    = rawBox.left
-      //   right  = (rawHeight - rawBox.top)
-      //   bottom = rawBox.right
-      scaleX = canvasSize.width / rawImageSize.height;
-      scaleY = canvasSize.height / rawImageSize.width;
-      double left = (rawImageSize.height - rawBox.bottom) * scaleX;
-      double top = rawBox.left * scaleY;
-      double right = (rawImageSize.height - rawBox.top) * scaleX;
-      double bottom = rawBox.right * scaleY;
-      Rect transformed = Rect.fromLTRB(left, top, right, bottom);
-      // For front camera, mirror horizontally.
-      if (isFrontCamera) {
-        double mirroredLeft = canvasSize.width - transformed.right;
-        double mirroredRight = canvasSize.width - transformed.left;
-        transformed = Rect.fromLTRB(mirroredLeft, transformed.top, mirroredRight, transformed.bottom);
-      }
-      return transformed;
-    } else if (sensorOrientation == 270) {
-      // For sensorOrientation 270 (rotated counter-clockwise 90°):
-      // Transformation: (x, y) => (y, rawWidth - x)
-      scaleX = canvasSize.width / rawImageSize.height;
-      scaleY = canvasSize.height / rawImageSize.width;
-      double left = rawBox.top * scaleX;
-      double top = (rawImageSize.width - rawBox.bottom) * scaleY;
-      double right = rawBox.bottom * scaleX;
-      double bottom = (rawImageSize.width - rawBox.top) * scaleY;
-      Rect transformed = Rect.fromLTRB(left, top, right, bottom);
-      if (isFrontCamera) {
-        double mirroredLeft = canvasSize.width - transformed.right;
-        double mirroredRight = canvasSize.width - transformed.left;
-        transformed = Rect.fromLTRB(mirroredLeft, transformed.top, mirroredRight, transformed.bottom);
-      }
-      return transformed;
-    } else {
-      // For other orientations (0, 180), adjust accordingly.
-      scaleX = canvasSize.width / rawImageSize.width;
-      scaleY = canvasSize.height / rawImageSize.height;
-      Rect transformed = Rect.fromLTRB(
-        rawBox.left * scaleX,
-        rawBox.top * scaleY,
-        rawBox.right * scaleX,
-        rawBox.bottom * scaleY,
-      );
-      if (isFrontCamera) {
-        double mirroredLeft = canvasSize.width - transformed.right;
-        double mirroredRight = canvasSize.width - transformed.left;
-        transformed = Rect.fromLTRB(mirroredLeft, transformed.top, mirroredRight, transformed.bottom);
-      }
-      return transformed;
-    }
-  }
-
   @override
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
       ..color = Colors.red
       ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke;
-    for (var face in faces) {
-      Rect rect = _transformRect(face, size);
-      canvas.drawRect(rect, paint);
+
+    // Determine the effective image size for face detection.
+    // MLKit uses the provided rotation metadata to output face boxes
+    // as if the image were upright.
+    Size effectiveSize = (sensorOrientation == 90 || sensorOrientation == 270)
+        ? Size(rawImageSize.height, rawImageSize.width)
+        : rawImageSize;
+
+    // Scale factors from effective image size to the canvas size.
+    final double scaleX = size.width / effectiveSize.width;
+    final double scaleY = size.height / effectiveSize.height;
+
+    for (Face face in faces) {
+      Rect box = face.boundingBox;
+      // Scale the bounding box coordinates.
+      double left = box.left * scaleX;
+      double top = box.top * scaleY;
+      double right = box.right * scaleX;
+      double bottom = box.bottom * scaleY;
+      Rect transformed = Rect.fromLTRB(left, top, right, bottom);
+
+      // If using the front camera, mirror the box horizontally.
+      if (isFrontCamera) {
+        transformed = Rect.fromLTRB(
+          size.width - transformed.right,
+          transformed.top,
+          size.width - transformed.left,
+          transformed.bottom,
+        );
+      }
+      canvas.drawRect(transformed, paint);
     }
   }
 
