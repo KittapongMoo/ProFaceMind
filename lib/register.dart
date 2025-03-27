@@ -36,7 +36,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final FaceDetector _faceDetector = FaceDetector(
     options: FaceDetectorOptions(
       performanceMode:
-      FaceDetectorMode.accurate, // accurate for better detection
+          FaceDetectorMode.accurate, // accurate for better detection
       enableTracking: true,
     ),
   );
@@ -100,9 +100,9 @@ class _RegisterPageState extends State<RegisterPage> {
         for (int col = 0; col < uvWidth; col++) {
           // In NV21 the order is V then U.
           nv21[offset++] =
-          image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
+              image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
           nv21[offset++] =
-          image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
+              image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
         }
       }
 
@@ -191,7 +191,7 @@ class _RegisterPageState extends State<RegisterPage> {
       if (_cameras != null && _cameras!.isNotEmpty) {
         // Find the front camera
         int frontCameraIndex = _cameras!.indexWhere(
-                (camera) => camera.lensDirection == CameraLensDirection.front);
+            (camera) => camera.lensDirection == CameraLensDirection.front);
         await _setCamera(frontCameraIndex != -1 ? frontCameraIndex : 0);
       }
     } catch (e) {
@@ -210,7 +210,7 @@ class _RegisterPageState extends State<RegisterPage> {
     int cameraIndex = 0;
     for (int i = 0; i < _cameras!.length; i++) {
       if ((_isFrontCamera &&
-          _cameras![i].lensDirection == CameraLensDirection.front) ||
+              _cameras![i].lensDirection == CameraLensDirection.front) ||
           (!_isFrontCamera &&
               _cameras![i].lensDirection == CameraLensDirection.back)) {
         cameraIndex = i;
@@ -226,7 +226,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       final inputImage =
-      _convertCameraImage(cameraImage, _cameraController!.description);
+          _convertCameraImage(cameraImage, _cameraController!.description);
       if (inputImage == null) {
         _isDetectingFaces = false;
         return;
@@ -397,7 +397,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       final XFile? imageFile =
-      await _picker.pickImage(source: ImageSource.gallery);
+          await _picker.pickImage(source: ImageSource.gallery);
       if (imageFile != null) {
         _showProgressIndicator("Processing image...");
         await _processCapturedImage(File(imageFile.path));
@@ -446,9 +446,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
       // Resize to the expected input size for MobileFaceNet (usually 112x112)
       final img.Image resizedImage =
-      img.copyResize(decodedImage, width: 112, height: 112);
+          img.copyResize(decodedImage, width: 112, height: 112);
       final Uint8List processedBytes =
-      _imageToByteListFloat32(resizedImage, 112, 127.5, 128.0);
+          _imageToByteListFloat32(resizedImage, 112, 127.5, 128.0);
 
       List<double> vector = await _runFaceRecognition(processedBytes);
       print("😀Face vector: $vector"); // Add this line to inspect the vector
@@ -500,13 +500,12 @@ class _RegisterPageState extends State<RegisterPage> {
       final Directory userDir = Directory('${appDir.path}/temp_faces');
 
       // Fetch only current session images and filter for Files.
-      final List<FileSystemEntity> imagesList = userDir
-          .listSync()
-          .whereType<File>()
-          .toList();
+      final List<FileSystemEntity> imagesList =
+          userDir.listSync().whereType<File>().toList();
 
       // Sort the images by last modified time (oldest first)
-      imagesList.sort((a, b) => a.statSync().modified.compareTo(b.statSync().modified));
+      imagesList.sort(
+          (a, b) => a.statSync().modified.compareTo(b.statSync().modified));
 
       // Insert user with a placeholder for primary_image
       int userId = await db.insert('users', {
@@ -569,8 +568,6 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-
-
   /// Run face recognition using tflite_flutter
   Future<List<double>> _runFaceRecognition(Uint8List imageBytes) async {
     if (interpreter == null) {
@@ -629,7 +626,6 @@ class _RegisterPageState extends State<RegisterPage> {
       },
     );
   }
-
 
   /// Build the camera preview.
   @override
@@ -712,7 +708,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   _faceVectors.length >= 5
                       ? Icon(Icons.check_circle, color: Colors.green, size: 20)
                       : Icon(Icons.circle_outlined,
-                      color: Colors.white, size: 20),
+                          color: Colors.white, size: 20),
                 ],
               ),
             ),
@@ -787,11 +783,12 @@ class _RegisterPageState extends State<RegisterPage> {
                       CustomPaint(
                         painter: FacePainter(
                           faces: _faces,
-                          imageSize: Size(
-                            // Note: swap width/height here if needed
-                            previewSize.height,
-                            previewSize.width,
-                          ),
+                          // If sensor orientation is 90 or 270,
+                          // you likely need to swap width/height:
+                          imageSize: (sensorOrientation == 90 ||
+                                  sensorOrientation == 270)
+                              ? Size(previewSize.height, previewSize.width)
+                              : Size(previewSize.width, previewSize.height),
                           isFrontCamera: isFrontCamera,
                           screenSize: constraints.biggest,
                         ),
@@ -825,6 +822,7 @@ class FacePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     canvas.save();
     canvas.rotate(-math.pi / 2);
+
     final Paint paint = Paint()
       ..color = Colors.red
       ..strokeWidth = 1.5
@@ -841,11 +839,11 @@ class FacePainter extends CustomPainter {
       double bottom = face.boundingBox.bottom * scaleY;
 
       // Mirror if front camera
-      if (isFrontCamera) {
-        final double temp = left;
-        left = size.width - right;
-        right = size.width - temp;
-      }
+      // if (isFrontCamera) {
+      //   final double temp = left;
+      //   left = size.width - right;
+      //   right = size.width - temp;
+      // }
 
       final Rect scaledRect = Rect.fromLTRB(left, top, right, bottom);
       canvas.drawRect(scaledRect, paint);
@@ -857,10 +855,3 @@ class FacePainter extends CustomPainter {
     return oldDelegate.faces != faces;
   }
 }
-
-
-
-
-
-
-
