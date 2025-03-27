@@ -833,27 +833,12 @@ class FacePainter extends CustomPainter {
     final double scaleX = size.width / imageSize.height;
     final double scaleY = size.height / imageSize.width;
 
-    // Loop through each detected face.
+    // Use the same coordinate mapping regardless of camera
     for (var face in faces) {
-      double left, top, right, bottom;
-
-      if (isFrontCamera) {
-        // For front camera:
-        // First compute the coordinates using the rotated coordinate system.
-        double originalLeft = face.boundingBox.top * scaleX;
-        double originalRight = face.boundingBox.bottom * scaleX;
-        top = (imageSize.width - face.boundingBox.right) * scaleY;
-        bottom = (imageSize.width - face.boundingBox.left) * scaleY;
-        // Then mirror the x-coordinates relative to the screen width.
-        left = size.width - originalRight;
-        right = size.width - originalLeft;
-      } else {
-        // For back camera, use the rotated coordinates directly.
-        left = face.boundingBox.top * scaleX;
-        right = face.boundingBox.bottom * scaleX;
-        top = (imageSize.width - face.boundingBox.right) * scaleY;
-        bottom = (imageSize.width - face.boundingBox.left) * scaleY;
-      }
+      double left = face.boundingBox.top * scaleX;
+      double right = face.boundingBox.bottom * scaleX;
+      double top = (imageSize.width - face.boundingBox.right) * scaleY;
+      double bottom = (imageSize.width - face.boundingBox.left) * scaleY;
 
       final Rect rect = Rect.fromLTRB(left, top, right, bottom);
       canvas.drawRect(rect, paint);
@@ -865,6 +850,7 @@ class FacePainter extends CustomPainter {
     return oldDelegate.faces != faces;
   }
 }
+
 
 
 
