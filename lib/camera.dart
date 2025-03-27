@@ -603,16 +603,6 @@ class FacePainter extends CustomPainter {
     return Rect.fromLTRB(newLeft, newTop, newRight, newBottom);
   }
 
-  /// Mirrors a rectangle both horizontally and vertically in the rotated coordinate system.
-  Rect _mirrorRectBoth(Rect rect, double mirrorWidth, double mirrorHeight) {
-    return Rect.fromLTRB(
-      mirrorWidth - rect.right,
-      mirrorHeight - rect.bottom,
-      mirrorWidth - rect.left,
-      mirrorHeight - rect.top,
-    );
-  }
-
   @override
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
@@ -633,12 +623,9 @@ class FacePainter extends CustomPainter {
       // Rotate the face bounding box.
       Rect rotatedRect = _rotateRect90(face.boundingBox, imageSize);
 
-      // For front camera, mirror both horizontally and vertically.
-      if (isFrontCamera) {
-        rotatedRect = _mirrorRectBoth(rotatedRect, rotatedWidth, rotatedHeight);
-      }
+      // No mirroring is applied now.
 
-      // Scale the rotated (and mirrored) rectangle.
+      // Scale the rotated rectangle to the canvas dimensions.
       Rect scaledRect = Rect.fromLTRB(
         rotatedRect.left * scaleX,
         rotatedRect.top * scaleY,
