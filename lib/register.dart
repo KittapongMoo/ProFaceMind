@@ -787,9 +787,10 @@ class _RegisterPageState extends State<RegisterPage> {
                       CustomPaint(
                         painter: FacePainter(
                           faces: _faces,
-                          rawImageSize: previewSize, // raw dimensions from camera
+                          rawImageSize: previewSize,
                           sensorOrientation: sensorOrientation,
                           isFrontCamera: isFrontCamera,
+                          rectangleRotation: -math.pi / 2, // rotate each box -90 degrees
                         ),
                       ),
                     ],
@@ -808,16 +809,20 @@ class FacePainter extends CustomPainter {
   final List<Face> faces;
   /// The raw image size from the camera preview (e.g. _cameraController!.value.previewSize)
   final Size rawImageSize;
-  /// The sensor orientation (usually 90 in portrait mode)
+  /// The sensor orientation in degrees (commonly 90 or 270)
   final int sensorOrientation;
-  /// True if the camera is front‑facing.
+  /// Whether the camera used is the front camera.
   final bool isFrontCamera;
+  /// Additional rotation (in radians) to apply to each drawn rectangle.
+  /// For –90°, use -math.pi/2.
+  final double rectangleRotation;
 
   FacePainter({
     required this.faces,
     required this.rawImageSize,
     required this.sensorOrientation,
     required this.isFrontCamera,
+    this.rectangleRotation = 0, // default no extra rotation
   });
 
   @override
@@ -827,27 +832,27 @@ class FacePainter extends CustomPainter {
       ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke;
 
-    // Determine the effective image size for face detection.
-    // MLKit uses the provided rotation metadata to output face boxes
-    // as if the image were upright.
+    // When MLKit receives rotation metadata (e.g., 90° or 270°),
+    // it returns bounding boxes as if the image were upright.
+    // For sensorOrientation 90° or 270°, the effective dimensions are swapped:
     Size effectiveSize = (sensorOrientation == 90 || sensorOrientation == 270)
         ? Size(rawImageSize.height, rawImageSize.width)
         : rawImageSize;
 
-    // Scale factors from effective image size to the canvas size.
+    // Scale factors from effective image size to the canvas.
     final double scaleX = size.width / effectiveSize.width;
     final double scaleY = size.height / effectiveSize.height;
 
     for (Face face in faces) {
       Rect box = face.boundingBox;
-      // Scale the bounding box coordinates.
+      // Scale the MLKit-provided bounding box.
       double left = box.left * scaleX;
       double top = box.top * scaleY;
       double right = box.right * scaleX;
       double bottom = box.bottom * scaleY;
       Rect transformed = Rect.fromLTRB(left, top, right, bottom);
 
-      // If using the front camera, mirror the box horizontally.
+      // Mirror horizontally for front camera.
       if (isFrontCamera) {
         transformed = Rect.fromLTRB(
           size.width - transformed.right,
@@ -856,7 +861,24 @@ class FacePainter extends CustomPainter {
           transformed.bottom,
         );
       }
-      canvas.drawRect(transformed, paint);
+
+      // If an extra rotation is requested, rotate the rectangle about its center.
+      if (rectangleRotation != 0) {
+        final Offset center = transformed.center;
+        canvas.save();
+        canvas.translate(center.dx, center.dy);
+        canvas.rotate(rectangleRotation);
+        // Draw a rectangle centered at (0,0) with the same dimensions.
+        final Rect rotatedRect = Rect.fromCenter(
+          center: Offset(0, 0),
+          width: transformed.width,
+          height: transformed.height,
+        );
+        canvas.drawRect(rotatedRect, paint);
+        canvas.restore();
+      } else {
+        canvas.drawRect(transformed, paint);
+      }
     }
   }
 
@@ -865,6 +887,7 @@ class FacePainter extends CustomPainter {
     return oldDelegate.faces != faces;
   }
 }
+
 
 
 
