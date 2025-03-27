@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,11 +7,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'navigation.dart';
 import 'profile.dart';
-import 'register.dart'; // ✅ Ensure RegisterPage is imported
+import 'register.dart'; // Ensure RegisterPage is imported
 import 'package:shared_preferences/shared_preferences.dart';
 import 'setphonenum.dart';
-
-
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -31,7 +30,6 @@ class _CameraPageState extends State<CameraPage> {
   @override
   void initState() {
     super.initState();
-
     // Lock the app orientation to portrait only
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -46,20 +44,27 @@ class _CameraPageState extends State<CameraPage> {
     try {
       _cameras = await availableCameras();
       if (_cameras!.isNotEmpty) {
-        CameraDescription selectedCamera = _cameras![_isFrontCamera ? 1 : 0];
+        // Select camera based on _isFrontCamera flag.
+        CameraDescription selectedCamera = _isFrontCamera
+            ? _cameras!.firstWhere(
+              (camera) => camera.lensDirection == CameraLensDirection.front,
+          orElse: () => _cameras!.first,
+        )
+            : _cameras!.firstWhere(
+              (camera) => camera.lensDirection == CameraLensDirection.back,
+          orElse: () => _cameras!.first,
+        );
 
         _cameraController = CameraController(
           selectedCamera,
           ResolutionPreset.high,
           enableAudio: false,
         );
-
         await _cameraController!.initialize();
         if (!mounted) return;
 
-        // Lock preview to portrait mode
-        await _cameraController!
-            .lockCaptureOrientation(DeviceOrientation.portraitUp);
+        // Lock preview to portrait mode.
+        await _cameraController!.lockCaptureOrientation(DeviceOrientation.portraitUp);
 
         setState(() {
           _isCameraInitialized = true;
@@ -72,6 +77,7 @@ class _CameraPageState extends State<CameraPage> {
   }
 
   Future<void> _takePicture() async {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
     if (!_cameraController!.value.isTakingPicture) {
       try {
         final image = await _cameraController!.takePicture();
@@ -84,14 +90,6 @@ class _CameraPageState extends State<CameraPage> {
     }
   }
 
-  void _switchCamera() async {
-    setState(() {
-      _isFrontCamera = !_isFrontCamera;
-      _isCameraInitialized = false;
-    });
-    await _initializeCamera();
-  }
-
   Future<void> _pickImage() async {
     final status = await Permission.photos.request();
     if (!status.isGranted) {
@@ -100,7 +98,6 @@ class _CameraPageState extends State<CameraPage> {
       );
       return;
     }
-
     try {
       final pickedFile =
       await ImagePicker().pickImage(source: ImageSource.gallery);
@@ -116,10 +113,12 @@ class _CameraPageState extends State<CameraPage> {
     }
   }
 
-  double _calculateRotation() {
-    if (_sensorOrientation == 90) return 1.5708; // 90 degrees in radians
-    if (_sensorOrientation == 270) return -1.5708; // -90 degrees in radians
-    return 0; // Default no rotation
+  void _switchCamera() async {
+    setState(() {
+      _isFrontCamera = !_isFrontCamera;
+      _isCameraInitialized = false;
+    });
+    await _initializeCamera();
   }
 
   @override
@@ -128,32 +127,68 @@ class _CameraPageState extends State<CameraPage> {
     super.dispose();
   }
 
+  /// This method builds the camera preview using scaling and rotation similar
+  /// to your second code sample.
+  Widget _buildCameraPreview(BuildContext context) {
+    if (!_isCameraInitialized ||
+        _cameraController == null ||
+        !_cameraController!.value.isInitialized) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final previewSize = _cameraController!.value.previewSize!;
+    final double cameraAspectRatio = previewSize.width / previewSize.height;
+    final Size screenSize = MediaQuery.of(context).size;
+    final double screenAspectRatio = screenSize.width / screenSize.height;
+    double scale = cameraAspectRatio / screenAspectRatio;
+    // Optional extra zoom factor – adjust as needed.
+    double extraZoomFactor = 0.72;
+    scale *= extraZoomFactor;
+
+    final int sensorOrientation = _cameraController!.description.sensorOrientation;
+    double rotationAngle = 0;
+    if (sensorOrientation == 90) {
+      rotationAngle = math.pi / 2;
+    } else if (sensorOrientation == 270) {
+      rotationAngle = -math.pi / 2;
+    }
+
+    final bool isFrontCamera =
+        _cameraController!.description.lensDirection == CameraLensDirection.front;
+    final Matrix4 transformMatrix = isFrontCamera
+        ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
+        : Matrix4.rotationZ(rotationAngle);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return ClipRect(
+          child: Transform.scale(
+            scale: scale * extraZoomFactor,
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: cameraAspectRatio,
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: transformMatrix,
+                  child: CameraPreview(_cameraController!),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
+          // Use the updated camera preview.
           Positioned.fill(
-            child: _isCameraInitialized
-                ? Center(
-              child: AspectRatio(
-                aspectRatio: _cameraController!.value.previewSize!.height /
-                    _cameraController!.value.previewSize!.width,
-                child: Transform.rotate(
-                  angle: _calculateRotation(), // Fix rotation based on sensor
-                  child: Transform(
-                    alignment: Alignment.center,
-                    transform: _isFrontCamera
-                        ? Matrix4.rotationY(3.1415927) // Mirror front cam
-                        : Matrix4.identity(),
-                    child: CameraPreview(_cameraController!),
-                  ),
-                ),
-              ),
-            )
-                : const Center(child: CircularProgressIndicator()),
+            child: _buildCameraPreview(context),
           ),
-
           // Profile button
           Positioned(
             top: 40,
@@ -165,14 +200,12 @@ class _CameraPageState extends State<CameraPage> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                        builder: (context) => const ProfilePage()),
+                    MaterialPageRoute(builder: (context) => const ProfilePage()),
                   );
                 },
               ),
             ),
           ),
-
           Positioned(
             top: 40,
             right: 20,
@@ -200,7 +233,7 @@ class _CameraPageState extends State<CameraPage> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // ✅ หัวข้อ + ปุ่มปิด
+                            // Header with title and close button.
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
@@ -222,13 +255,10 @@ class _CameraPageState extends State<CameraPage> {
                                 ),
                               ],
                             ),
-
                             const SizedBox(height: 16),
-
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // ▶️ ฝั่งซ้าย: ชื่อและความสัมพันธ์ + เบอร์
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,7 +270,7 @@ class _CameraPageState extends State<CameraPage> {
                                           color: Color(0xFF6B7280),
                                         ),
                                       ),
-                                      const SizedBox(height: 4), // ✅ ลดความห่าง
+                                      const SizedBox(height: 4),
                                       Text(
                                         phone,
                                         style: const TextStyle(
@@ -253,8 +283,6 @@ class _CameraPageState extends State<CameraPage> {
                                     ],
                                   ),
                                 ),
-
-                                // ▶️ ฝั่งขวา: ปุ่มแก้ไข
                                 GestureDetector(
                                   onTap: () {
                                     Navigator.pop(context);
@@ -272,23 +300,17 @@ class _CameraPageState extends State<CameraPage> {
                                     ),
                                   ),
                                 ),
-
                               ],
                             ),
-
                           ],
                         ),
                       ),
                     ),
                   );
-
-
                 },
-
               ),
             ),
           ),
-
           Positioned(
             bottom: 80,
             left: 20,
@@ -308,9 +330,7 @@ class _CameraPageState extends State<CameraPage> {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) => const RegisterPage(),
-                      ),
+                      MaterialPageRoute(builder: (context) => const RegisterPage()),
                     );
                   },
                 ),
@@ -322,15 +342,13 @@ class _CameraPageState extends State<CameraPage> {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                          builder: (context) => const NavigationPage()),
+                      MaterialPageRoute(builder: (context) => const NavigationPage()),
                     );
                   },
                 ),
               ],
             ),
           ),
-
           Positioned(
             bottom: 30,
             left: MediaQuery.of(context).size.width / 2 - 30,
