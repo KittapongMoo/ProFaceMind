@@ -819,36 +819,31 @@ class FacePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Apply a counter rotation if needed:
-    canvas.save();
-    canvas.rotate(-math.pi / 2);
-
     final Paint paint = Paint()
       ..color = Colors.red
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
-    // Since the canvas is rotated, swap the scale factors.
-    final double scaleX = size.height / imageSize.width;
-    final double scaleY = size.width / imageSize.height;
-
     for (var face in faces) {
+      // Convert coordinates from image to screen
+      final double scaleX = size.width / imageSize.width;
+      final double scaleY = size.height / imageSize.height;
+
       double left = face.boundingBox.left * scaleX;
       double top = face.boundingBox.top * scaleY;
       double right = face.boundingBox.right * scaleX;
       double bottom = face.boundingBox.bottom * scaleY;
 
+      // Mirror if front camera
       if (isFrontCamera) {
         final double temp = left;
-        left = size.height - right;
-        right = size.height - temp;
+        left = size.width - right;
+        right = size.width - temp;
       }
 
       final Rect scaledRect = Rect.fromLTRB(left, top, right, bottom);
       canvas.drawRect(scaledRect, paint);
     }
-
-    canvas.restore();
   }
 
   @override
