@@ -793,6 +793,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             previewSize.width,
                           ),
                           isFrontCamera: isFrontCamera,
+                          screenSize: constraints.biggest,
                         ),
                       ),
                     ],
@@ -812,11 +813,13 @@ class FacePainter extends CustomPainter {
   // imageSize is passed as Size(previewSize.height, previewSize.width)
   final Size imageSize;
   final bool isFrontCamera;
+  final Size screenSize; // added field
 
   FacePainter({
     required this.faces,
     required this.imageSize,
     required this.isFrontCamera,
+    required this.screenSize, // added parameter
   });
 
   @override
