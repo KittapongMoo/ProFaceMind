@@ -787,10 +787,13 @@ class _RegisterPageState extends State<RegisterPage> {
                       CustomPaint(
                         painter: FacePainter(
                           faces: _faces,
-                          rawImageSize: previewSize,
-                          sensorOrientation: sensorOrientation,
+                          imageSize: Size(
+                            // Note: swap width/height here if needed
+                            previewSize.height,
+                            previewSize.width,
+                          ),
                           isFrontCamera: isFrontCamera,
-                          extraRotation: -math.pi / 2, // rotate each box by -90 degrees
+                          screenSize: constraints.biggest,
                         ),
                       ),
                     ],
@@ -807,73 +810,45 @@ class _RegisterPageState extends State<RegisterPage> {
 
 class FacePainter extends CustomPainter {
   final List<Face> faces;
-  /// The raw image size from the camera preview (e.g. _cameraController!.value.previewSize)
-  final Size rawImageSize;
-  /// The sensor orientation in degrees (commonly 90 or 270)
-  final int sensorOrientation;
-  /// Whether the camera used is the front camera.
+  final Size imageSize;
   final bool isFrontCamera;
-  /// Extra rotation in radians to apply to each drawn bounding box.
-  /// For –90° rotation, pass -math.pi/2.
-  final double extraRotation;
+  final Size screenSize;
 
   FacePainter({
     required this.faces,
-    required this.rawImageSize,
-    required this.sensorOrientation,
+    required this.imageSize,
     required this.isFrontCamera,
-    this.extraRotation = 0,
+    required this.screenSize,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.rotate(-math.pi / 2);
     final Paint paint = Paint()
       ..color = Colors.red
-      ..strokeWidth = 2.0
+      ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
-    // MLKit returns boxes as if the image were upright.
-    // In portrait mode (sensorOrientation 90 or 270), the effective dimensions are swapped.
-    Size effectiveSize = (sensorOrientation == 90 || sensorOrientation == 270)
-        ? Size(rawImageSize.height, rawImageSize.width)
-        : rawImageSize;
+    for (var face in faces) {
+      // Convert coordinates from image to screen
+      final double scaleX = size.width / imageSize.width;
+      final double scaleY = size.height / imageSize.height;
 
-    // Scale factors to convert effective image coordinates to canvas coordinates.
-    final double scaleX = size.width / effectiveSize.width;
-    final double scaleY = size.height / effectiveSize.height;
+      double left = face.boundingBox.left * scaleX;
+      double top = face.boundingBox.top * scaleY;
+      double right = face.boundingBox.right * scaleX;
+      double bottom = face.boundingBox.bottom * scaleY;
 
-    for (Face face in faces) {
-      // Scale the MLKit-provided bounding box.
-      Rect box = face.boundingBox;
-      double left = box.left * scaleX;
-      double top = box.top * scaleY;
-      double right = box.right * scaleX;
-      double bottom = box.bottom * scaleY;
-      Rect transformed = Rect.fromLTRB(left, top, right, bottom);
-
-      // Mirror horizontally for front camera.
+      // Mirror if front camera
       if (isFrontCamera) {
-        transformed = Rect.fromLTRB(
-          size.width - transformed.right,
-          transformed.top,
-          size.width - transformed.left,
-          transformed.bottom,
-        );
+        final double temp = left;
+        left = size.width - right;
+        right = size.width - temp;
       }
 
-      // Rotate the rectangle by extraRotation around its center.
-      final Offset center = transformed.center;
-      canvas.save();
-      canvas.translate(center.dx, center.dy);
-      canvas.rotate(extraRotation);
-      // Draw the rectangle centered at the origin.
-      final Rect rotatedRect = Rect.fromCenter(
-        center: Offset.zero,
-        width: transformed.width,
-        height: transformed.height,
-      );
-      canvas.drawRect(rotatedRect, paint);
-      canvas.restore();
+      final Rect scaledRect = Rect.fromLTRB(left, top, right, bottom);
+      canvas.drawRect(scaledRect, paint);
     }
   }
 
