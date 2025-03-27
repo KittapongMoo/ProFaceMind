@@ -606,10 +606,10 @@ class FacePainter extends CustomPainter {
   /// Rotates a rectangle -90° (counterclockwise).
   /// Transformation: (x, y) => (originalHeight - y, x)
   Rect _rotateMinus90(Rect rect, Size originalSize) {
-    double newLeft = originalSize.height - rect.bottom;
-    double newTop = rect.left;
-    double newRight = originalSize.height - rect.top;
-    double newBottom = rect.right;
+    double newLeft = rect.top;
+    double newTop = originalSize.width - rect.right;
+    double newRight = rect.bottom;
+    double newBottom = originalSize.width - rect.left;
     return Rect.fromLTRB(newLeft, newTop, newRight, newBottom);
   }
 
