@@ -790,7 +790,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           rawImageSize: previewSize,
                           sensorOrientation: sensorOrientation,
                           isFrontCamera: isFrontCamera,
-                          rectangleRotation: -math.pi / 2, // rotate each box -90 degrees
+                          extraRotation: -math.pi / 2, // rotate each box by -90 degrees
                         ),
                       ),
                     ],
@@ -813,16 +813,16 @@ class FacePainter extends CustomPainter {
   final int sensorOrientation;
   /// Whether the camera used is the front camera.
   final bool isFrontCamera;
-  /// Additional rotation (in radians) to apply to each drawn rectangle.
-  /// For –90°, use -math.pi/2.
-  final double rectangleRotation;
+  /// Extra rotation in radians to apply to each drawn bounding box.
+  /// For –90° rotation, pass -math.pi/2.
+  final double extraRotation;
 
   FacePainter({
     required this.faces,
     required this.rawImageSize,
     required this.sensorOrientation,
     required this.isFrontCamera,
-    this.rectangleRotation = 0, // default no extra rotation
+    this.extraRotation = 0,
   });
 
   @override
@@ -832,20 +832,19 @@ class FacePainter extends CustomPainter {
       ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke;
 
-    // When MLKit receives rotation metadata (e.g., 90° or 270°),
-    // it returns bounding boxes as if the image were upright.
-    // For sensorOrientation 90° or 270°, the effective dimensions are swapped:
+    // MLKit returns boxes as if the image were upright.
+    // In portrait mode (sensorOrientation 90 or 270), the effective dimensions are swapped.
     Size effectiveSize = (sensorOrientation == 90 || sensorOrientation == 270)
         ? Size(rawImageSize.height, rawImageSize.width)
         : rawImageSize;
 
-    // Scale factors from effective image size to the canvas.
+    // Scale factors to convert effective image coordinates to canvas coordinates.
     final double scaleX = size.width / effectiveSize.width;
     final double scaleY = size.height / effectiveSize.height;
 
     for (Face face in faces) {
-      Rect box = face.boundingBox;
       // Scale the MLKit-provided bounding box.
+      Rect box = face.boundingBox;
       double left = box.left * scaleX;
       double top = box.top * scaleY;
       double right = box.right * scaleX;
@@ -862,23 +861,19 @@ class FacePainter extends CustomPainter {
         );
       }
 
-      // If an extra rotation is requested, rotate the rectangle about its center.
-      if (rectangleRotation != 0) {
-        final Offset center = transformed.center;
-        canvas.save();
-        canvas.translate(center.dx, center.dy);
-        canvas.rotate(rectangleRotation);
-        // Draw a rectangle centered at (0,0) with the same dimensions.
-        final Rect rotatedRect = Rect.fromCenter(
-          center: Offset(0, 0),
-          width: transformed.width,
-          height: transformed.height,
-        );
-        canvas.drawRect(rotatedRect, paint);
-        canvas.restore();
-      } else {
-        canvas.drawRect(transformed, paint);
-      }
+      // Rotate the rectangle by extraRotation around its center.
+      final Offset center = transformed.center;
+      canvas.save();
+      canvas.translate(center.dx, center.dy);
+      canvas.rotate(extraRotation);
+      // Draw the rectangle centered at the origin.
+      final Rect rotatedRect = Rect.fromCenter(
+        center: Offset.zero,
+        width: transformed.width,
+        height: transformed.height,
+      );
+      canvas.drawRect(rotatedRect, paint);
+      canvas.restore();
     }
   }
 
