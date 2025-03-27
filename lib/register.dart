@@ -806,6 +806,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
 class FacePainter extends CustomPainter {
   final List<Face> faces;
+  // Original image dimensions before rotation.
   final Size imageSize;
   final bool isFrontCamera;
   final Size screenSize;
@@ -817,41 +818,58 @@ class FacePainter extends CustomPainter {
     required this.screenSize,
   });
 
+  /// Rotate a rectangle by 90° clockwise around the origin.
+  /// For a point (x, y) in the original image, the new coordinates become:
+  ///   newX = y, and newY = imageWidth - x.
+  /// This function applies that logic to a rectangle.
+  Rect _rotateRect90(Rect rect, Size originalSize) {
+    double newLeft = rect.top;
+    double newTop = originalSize.width - rect.right;
+    double newRight = rect.bottom;
+    double newBottom = originalSize.width - rect.left;
+    return Rect.fromLTRB(newLeft, newTop, newRight, newBottom);
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
-    // Apply a counter rotation if needed:
-    canvas.save();
-    canvas.rotate(-math.pi / 2);
-
     final Paint paint = Paint()
       ..color = Colors.red
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
-    // Since the canvas is rotated, swap the scale factors.
-    final double scaleX = size.height / imageSize.width;
-    final double scaleY = size.width / imageSize.height;
+    // After a 90° clockwise rotation, the effective image dimensions swap:
+    // rotatedWidth becomes original image height, and rotatedHeight becomes original image width.
+    double rotatedWidth = imageSize.height;
+    double rotatedHeight = imageSize.width;
 
-    // Define a horizontal offset to move the bounding boxes to the left.
-    const double offsetX = 20.0; // adjust this value as needed
+    // Scale factors to map the rotated image coordinates to the canvas.
+    final double scaleX = size.width / rotatedWidth;
+    final double scaleY = size.height / rotatedHeight;
 
     for (var face in faces) {
-      double left = face.boundingBox.left * scaleX - offsetX;
-      double top = face.boundingBox.top * scaleY;
-      double right = face.boundingBox.right * scaleX - offsetX;
-      double bottom = face.boundingBox.bottom * scaleY;
+      // First, rotate the bounding box from the face detector.
+      Rect rotatedRect = _rotateRect90(face.boundingBox, imageSize);
 
+      // If using the front camera, mirror the rectangle horizontally.
       if (isFrontCamera) {
-        final double temp = left;
-        left = size.height - right;
-        right = size.height - temp;
+        rotatedRect = Rect.fromLTRB(
+          rotatedWidth - rotatedRect.right,
+          rotatedRect.top,
+          rotatedWidth - rotatedRect.left,
+          rotatedRect.bottom,
+        );
       }
 
-      final Rect scaledRect = Rect.fromLTRB(left, top, right, bottom);
+      // Scale the rotated rectangle to the canvas dimensions.
+      Rect scaledRect = Rect.fromLTRB(
+        rotatedRect.left * scaleX,
+        rotatedRect.top * scaleY,
+        rotatedRect.right * scaleX,
+        rotatedRect.bottom * scaleY,
+      );
+
       canvas.drawRect(scaledRect, paint);
     }
-
-    canvas.restore();
   }
 
   @override
@@ -859,3 +877,4 @@ class FacePainter extends CustomPainter {
     return oldDelegate.faces != faces;
   }
 }
+
