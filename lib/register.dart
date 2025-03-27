@@ -835,10 +835,11 @@ class FacePainter extends CustomPainter {
 
     // Use the same coordinate mapping regardless of camera
     for (var face in faces) {
+      // Using the rotated coordinate system:
       double left = face.boundingBox.top * scaleX;
       double right = face.boundingBox.bottom * scaleX;
-      double top = (imageSize.width - face.boundingBox.right) * scaleY;
-      double bottom = (imageSize.width - face.boundingBox.left) * scaleY;
+      double top = face.boundingBox.left * scaleY;
+      double bottom = face.boundingBox.right * scaleY;
 
       final Rect rect = Rect.fromLTRB(left, top, right, bottom);
       canvas.drawRect(rect, paint);
