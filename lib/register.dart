@@ -783,12 +783,11 @@ class _RegisterPageState extends State<RegisterPage> {
                       CustomPaint(
                         painter: FacePainter(
                           faces: _faces,
-                          // If sensor orientation is 90 or 270,
-                          // you likely need to swap width/height:
-                          imageSize: (sensorOrientation == 90 ||
-                                  sensorOrientation == 270)
-                              ? Size(previewSize.height, previewSize.width)
-                              : Size(previewSize.width, previewSize.height),
+                          imageSize: Size(
+                            // Note: swap width/height here if needed
+                            previewSize.height,
+                            previewSize.width,
+                          ),
                           isFrontCamera: isFrontCamera,
                           screenSize: constraints.biggest,
                         ),
@@ -820,6 +819,7 @@ class FacePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Apply a counter rotation if needed:
     canvas.save();
     canvas.rotate(-math.pi / 2);
 
@@ -828,26 +828,27 @@ class FacePainter extends CustomPainter {
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
-    for (var face in faces) {
-      // Convert coordinates from image to screen
-      final double scaleX = size.width / imageSize.width;
-      final double scaleY = size.height / imageSize.height;
+    // Since the canvas is rotated, swap the scale factors.
+    final double scaleX = size.height / imageSize.width;
+    final double scaleY = size.width / imageSize.height;
 
+    for (var face in faces) {
       double left = face.boundingBox.left * scaleX;
       double top = face.boundingBox.top * scaleY;
       double right = face.boundingBox.right * scaleX;
       double bottom = face.boundingBox.bottom * scaleY;
 
-      // Mirror if front camera
-      // if (isFrontCamera) {
-      //   final double temp = left;
-      //   left = size.width - right;
-      //   right = size.width - temp;
-      // }
+      if (isFrontCamera) {
+        final double temp = left;
+        left = size.height - right;
+        right = size.height - temp;
+      }
 
       final Rect scaledRect = Rect.fromLTRB(left, top, right, bottom);
       canvas.drawRect(scaledRect, paint);
     }
+
+    canvas.restore();
   }
 
   @override
