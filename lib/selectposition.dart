@@ -3,7 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_place/google_place.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // ✅ สำหรับบันทึกข้อมูล
+import 'package:shared_preferences/shared_preferences.dart';
 import 'setphonenum.dart';
 
 class Selectposition extends StatefulWidget {
@@ -56,43 +56,22 @@ class _SelectpositionState extends State<Selectposition> {
 
     try {
       Position position = await Geolocator.getCurrentPosition(
-          locationSettings:
-              const LocationSettings(accuracy: LocationAccuracy.best));
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.best),
+      );
 
       setState(() {
         _selectedPosition = LatLng(position.latitude, position.longitude);
         _isLoading = false;
       });
 
-      if (mapController != null) {
-        mapController!
-            .animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition!, 15));
-      }
+      mapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(_selectedPosition!, 15),
+      );
 
       _getAddressFromLatLng(_selectedPosition!);
     } catch (e) {
       debugPrint("❌ ไม่สามารถดึงตำแหน่ง GPS ได้: $e");
       setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _getAddressFromLatLng(LatLng position) async {
-    try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-
-      if (placemarks.isNotEmpty) {
-        Placemark place = placemarks.first;
-        String address =
-            "${place.street}, ${place.subLocality}, ${place.locality}, ${place.postalCode}";
-        setState(() {
-          _searchController.text = address;
-        });
-      }
-    } catch (e) {
-      debugPrint("❌ ไม่สามารถดึงที่อยู่จากพิกัดได้: $e");
     }
   }
 
@@ -124,8 +103,7 @@ class _SelectpositionState extends State<Selectposition> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("สิทธิ์ถูกปฏิเสธ"),
-        content: const Text(
-            "กรุณาให้สิทธิ์ตำแหน่งในตั้งค่าแอปเพื่อใช้งานฟีเจอร์นี้"),
+        content: const Text("กรุณาให้สิทธิ์ตำแหน่งในตั้งค่าแอปเพื่อใช้งานฟีเจอร์นี้"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -141,6 +119,25 @@ class _SelectpositionState extends State<Selectposition> {
         ],
       ),
     );
+  }
+
+  Future<void> _getAddressFromLatLng(LatLng position) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks.first;
+        String address = "${place.street}, ${place.subLocality}, ${place.locality}, ${place.postalCode}";
+        setState(() {
+          _searchController.text = address;
+        });
+      }
+    } catch (e) {
+      debugPrint("❌ ไม่สามารถดึงที่อยู่จากพิกัดได้: $e");
+    }
   }
 
   void _onSearchChanged(String value) async {
@@ -169,29 +166,18 @@ class _SelectpositionState extends State<Selectposition> {
         predictions = [];
       });
 
-      if (mapController != null) {
-        mapController!
-            .animateCamera(CameraUpdate.newLatLngZoom(_selectedPosition!, 15));
-      }
+      mapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(_selectedPosition!, 15),
+      );
     }
   }
 
-  Future<void> _moveToCurrentLocation() async {
-    Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-
-    mapController?.animateCamera(
-      CameraUpdate.newLatLngZoom(LatLng(position.latitude, position.longitude), 15),
-    );
-  }
-
-  // ✅ บันทึกตำแหน่งใน SharedPreferences
   Future<void> _saveSelectedLocation() async {
     if (_selectedPosition != null) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble('selected_latitude', _selectedPosition!.latitude);
       await prefs.setDouble('selected_longitude', _selectedPosition!.longitude);
 
-      // นำทางไปหน้า SecondPage
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const SetPhoneNumber()),
@@ -208,30 +194,27 @@ class _SelectpositionState extends State<Selectposition> {
     return Scaffold(
       body: Stack(
         children: [
-          // Google Map
           if (_selectedPosition != null)
             GoogleMap(
               onMapCreated: (controller) {
                 mapController = controller;
-                mapController?.animateCamera(
+                mapController!.animateCamera(
                   CameraUpdate.newLatLngZoom(_selectedPosition!, 15),
                 );
               },
-              initialCameraPosition:
-                  CameraPosition(target: _selectedPosition!, zoom: 15),
-              myLocationEnabled: true, // ✅ Show user location
-              myLocationButtonEnabled: false, // ❌ Hide default button
-              zoomControlsEnabled: false, // ❌ Hide Zoom In/Out buttons
-              mapToolbarEnabled: false, // ❌ Hide additional map tools
+              initialCameraPosition: CameraPosition(
+                target: _selectedPosition!,
+                zoom: 15,
+              ),
+              myLocationEnabled: true,
+              myLocationButtonEnabled: false,
               markers: {
-                if (_selectedPosition != null)
-                  Marker(
-                    markerId: const MarkerId("selected-location"),
-                    position: _selectedPosition!,
-                    infoWindow: const InfoWindow(title: "ตำแหน่งที่เลือก"),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(
-                        BitmapDescriptor.hueRed),
-                  ),
+                Marker(
+                  markerId: const MarkerId('selected-location'),
+                  position: _selectedPosition!,
+                  infoWindow: const InfoWindow(title: "ตำแหน่งที่เลือก"),
+                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                )
               },
               onCameraMove: (position) {
                 setState(() {
@@ -245,81 +228,124 @@ class _SelectpositionState extends State<Selectposition> {
           else
             const Center(child: CircularProgressIndicator()),
 
-          // Search Bar & Custom My Location Button
+          // Search bar
           Positioned(
             top: 40,
             left: 16,
-            right: 80, // Adjusted to fit My Location button
-            child: TextField(
-              controller: _searchController,
-              onSubmitted: (value) async {
-                if (predictions.isNotEmpty) {
-                  _selectLocation(predictions.first.placeId!,
-                      predictions.first.description!);
-                }
-              },
-              onChanged: _onSearchChanged,
-              decoration: InputDecoration(
-                hintText: "ค้นหาสถานที่",
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30),
-                    borderSide: BorderSide.none),
-                prefixIcon: const Icon(Icons.search, color: Colors.blue),
+            right: 60,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6)],
+              ),
+              child: TextField(
+                controller: _searchController,
+                onChanged: _onSearchChanged,
+                onSubmitted: (value) {
+                  if (predictions.isNotEmpty) {
+                    _selectLocation(predictions.first.placeId!, predictions.first.description!);
+                  }
+                },
+                decoration: const InputDecoration(
+                  hintText: "ค้นหาสถานที่",
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  prefixIcon: Icon(Icons.search, color: Colors.blue),
+                ),
               ),
             ),
           ),
 
-          // Custom My Location Button
+          // Current location button (top right)
           Positioned(
             top: 40,
             right: 16,
             child: FloatingActionButton(
               mini: true,
               backgroundColor: Colors.white,
-              onPressed: _moveToCurrentLocation,
-              child: const Icon(Icons.my_location, color: Colors.blue),
+              onPressed: _getCurrentLocation,
+              shape: const CircleBorder(),
+              child: const Icon(Icons.my_location, color: Colors.black),
             ),
           ),
 
-          // Predictions List
+          // Suggestion List
           if (predictions.isNotEmpty)
             Positioned(
               top: 90,
               left: 16,
               right: 16,
-              child: Container(
-                height: 200,
-                color: Colors.white,
+              child: Material(
+                elevation: 3,
                 child: ListView.builder(
                   itemCount: predictions.length,
+                  shrinkWrap: true,
                   itemBuilder: (context, index) {
                     return ListTile(
                       title: Text(predictions[index].description ?? ""),
-                      onTap: () => _selectLocation(
-                        predictions[index].placeId!,
-                        predictions[index].description!,
-                      ),
+                      onTap: () {
+                        _selectLocation(
+                          predictions[index].placeId!,
+                          predictions[index].description!,
+                        );
+                      },
                     );
                   },
                 ),
               ),
             ),
 
-          // Select Button
+          // Floating panel with address + button
           Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16,
-            child: ElevatedButton(
-              onPressed: _saveSelectedLocation, // ✅ Save the selected location
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                padding: const EdgeInsets.symmetric(vertical: 15),
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 25, 20, 20),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(25),
+                  topRight: Radius.circular(25),
+                ),
+                boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
               ),
-              child: const Text("เลือกที่นี่",
-                  style: TextStyle(fontSize: 18, color: Colors.white)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      _searchController.text,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _saveSelectedLocation,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        "เลือกที่นี่",
+                        style: TextStyle(fontSize: 18, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
