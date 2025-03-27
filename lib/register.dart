@@ -793,7 +793,6 @@ class _RegisterPageState extends State<RegisterPage> {
                             previewSize.width,
                           ),
                           isFrontCamera: isFrontCamera,
-                          screenSize: constraints.biggest,
                         ),
                       ),
                     ],
