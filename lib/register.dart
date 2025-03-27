@@ -827,14 +827,14 @@ class FacePainter extends CustomPainter {
     return Rect.fromLTRB(newLeft, newTop, newRight, newBottom);
   }
 
-  /// Mirrors a rectangle horizontally based on the given mirrorWidth.
-  /// Only the left/right (x) coordinates are changed.
-  Rect _mirrorRect(Rect rect, double mirrorWidth) {
+  /// Mirrors a rectangle both horizontally and vertically.
+  /// mirrorWidth and mirrorHeight are the dimensions of the rotated coordinate system.
+  Rect _mirrorRectBoth(Rect rect, double mirrorWidth, double mirrorHeight) {
     return Rect.fromLTRB(
       mirrorWidth - rect.right,
-      rect.top,
+      mirrorHeight - rect.bottom,
       mirrorWidth - rect.left,
-      rect.bottom,
+      mirrorHeight - rect.top,
     );
   }
 
@@ -845,22 +845,22 @@ class FacePainter extends CustomPainter {
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
-    // After a 90° clockwise rotation, the effective image dimensions swap:
-    // rotatedWidth becomes the original image height, and rotatedHeight becomes the original image width.
+    // After a 90° clockwise rotation, the effective dimensions swap:
+    // rotatedWidth is the original image height, and rotatedHeight is the original image width.
     double rotatedWidth = imageSize.height;
     double rotatedHeight = imageSize.width;
 
-    // Scale factors to map the rotated image coordinates to the canvas.
+    // Scale factors to map the rotated coordinates to the canvas.
     final double scaleX = size.width / rotatedWidth;
     final double scaleY = size.height / rotatedHeight;
 
     for (var face in faces) {
-      // Rotate the bounding box.
+      // Rotate the original bounding box.
       Rect rotatedRect = _rotateRect90(face.boundingBox, imageSize);
 
-      // For front camera, mirror horizontally in the rotated coordinate system.
+      // For the front camera, mirror both horizontally and vertically.
       if (isFrontCamera) {
-        rotatedRect = _mirrorRect(rotatedRect, rotatedWidth);
+        rotatedRect = _mirrorRectBoth(rotatedRect, rotatedWidth, rotatedHeight);
       }
 
       // Scale the rotated (and mirrored) rectangle to the canvas dimensions.
@@ -880,5 +880,6 @@ class FacePainter extends CustomPainter {
     return oldDelegate.faces != faces;
   }
 }
+
 
 
