@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'main.dart';
 import 'navigation.dart';
 import 'profile.dart';
 import 'register.dart';
@@ -17,7 +18,6 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
-import 'package:facemind/main.dart';
 
 // Import ML Kit face detection:
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
@@ -57,15 +57,6 @@ class _CameraPageState extends State<CameraPage> {
   bool _processingImage = false;
   List<List<double>> _faceVectors = [];
 
-  // << NEW >>: Store a local BuildContext.
-  late BuildContext _localContext;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _localContext = context as BuildContext;
-  }
-
   @override
   void initState() {
     super.initState();
@@ -85,6 +76,7 @@ class _CameraPageState extends State<CameraPage> {
       // Explicitly load asset data first
       final modelData = await rootBundle.load('assets/MobileFaceNet.tflite');
       final buffer = modelData.buffer;
+
       interpreter = Interpreter.fromBuffer(buffer.asUint8List());
       print('✅ TFLite model loaded successfully from buffer!');
     } catch (e) {
@@ -137,8 +129,10 @@ class _CameraPageState extends State<CameraPage> {
       final int uvSize =
           image.planes[1].bytes.length + image.planes[2].bytes.length;
       final Uint8List nv21 = Uint8List(ySize + uvSize);
+
       // Copy Y plane.
       nv21.setRange(0, ySize, image.planes[0].bytes);
+
       int offset = ySize;
       final int uvPixelStride = image.planes[1].bytesPerPixel!;
       final int uvHeight = image.height ~/ 2;
@@ -649,8 +643,8 @@ class _CameraPageState extends State<CameraPage> {
       // Compare with database.
       Map<String, dynamic>? matchedUser = await _findMatchingUser(vector);
       if (matchedUser != null) {
-        // Use the stored local BuildContext.
-        _showUserInfoOverlay(matchedUser, _localContext);
+        final BuildContext overlayContext = navigatorKey.currentState!.context;
+        _showUserInfoOverlay(matchedUser, overlayContext);
       }
     } catch (e) {
       print("Error in real-time recognition: $e");
