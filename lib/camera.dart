@@ -341,7 +341,7 @@ class _CameraPageState extends State<CameraPage> {
     final db = await _getDatabase();
     final List<Map<String, dynamic>> users = await db.query('users');
 
-    double threshold = 0.5; // Adjust as needed.
+    double threshold = 0.8; // Adjust as needed.
     Map<String, dynamic>? bestMatch;
     double bestDistance = double.infinity;
 
