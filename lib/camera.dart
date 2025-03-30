@@ -30,7 +30,7 @@ class CameraPage extends StatefulWidget {
   _CameraPageState createState() => _CameraPageState();
 }
 
-class _CameraPageState extends State<CameraPage> {
+class _CameraPageState extends State<CameraPage> with RouteAware{
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
   bool _isCameraInitialized = false;
@@ -77,10 +77,36 @@ class _CameraPageState extends State<CameraPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final ModalRoute<dynamic>? route = ModalRoute.of(this.context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void didPushNext() {
+    // When another page is pushed on top, stop face detection.
+    _cameraController?.stopImageStream();
+  }
+
+  @override
+  void didPopNext() {
+    // When returning to this page, restart face detection.
+    _cameraController?.startImageStream((CameraImage cameraImage) {
+      if (!_isDetectingFaces) {
+        _detectFacesFromCamera(cameraImage);
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _timer?.cancel();
     _cameraController?.dispose();
     _faceDetector.close();
+    routeObserver.unsubscribe(this);
     super.dispose();
   }
 
@@ -446,24 +472,39 @@ class _CameraPageState extends State<CameraPage> {
     final db = await _getDatabase();
     final List<Map<String, dynamic>> users = await db.query('users');
 
-    double threshold = 0.8; // Adjust as needed.
+    double similarityThreshold = 0.7; // Adjust threshold as needed (1.0 is a perfect match).
     Map<String, dynamic>? bestMatch;
-    double bestDistance = double.infinity;
+    double bestSimilarity = -1; // Initialize with a low similarity.
 
     for (var user in users) {
       String faceVectorJson = user['face_vector'];
       List<dynamic> stored = jsonDecode(faceVectorJson);
       List<double> storedVector = stored.map((e) => (e as num).toDouble()).toList();
-      double dist = _euclideanDistance(vector, storedVector);
-      print("Distance for user ${user['id']}: $dist");
-      if (dist < threshold && dist < bestDistance) {
-        bestDistance = dist;
+      double similarity = _cosineSimilarity(vector, storedVector);
+      print("😀😀😀Cosine similarity for user ${user['id']}: $similarity");
+
+      if (similarity > similarityThreshold && similarity > bestSimilarity) {
+        bestSimilarity = similarity;
         bestMatch = user;
       }
     }
-    print("Best distance: $bestDistance");
+    print("🅱️🅱️🅱️Best similarity: $bestSimilarity");
     return bestMatch;
   }
+
+  double _cosineSimilarity(List<double> a, List<double> b) {
+    double dot = 0;
+    double normA = 0;
+    double normB = 0;
+    for (int i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+    // Add a small constant to avoid division by zero.
+    return dot / ((math.sqrt(normA) * math.sqrt(normB)) + 1e-10);
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -721,9 +762,9 @@ class _CameraPageState extends State<CameraPage> {
           // BLACK BOX OVERLAY: Show matched user info (or placeholders "??")
           // ---------------------------------------------------------------------
           Positioned(
-            bottom: 180,
-            left: 20,
-            right: 20,
+            bottom: 200,
+            left: 50,
+            right: 50,
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
