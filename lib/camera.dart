@@ -578,8 +578,9 @@ class _CameraPageState extends State<CameraPage> {
   }
 }
 
-/// A custom painter that rotates the face bounding boxes 90° clockwise and mirrors them.
-/// It draws the boxes over the preview based on the provided face detection results.
+/// A custom painter that rotates the face bounding boxes appropriately for each camera.
+/// For the back camera, it rotates the rectangle by 180°.
+/// For the front camera, it rotates the rectangle by +90° (clockwise).
 class FacePainter extends CustomPainter {
   final List<Face> faces;
   final Size imageSize;
@@ -594,8 +595,6 @@ class FacePainter extends CustomPainter {
   });
 
   /// Rotates a rectangle 180°.
-  /// For a point (x, y) in the original image, the transformation is:
-  /// newX = originalWidth - x, newY = originalHeight - y.
   Rect _rotatePlus180(Rect rect, Size originalSize) {
     return Rect.fromLTRB(
       originalSize.width - rect.right,
@@ -605,23 +604,15 @@ class FacePainter extends CustomPainter {
     );
   }
 
-  /// Rotates a rectangle -90° (counterclockwise).
-  /// Transformation: (x, y) => (originalHeight - y, x)
-  Rect _rotateMinus90(Rect rect, Size originalSize) {
-    double newLeft = originalSize.height - rect.bottom;
-    double newTop = rect.left;
-    double newRight = originalSize.height - rect.top;
-    double newBottom = rect.right;
-    return Rect.fromLTRB(newLeft, newTop, newRight, newBottom);
-  }
-
-  /// Mirrors a rectangle horizontally (left/right) in the rotated coordinate system.
-  Rect _mirrorRectHorizontally(Rect rect, double mirrorWidth) {
+  /// Rotates a rectangle +90° (clockwise).
+  /// For a point (x, y) in the original image with width w,
+  /// new coordinates become (y, w - x).
+  Rect _rotatePlus90(Rect rect, Size originalSize) {
     return Rect.fromLTRB(
-      mirrorWidth - rect.right,
       rect.top,
-      mirrorWidth - rect.left,
+      originalSize.width - rect.right,
       rect.bottom,
+      originalSize.width - rect.left,
     );
   }
 
@@ -632,32 +623,27 @@ class FacePainter extends CustomPainter {
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
-    // Process each detected face individually.
     for (var face in faces) {
       Rect rotatedRect;
       double rotatedWidth;
       double rotatedHeight;
       if (!isFrontCamera) {
-        // Back camera: rotate 180° (i.e., two 90° rotations).
+        // Back camera: rotate 180°.
         rotatedRect = _rotatePlus180(face.boundingBox, imageSize);
-        // 180° rotation retains the original dimensions.
         rotatedWidth = imageSize.width;
         rotatedHeight = imageSize.height;
       } else {
-        // Front camera: rotate -90° then mirror horizontally.
-        rotatedRect = _rotateMinus90(face.boundingBox, imageSize);
-        // After -90° rotation, the dimensions swap.
-        rotatedWidth = imageSize.height;
+        // Front camera: rotate +90° (clockwise) without additional mirroring.
+        rotatedRect = _rotatePlus90(face.boundingBox, imageSize);
+        rotatedWidth = imageSize.height; // dimensions swap for 90° rotation.
         rotatedHeight = imageSize.width;
-        // Mirror horizontally using the rotated width.
-        rotatedRect = _mirrorRectHorizontally(rotatedRect, rotatedWidth);
       }
 
-      // Scale factors to map rotated coordinates to the canvas.
+      // Compute scaling factors to map from rotated image coordinates to canvas.
       final double scaleX = size.width / rotatedWidth;
       final double scaleY = size.height / rotatedHeight;
 
-      // Scale the rotated (and optionally mirrored) rectangle.
+      // Scale the rotated rectangle.
       Rect scaledRect = Rect.fromLTRB(
         rotatedRect.left * scaleX,
         rotatedRect.top * scaleY,
@@ -674,6 +660,7 @@ class FacePainter extends CustomPainter {
     return oldDelegate.faces != faces;
   }
 }
+
 
 
 
