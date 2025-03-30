@@ -489,7 +489,7 @@ class _CameraPageState extends State<CameraPage> {
                 ),
                 // Tappable rectangle for last image.
                 FutureBuilder<String?>(
-                  future: _getLastImagePath(),
+                  future: _lastImageFuture,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return GestureDetector(
