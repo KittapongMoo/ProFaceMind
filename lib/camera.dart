@@ -594,26 +594,46 @@ class FacePainter extends CustomPainter {
     required this.screenSize,
   });
 
-  /// Rotates a rectangle +90° clockwise.
-  /// For a point (x, y) with original width w, the new point becomes (y, w - x).
+  /// Computes a rotated bounding box by mapping all four corners with a +90° clockwise rotation.
+  /// For a point (x, y) in the original image (with width w), the rotated point is (y, w - x).
   Rect _rotatePlus90(Rect rect, Size originalSize) {
-    return Rect.fromLTRB(
-      rect.top,
-      originalSize.width - rect.right,
-      rect.bottom,
-      originalSize.width - rect.left,
-    );
+    final p1 = Offset(rect.left, rect.top);
+    final p2 = Offset(rect.right, rect.top);
+    final p3 = Offset(rect.left, rect.bottom);
+    final p4 = Offset(rect.right, rect.bottom);
+
+    final r1 = Offset(p1.dy, originalSize.width - p1.dx);
+    final r2 = Offset(p2.dy, originalSize.width - p2.dx);
+    final r3 = Offset(p3.dy, originalSize.width - p3.dx);
+    final r4 = Offset(p4.dy, originalSize.width - p4.dx);
+
+    final newLeft = math.min(math.min(r1.dx, r2.dx), math.min(r3.dx, r4.dx));
+    final newTop = math.min(math.min(r1.dy, r2.dy), math.min(r3.dy, r4.dy));
+    final newRight = math.max(math.max(r1.dx, r2.dx), math.max(r3.dx, r4.dx));
+    final newBottom = math.max(math.max(r1.dy, r2.dy), math.max(r3.dy, r4.dy));
+
+    return Rect.fromLTRB(newLeft, newTop, newRight, newBottom);
   }
 
-  /// Mirrors a rectangle horizontally.
-  /// [mirrorWidth] should be the width of the rotated image.
-  Rect _mirrorRect(Rect rect, double mirrorWidth) {
-    return Rect.fromLTRB(
-      mirrorWidth - rect.right,
-      rect.top,
-      mirrorWidth - rect.left,
-      rect.bottom,
-    );
+  /// Computes a rotated bounding box by mapping all four corners with a 180° rotation.
+  /// For a point (x, y) in the original image (with size w×h), the rotated point is (w - x, h - y).
+  Rect _rotatePlus180(Rect rect, Size originalSize) {
+    final p1 = Offset(rect.left, rect.top);
+    final p2 = Offset(rect.right, rect.top);
+    final p3 = Offset(rect.left, rect.bottom);
+    final p4 = Offset(rect.right, rect.bottom);
+
+    final r1 = Offset(originalSize.width - p1.dx, originalSize.height - p1.dy);
+    final r2 = Offset(originalSize.width - p2.dx, originalSize.height - p2.dy);
+    final r3 = Offset(originalSize.width - p3.dx, originalSize.height - p3.dy);
+    final r4 = Offset(originalSize.width - p4.dx, originalSize.height - p4.dy);
+
+    final newLeft = math.min(math.min(r1.dx, r2.dx), math.min(r3.dx, r4.dx));
+    final newTop = math.min(math.min(r1.dy, r2.dy), math.min(r3.dy, r4.dy));
+    final newRight = math.max(math.max(r1.dx, r2.dx), math.max(r3.dx, r4.dx));
+    final newBottom = math.max(math.max(r1.dy, r2.dy), math.max(r3.dy, r4.dy));
+
+    return Rect.fromLTRB(newLeft, newTop, newRight, newBottom);
   }
 
   @override
@@ -625,24 +645,27 @@ class FacePainter extends CustomPainter {
 
     for (var face in faces) {
       Rect rotatedRect;
-      // After a 90° clockwise rotation, the dimensions swap.
-      double rotatedWidth = imageSize.height;
-      double rotatedHeight = imageSize.width;
-
-      // Rotate the bounding box.
-      rotatedRect = _rotatePlus90(face.boundingBox, imageSize);
-
-      // If it's the front camera, mirror horizontally.
-      if (isFrontCamera) {
-        rotatedRect = _mirrorRect(rotatedRect, rotatedWidth);
+      double rotatedWidth;
+      double rotatedHeight;
+      if (!isFrontCamera) {
+        // Back camera: apply a +90° rotation.
+        rotatedRect = _rotatePlus90(face.boundingBox, imageSize);
+        // Note: after a 90° rotation, the width and height swap.
+        rotatedWidth = imageSize.height;
+        rotatedHeight = imageSize.width;
+      } else {
+        // Front camera: apply a 180° rotation.
+        rotatedRect = _rotatePlus180(face.boundingBox, imageSize);
+        rotatedWidth = imageSize.width;
+        rotatedHeight = imageSize.height;
       }
 
-      // Compute scale factors to map from rotated image coordinates to canvas size.
+      // Compute scaling factors to map rotated image coordinates to the canvas.
       final double scaleX = size.width / rotatedWidth;
       final double scaleY = size.height / rotatedHeight;
 
       // Scale the rotated rectangle.
-      Rect scaledRect = Rect.fromLTRB(
+      final scaledRect = Rect.fromLTRB(
         rotatedRect.left * scaleX,
         rotatedRect.top * scaleY,
         rotatedRect.right * scaleX,
