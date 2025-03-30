@@ -598,9 +598,9 @@ class FacePainter extends CustomPainter {
   Rect _rotatePlus180(Rect rect, Size originalSize) {
     return Rect.fromLTRB(
       originalSize.width - rect.right,
-      originalSize.height - rect.bottom,
+        rect.top,
       originalSize.width - rect.left,
-      originalSize.height - rect.top,
+        rect.bottom,
     );
   }
 
@@ -609,10 +609,10 @@ class FacePainter extends CustomPainter {
   /// new coordinates become (y, w - x).
   Rect _rotatePlus90(Rect rect, Size originalSize) {
     return Rect.fromLTRB(
+      rect.right,
       rect.top,
-      originalSize.width - rect.right,
+      rect.left,
       rect.bottom,
-      originalSize.width - rect.left,
     );
   }
 
@@ -629,12 +629,12 @@ class FacePainter extends CustomPainter {
       double rotatedHeight;
       if (!isFrontCamera) {
         // Back camera: rotate 180°.
-        rotatedRect = _rotatePlus180(face.boundingBox, imageSize);
+        rotatedRect = _rotatePlus90(face.boundingBox, imageSize);
         rotatedWidth = imageSize.width;
         rotatedHeight = imageSize.height;
       } else {
         // Front camera: rotate +90° (clockwise) without additional mirroring.
-        rotatedRect = _rotatePlus90(face.boundingBox, imageSize);
+        rotatedRect = _rotatePlus180(face.boundingBox, imageSize);
         rotatedWidth = imageSize.height; // dimensions swap for 90° rotation.
         rotatedHeight = imageSize.width;
       }
