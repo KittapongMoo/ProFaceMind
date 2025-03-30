@@ -49,10 +49,10 @@ class _CameraPageState extends State<CameraPage> {
   bool _isDetectingFaces = false;
   List<Face> _faces = [];
 
-  // Cache for last image path future.
+  // Cached future for last image path.
   Future<String?>? _lastImageFuture;
 
-  // Added flags and lists.
+  // Flags and lists.
   bool _isRecognizing = false;
   bool _processingImage = false;
   List<List<double>> _faceVectors = [];
@@ -62,10 +62,26 @@ class _CameraPageState extends State<CameraPage> {
     super.initState();
     // Lock orientation to portrait.
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    // Use a single initState to initialize camera, load model, and cache last image.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeCamera();
     });
     _lastImageFuture = _getLastImagePath();
+    _loadModel();
+  }
+
+  /// Load MobileFaceNet Model via TFLite
+  Future<void> _loadModel() async {
+    try {
+      // Explicitly load asset data first
+      final modelData = await rootBundle.load('assets/MobileFaceNet.tflite');
+      final buffer = modelData.buffer;
+
+      interpreter = Interpreter.fromBuffer(buffer.asUint8List());
+      print('✅ TFLite model loaded successfully from buffer!');
+    } catch (e) {
+      print('❌ Error loading model: $e');
+    }
   }
 
   Future<void> _initializeCamera() async {
@@ -165,7 +181,8 @@ class _CameraPageState extends State<CameraPage> {
   Future<void> _detectFacesFromCamera(CameraImage cameraImage) async {
     _isDetectingFaces = true;
     try {
-      final inputImage = _convertCameraImage(cameraImage, _cameraController!.description);
+      final inputImage =
+      _convertCameraImage(cameraImage, _cameraController!.description);
       if (inputImage == null) {
         _isDetectingFaces = false;
         return;
@@ -500,7 +517,7 @@ class _CameraPageState extends State<CameraPage> {
                 ),
                 // Tappable rectangle for last image.
                 FutureBuilder<String?>(
-                  future: _lastImageFuture, // use cached future (do not invoke)
+                  future: _lastImageFuture,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return GestureDetector(
@@ -619,14 +636,20 @@ class _CameraPageState extends State<CameraPage> {
       final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
       // Run recognition.
       List<double> vector = await _runFaceRecognition(processedBytes);
-      print("💕💕💕💕Real-time face vector: $vector");
+      print("Real-time face vector: $vector");
       if (vector.every((element) => element == 0)) {
-        print("🦓🦓🦓🦓🦓Face vector is all zeros. Check image preprocessing.");
+        print("Face vector is all zeros. Check image preprocessing.");
       }
       // Compare with database.
       Map<String, dynamic>? matchedUser = await _findMatchingUser(vector);
       if (matchedUser != null) {
-        _showUserInfoOverlay(matchedUser, navigatorKey.currentContext!);
+        BuildContext overlayContext;
+        if (navigatorKey.currentContext != null) {
+          overlayContext = navigatorKey.currentContext!;
+        } else {
+          overlayContext = this.context;
+        }
+        _showUserInfoOverlay(matchedUser, overlayContext);
       }
     } catch (e) {
       print("Error in real-time recognition: $e");
@@ -683,7 +706,7 @@ class _CameraPageState extends State<CameraPage> {
         bestMatch = user;
       }
     }
-    print("🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢Best distance: $bestDistance");
+    print("Best distance: $bestDistance");
     return bestMatch;
   }
 
