@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'main.dart';
 import 'navigation.dart';
 import 'profile.dart';
 import 'register.dart';
@@ -17,7 +18,6 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
-import 'package:facemind/main.dart';
 
 // Import ML Kit face detection:
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
@@ -643,12 +643,7 @@ class _CameraPageState extends State<CameraPage> {
       // Compare with database.
       Map<String, dynamic>? matchedUser = await _findMatchingUser(vector);
       if (matchedUser != null) {
-        BuildContext overlayContext;
-        if (navigatorKey.currentContext != null) {
-          overlayContext = navigatorKey.currentContext!;
-        } else {
-          overlayContext = this.context;
-        }
+        final BuildContext overlayContext = navigatorKey.currentState!.context;
         _showUserInfoOverlay(matchedUser, overlayContext);
       }
     } catch (e) {
