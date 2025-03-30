@@ -1,3 +1,4 @@
+import 'dart:async'; // For Timer
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -46,34 +47,40 @@ class _CameraPageState extends State<CameraPage> {
       enableTracking: true,
     ),
   );
-  bool _isDetectingFaces = false;
-  List<Face> _faces = [];
 
   // Cached future for last image path.
   Future<String?>? _lastImageFuture;
 
-  // Flags and lists.
-  bool _isRecognizing = false;
-  bool _processingImage = false;
-  List<List<double>> _faceVectors = [];
+  /// Store matched user info here. If null => no overlay.
+  Map<String, dynamic>? _matchedUser;
 
-  /// Store matched user info here. If null => no match => no overlay.
-  Map<String, dynamic>? _matchedUser; // <-- ADDED
+  Timer? _timer; // Timer for periodic recognition
 
   @override
   void initState() {
     super.initState();
     // Lock orientation to portrait.
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    // Initialize camera, load model, and cache last image.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeCamera();
     });
     _lastImageFuture = _getLastImagePath();
     _loadModel();
+    // Start a timer to check for a face match every 10 seconds.
+    _timer = Timer.periodic(const Duration(seconds: 10), (Timer timer) {
+      _recognizeFace();
+    });
   }
 
-  /// Load MobileFaceNet Model via TFLite
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _cameraController?.dispose();
+    _faceDetector.close();
+    super.dispose();
+  }
+
+  /// Load MobileFaceNet Model via TFLite.
   Future<void> _loadModel() async {
     try {
       final modelData = await rootBundle.load('assets/MobileFaceNet.tflite');
@@ -107,11 +114,6 @@ class _CameraPageState extends State<CameraPage> {
         // Lock preview to portrait.
         await _cameraController!.lockCaptureOrientation(DeviceOrientation.portraitUp);
 
-        // Start image stream for face detection.
-        _cameraController!.startImageStream((CameraImage cameraImage) {
-          _detectFacesFromCamera(cameraImage);
-        });
-
         if (!mounted) return;
         setState(() {
           _isCameraInitialized = true;
@@ -121,120 +123,6 @@ class _CameraPageState extends State<CameraPage> {
     } catch (e) {
       print('Error initializing camera: $e');
     }
-  }
-
-  /// Convert a [CameraImage] in YUV420 format to an [InputImage] for ML Kit.
-  InputImage? _convertCameraImage(CameraImage image, CameraDescription camera) {
-    try {
-      final int ySize = image.planes[0].bytes.length;
-      final int uvSize =
-          image.planes[1].bytes.length + image.planes[2].bytes.length;
-      final Uint8List nv21 = Uint8List(ySize + uvSize);
-
-      // Copy Y plane.
-      nv21.setRange(0, ySize, image.planes[0].bytes);
-
-      int offset = ySize;
-      final int uvPixelStride = image.planes[1].bytesPerPixel!;
-      final int uvHeight = image.height ~/ 2;
-      final int uvWidth = image.width ~/ 2;
-      for (int row = 0; row < uvHeight; row++) {
-        final int rowOffset1 = row * image.planes[1].bytesPerRow;
-        final int rowOffset2 = row * image.planes[2].bytesPerRow;
-        for (int col = 0; col < uvWidth; col++) {
-          nv21[offset++] =
-          image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
-          nv21[offset++] =
-          image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
-        }
-      }
-      final imageSize = Size(image.width.toDouble(), image.height.toDouble());
-      // Get rotation based on sensor orientation.
-      InputImageRotation imageRotation;
-      switch (camera.sensorOrientation) {
-        case 0:
-          imageRotation = InputImageRotation.rotation0deg;
-          break;
-        case 90:
-          imageRotation = InputImageRotation.rotation90deg;
-          break;
-        case 180:
-          imageRotation = InputImageRotation.rotation180deg;
-          break;
-        case 270:
-          imageRotation = InputImageRotation.rotation270deg;
-          break;
-        default:
-          imageRotation = InputImageRotation.rotation0deg;
-      }
-      final metadata = InputImageMetadata(
-        size: imageSize,
-        rotation: imageRotation,
-        format: InputImageFormat.nv21,
-        bytesPerRow: image.planes[0].bytesPerRow,
-      );
-      return InputImage.fromBytes(bytes: nv21, metadata: metadata);
-    } catch (e) {
-      print("Error converting camera image: $e");
-      return null;
-    }
-  }
-
-  /// Process the camera image to detect faces.
-  Future<void> _detectFacesFromCamera(CameraImage cameraImage) async {
-    _isDetectingFaces = true;
-    try {
-      final inputImage =
-      _convertCameraImage(cameraImage, _cameraController!.description);
-      if (inputImage == null) {
-        _isDetectingFaces = false;
-        return;
-      }
-      final faces = await _faceDetector.processImage(inputImage);
-      if (mounted) {
-        setState(() {
-          _faces = faces;
-        });
-        // If a face is detected and we're not already recognizing, trigger recognition.
-        if (faces.isNotEmpty && !_isRecognizing) {
-          _recognizeFace();
-        }
-      }
-    } catch (e) {
-      print("Error detecting faces: $e");
-    } finally {
-      _isDetectingFaces = false;
-    }
-  }
-
-  Future<void> _takePicture() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized)
-      return;
-    if (!_cameraController!.value.isTakingPicture) {
-      try {
-        final image = await _cameraController!.takePicture();
-        setState(() {
-          _capturedImage = image;
-        });
-      } catch (e) {
-        print('Error capturing image: $e');
-      }
-    }
-  }
-
-  void _switchCamera() async {
-    setState(() {
-      _isFrontCamera = !_isFrontCamera;
-      _isCameraInitialized = false;
-    });
-    await _initializeCamera();
-  }
-
-  @override
-  void dispose() {
-    _cameraController?.dispose();
-    _faceDetector.close();
-    super.dispose();
   }
 
   Future<Database> _getDatabase() async {
@@ -284,10 +172,8 @@ class _CameraPageState extends State<CameraPage> {
     return null;
   }
 
-  Uint8List _imageToByteListFloat32(
-      img.Image image, int inputSize, double mean, double std) {
-    final Float32List convertedBytes =
-    Float32List(1 * inputSize * inputSize * 3);
+  Uint8List _imageToByteListFloat32(img.Image image, int inputSize, double mean, double std) {
+    final Float32List convertedBytes = Float32List(1 * inputSize * inputSize * 3);
     int pixelIndex = 0;
     for (int y = 0; y < inputSize; y++) {
       for (int x = 0; x < inputSize; x++) {
@@ -324,8 +210,7 @@ class _CameraPageState extends State<CameraPage> {
     } else if (sensorOrientation == 270) {
       rotationAngle = -math.pi / 2;
     }
-    final bool isFrontCamera =
-        _cameraController!.description.lensDirection == CameraLensDirection.front;
+    final bool isFrontCamera = _cameraController!.description.lensDirection == CameraLensDirection.front;
     final Matrix4 transformMatrix = isFrontCamera
         ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
         : Matrix4.rotationZ(rotationAngle);
@@ -340,20 +225,7 @@ class _CameraPageState extends State<CameraPage> {
                 child: Transform(
                   alignment: Alignment.center,
                   transform: transformMatrix,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CameraPreview(_cameraController!),
-                      CustomPaint(
-                        painter: FacePainter(
-                          faces: _faces,
-                          imageSize: Size(previewSize.height, previewSize.width),
-                          isFrontCamera: isFrontCamera,
-                          screenSize: constraints.biggest,
-                        ),
-                      ),
-                    ],
-                  ),
+                  child: CameraPreview(_cameraController!),
                 ),
               ),
             ),
@@ -363,21 +235,13 @@ class _CameraPageState extends State<CameraPage> {
     );
   }
 
-  //////////////////////////////////////////////////////////////////////////////
-  // REAL-TIME FACE RECOGNITION FUNCTIONS
-  //////////////////////////////////////////////////////////////////////////////
-
-  /// Trigger face recognition in real time.
+  /// Trigger face recognition every 10 seconds.
   Future<void> _recognizeFace() async {
-    if (_isRecognizing) return;
-    _isRecognizing = true;
+    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
     try {
-      // Stop image stream to capture a clear frame.
-      await _cameraController!.stopImageStream();
-
       // Capture the picture.
       final XFile imageFile = await _cameraController!.takePicture();
-      print("Real-time picture taken: ${imageFile.path}");
+      print("Picture taken: ${imageFile.path}");
 
       // Read and decode the image using package:image.
       final Uint8List bytes = await imageFile.readAsBytes();
@@ -386,9 +250,25 @@ class _CameraPageState extends State<CameraPage> {
         print("Failed to decode captured image");
         return;
       }
-      // Use the first detected face bounding box.
-      if (_faces.isEmpty) return;
-      final face = _faces.first;
+
+      // Use ML Kit to detect faces in the captured image.
+      final inputImage = InputImage.fromFilePath(imageFile.path);
+      final List<Face> faces = await _faceDetector.processImage(inputImage);
+
+      // If no face is detected, update overlay with placeholders.
+      if (faces.isEmpty) {
+        setState(() {
+          _matchedUser = {
+            "nickname": "??",
+            "name": "??",
+            "relation": "??"
+          };
+        });
+        return;
+      }
+
+      // Use the first detected face.
+      final face = faces.first;
       Rect bbox = face.boundingBox;
 
       // Ensure the crop coordinates are within image bounds.
@@ -396,38 +276,37 @@ class _CameraPageState extends State<CameraPage> {
       int cropY = bbox.top.floor().clamp(0, decodedImage.height - 1);
       int cropW = bbox.width.floor().clamp(0, decodedImage.width - cropX);
       int cropH = bbox.height.floor().clamp(0, decodedImage.height - cropY);
-      final img.Image croppedImage =
-      img.copyCrop(decodedImage, cropX, cropY, cropW, cropH);
+      final img.Image croppedImage = img.copyCrop(decodedImage, cropX, cropY, cropW, cropH);
 
-      // Resize the cropped face to the expected input size for MobileFaceNet (112x112).
-      final img.Image resizedFace =
-      img.copyResize(croppedImage, width: 112, height: 112);
-
-      final Uint8List processedBytes =
-      _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
+      // Resize the cropped face to 112x112.
+      final img.Image resizedFace = img.copyResize(croppedImage, width: 112, height: 112);
+      final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
 
       // Run recognition.
       List<double> vector = await _runFaceRecognition(processedBytes);
-      print("Real-time face vector: $vector");
+      print("Face vector: $vector");
       if (vector.every((element) => element == 0)) {
         print("Face vector is all zeros. Check image preprocessing.");
       }
 
       // Compare with database.
       Map<String, dynamic>? matchedUser = await _findMatchingUser(vector);
-
-      // If match, set matched user; otherwise set null.
-      setState(() {
-        _matchedUser = matchedUser; // <-- ADDED
-      });
+      if (matchedUser == null) {
+        // No matching user found; show placeholders.
+        setState(() {
+          _matchedUser = {
+            "nickname": "??",
+            "name": "??",
+            "relation": "??"
+          };
+        });
+      } else {
+        setState(() {
+          _matchedUser = matchedUser;
+        });
+      }
     } catch (e) {
-      print("Error in real-time recognition: $e");
-    } finally {
-      // Restart image stream.
-      _cameraController!.startImageStream((CameraImage cameraImage) {
-        _detectFacesFromCamera(cameraImage);
-      });
-      _isRecognizing = false;
+      print("Error in recognition: $e");
     }
   }
 
@@ -462,7 +341,7 @@ class _CameraPageState extends State<CameraPage> {
     final db = await _getDatabase();
     final List<Map<String, dynamic>> users = await db.query('users');
 
-    double threshold = 0.6; // Adjust as needed
+    double threshold = 0.5; // Adjust as needed.
     Map<String, dynamic>? bestMatch;
     double bestDistance = double.infinity;
 
@@ -471,13 +350,13 @@ class _CameraPageState extends State<CameraPage> {
       List<dynamic> stored = jsonDecode(faceVectorJson);
       List<double> storedVector = stored.map((e) => (e as num).toDouble()).toList();
       double dist = _euclideanDistance(vector, storedVector);
-      print("😊😊😊😊😊Distance for user ${user['id']}: $dist");
+      print("😊😊😊Distance for user ${user['id']}: $dist");
       if (dist < threshold && dist < bestDistance) {
         bestDistance = dist;
         bestMatch = user;
       }
     }
-    print("❤️❤️❤️❤️❤️Best distance: $bestDistance");
+    print("❤️❤️❤️Best distance: $bestDistance");
     return bestMatch;
   }
 
@@ -486,10 +365,10 @@ class _CameraPageState extends State<CameraPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // Camera preview with face overlay.
+          // Camera preview.
           Positioned.fill(child: _buildCameraPreview(context)),
 
-          // Profile button (top-left)
+          // Profile button (top-left).
           Positioned(
             top: 40,
             left: 20,
@@ -507,7 +386,7 @@ class _CameraPageState extends State<CameraPage> {
             ),
           ),
 
-          // Phone button (top-right)
+          // Phone button (top-right).
           Positioned(
             top: 40,
             right: 20,
@@ -518,8 +397,7 @@ class _CameraPageState extends State<CameraPage> {
                 onPressed: () async {
                   final prefs = await SharedPreferences.getInstance();
                   final name = prefs.getString('emergency_name') ?? 'ไม่พบชื่อ';
-                  final relation =
-                      prefs.getString('emergency_relation') ?? 'ไม่พบความสัมพันธ์';
+                  final relation = prefs.getString('emergency_relation') ?? 'ไม่พบความสัมพันธ์';
                   final phone = prefs.getString('emergency_phone') ?? 'ไม่พบเบอร์โทร';
                   showDialog(
                     context: context,
@@ -528,8 +406,7 @@ class _CameraPageState extends State<CameraPage> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      insetPadding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 100),
+                      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 100),
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
                         child: Column(
@@ -552,8 +429,7 @@ class _CameraPageState extends State<CameraPage> {
                                   onTap: () => Navigator.pop(context),
                                   child: const Padding(
                                     padding: EdgeInsets.all(8),
-                                    child:
-                                    Icon(Icons.close, size: 22, color: Colors.grey),
+                                    child: Icon(Icons.close, size: 22, color: Colors.grey),
                                   ),
                                 ),
                               ],
@@ -591,8 +467,7 @@ class _CameraPageState extends State<CameraPage> {
                                     Navigator.pop(context);
                                     Navigator.push(
                                       context,
-                                      MaterialPageRoute(
-                                          builder: (context) => const SetPhoneNumber()),
+                                      MaterialPageRoute(builder: (context) => const SetPhoneNumber()),
                                     );
                                   },
                                   child: Padding(
@@ -600,8 +475,7 @@ class _CameraPageState extends State<CameraPage> {
                                     child: CircleAvatar(
                                       radius: 25,
                                       backgroundColor: Colors.blue,
-                                      child: const Icon(Icons.edit,
-                                          size: 25, color: Colors.white),
+                                      child: const Icon(Icons.edit, size: 25, color: Colors.white),
                                     ),
                                   ),
                                 ),
@@ -617,7 +491,7 @@ class _CameraPageState extends State<CameraPage> {
             ),
           ),
 
-          // Flip camera button (top center)
+          // Flip camera button (top center).
           Positioned(
             top: 40,
             left: MediaQuery.of(context).size.width / 2 - 25,
@@ -625,7 +499,13 @@ class _CameraPageState extends State<CameraPage> {
               backgroundColor: Colors.white,
               child: IconButton(
                 icon: const Icon(Icons.flip_camera_ios, color: Colors.black),
-                onPressed: _switchCamera,
+                onPressed: () {
+                  setState(() {
+                    _isFrontCamera = !_isFrontCamera;
+                    _isCameraInitialized = false;
+                  });
+                  _initializeCamera();
+                },
               ),
             ),
           ),
@@ -733,46 +613,43 @@ class _CameraPageState extends State<CameraPage> {
           ),
 
           // ---------------------------------------------------------------------
-          // BLACK BOX OVERLAY: Only show if _matchedUser != null
+          // BLACK BOX OVERLAY: Show matched user info (or placeholder "??")
           // ---------------------------------------------------------------------
-          if (_matchedUser != null) // <-- ADDED
-            Positioned(
-              // Position it as you like. Here is an example near the top/middle.
-              bottom: 180,
-              left: 20,
-              right: 20,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.black87,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'ชื่อเล่น : ${_matchedUser!['nickname']}',
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                    Text(
-                      'ชื่อ : ${_matchedUser!['name']}',
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                    Text(
-                      'ความสัมพันธ์ : ${_matchedUser!['relation']}',
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                  ],
-                ),
+          Positioned(
+            bottom: 180,
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.black87,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ชื่อเล่น : ${_matchedUser?['nickname'] ?? "??"}',
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                  Text(
+                    'ชื่อ : ${_matchedUser?['name'] ?? "??"}',
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                  Text(
+                    'ความสัมพันธ์ : ${_matchedUser?['relation'] ?? "??"}',
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ],
               ),
             ),
+          ),
         ],
       ),
     );
   }
 }
 
-/// A custom painter that rotates the face bounding boxes appropriately.
 class FacePainter extends CustomPainter {
   final List<Face> faces;
   final Size imageSize;
@@ -786,7 +663,6 @@ class FacePainter extends CustomPainter {
     required this.screenSize,
   });
 
-  /// Rotates a rectangle 90° clockwise.
   Rect _rotateRect90(Rect rect, Size originalSize) {
     double newLeft = rect.top;
     double newTop = originalSize.width - rect.right;
@@ -795,7 +671,6 @@ class FacePainter extends CustomPainter {
     return Rect.fromLTRB(newLeft, newTop, newRight, newBottom);
   }
 
-  /// Mirrors a rectangle both horizontally and vertically.
   Rect _mirrorRectBoth(Rect rect, double mirrorWidth, double mirrorHeight) {
     return Rect.fromLTRB(
       mirrorWidth - rect.right,
@@ -812,10 +687,8 @@ class FacePainter extends CustomPainter {
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
-    // After a 90° rotation, the effective dimensions swap:
     double rotatedWidth = imageSize.height;
     double rotatedHeight = imageSize.width;
-
     final double scaleX = size.width / rotatedWidth;
     final double scaleY = size.height / rotatedHeight;
 
