@@ -619,7 +619,10 @@ class _CameraPageState extends State<CameraPage> {
       final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
       // Run recognition.
       List<double> vector = await _runFaceRecognition(processedBytes);
-      print("Real-time face vector: $vector");
+      print("💕💕💕💕Real-time face vector: $vector");
+      if (vector.every((element) => element == 0)) {
+        print("🦓🦓🦓🦓🦓Face vector is all zeros. Check image preprocessing.");
+      }
       // Compare with database.
       Map<String, dynamic>? matchedUser = await _findMatchingUser(vector);
       if (matchedUser != null) {
@@ -666,7 +669,7 @@ class _CameraPageState extends State<CameraPage> {
   Future<Map<String, dynamic>?> _findMatchingUser(List<double> vector) async {
     final db = await _getDatabase();
     final List<Map<String, dynamic>> users = await db.query('users');
-    double threshold = 0.6; // Adjust threshold as needed.
+    double threshold = 0.6; // You might try a higher threshold, e.g., 0.8
     Map<String, dynamic>? bestMatch;
     double bestDistance = double.infinity;
     for (var user in users) {
@@ -674,11 +677,13 @@ class _CameraPageState extends State<CameraPage> {
       List<dynamic> stored = jsonDecode(faceVectorJson);
       List<double> storedVector = stored.map((e) => (e as num).toDouble()).toList();
       double dist = _euclideanDistance(vector, storedVector);
+      print("Distance for user ${user['id']}: $dist");
       if (dist < threshold && dist < bestDistance) {
         bestDistance = dist;
         bestMatch = user;
       }
     }
+    print("🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢Best distance: $bestDistance");
     return bestMatch;
   }
 
