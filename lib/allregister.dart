@@ -1,8 +1,9 @@
+// ... ส่วน import คงเดิม
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
-import 'personinfo.dart'; // Import your PersonInfoPage
+import 'personinfo.dart';
 
 class AllRegisterPage extends StatefulWidget {
   const AllRegisterPage({Key? key}) : super(key: key);
@@ -20,22 +21,15 @@ class _AllRegisterPageState extends State<AllRegisterPage> {
     _usersFuture = _loadUsers();
   }
 
-  /// Opens (or creates) the local SQLite database.
   Future<Database> _getDatabase() async {
     final dbPath = await getDatabasesPath();
     final path = p.join(dbPath, 'facemind.db');
-    return openDatabase(
-      path,
-      version: 2,
-    );
+    return openDatabase(path, version: 2);
   }
 
-  /// Loads the user records along with the first (oldest) image from user_images.
   Future<List<Map<String, dynamic>>> _loadUsers() async {
     final db = await _getDatabase();
-    // This query returns each user's id, nickname, and the first image.
-    // If primary_image is set (non-empty) it takes precedence; otherwise, it uses the minimum image_path from user_images.
-    final List<Map<String, dynamic>> results = await db.rawQuery('''
+    return await db.rawQuery('''
       SELECT 
         u.id, 
         u.nickname, 
@@ -49,104 +43,153 @@ class _AllRegisterPageState extends State<AllRegisterPage> {
       GROUP BY u.id
       ORDER BY u.id DESC
     ''');
-    return results;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('ผู้คน'),
-        centerTitle: true,
-      ),
-      body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _usersFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'));
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('ยังไม่มีการลงทะเบียนผู้ใช้'));
-          }
-
-          final users = snapshot.data!;
-
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: GridView.builder(
-              itemCount: users.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.7,
-              ),
-              itemBuilder: (context, index) {
-                final user = users[index];
-                final nickname = user['nickname'] ?? '';
-                final firstImage = user['first_image'] as String?;
-
-                // Wrap the grid item in a GestureDetector to handle taps.
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => PersonInfoPage(userId: user['id']),
-                      ),
-                    ).then((result) {
-                      if (result == true) {
-                        setState(() {
-                          _usersFuture = _loadUsers();
-                        });
-                      }
-                    });
-                  },
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Use a rectangle with rounded edges for the image.
-                      if (firstImage != null &&
-                          firstImage.isNotEmpty &&
-                          File(firstImage).existsSync())
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(27),
-                          child: Image.file(
-                            File(firstImage),
-                            width: 80,
-                            height: 80,
-                            fit: BoxFit.cover,
-                          ),
-                        )
-                      else
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: Colors.grey,
-                            borderRadius: BorderRadius.circular(27),
-                          ),
-                          child:
-                          const Icon(Icons.person, color: Colors.white),
-                        ),
-                      const SizedBox(height: 8),
-                      Text(
-                        nickname,
-                        style: const TextStyle(fontSize: 16),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+      backgroundColor: const Color(0xFFF5F8FC),
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              const SizedBox(height: 60),
+              const Center(
+                child: Text(
+                  'ผู้คน',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    shadows: [
+                      Shadow(
+                        offset: Offset(1, 2),
+                        blurRadius: 3,
+                        color: Colors.black26,
                       ),
                     ],
                   ),
-                );
-              },
+                ),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _usersFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'));
+                    }
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const Center(child: Text('ยังไม่มีการลงทะเบียนผู้ใช้'));
+                    }
+
+                    final users = snapshot.data!;
+
+                    return Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: GridView.builder(
+                        itemCount: users.length,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 0.75, // เพิ่มสัดส่วนให้ภาพใหญ่ขึ้น
+                        ),
+                        itemBuilder: (context, index) {
+                          final user = users[index];
+                          final nickname = user['nickname'] ?? '';
+                          final firstImage = user['first_image'] as String?;
+
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PersonInfoPage(userId: user['id']),
+                                ),
+                              ).then((result) {
+                                if (result == true) {
+                                  setState(() {
+                                    _usersFuture = _loadUsers();
+                                  });
+                                }
+                              });
+                            },
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (firstImage != null &&
+                                    firstImage.isNotEmpty &&
+                                    File(firstImage).existsSync())
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(30),
+                                    child: Image.file(
+                                      File(firstImage),
+                                      width: 105,
+                                      height: 105,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  )
+                                else
+                                  Container(
+                                    width: 105,
+                                    height: 105,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey,
+                                      borderRadius: BorderRadius.circular(30),
+                                    ),
+                                    child: const Icon(Icons.person, color: Colors.white, size: 48),
+                                  ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  nickname.isNotEmpty ? nickname : 'ไม่มีข้อมูล',
+                                  style: const TextStyle(fontSize: 16),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+
+          // 🔙 Back Button
+          Positioned(
+            top: 40,
+            left: 16,
+            child: FloatingActionButton(
+              onPressed: () => Navigator.pop(context),
+              backgroundColor: Colors.white,
+              shape: const CircleBorder(),
+              elevation: 4,
+              child: const Icon(Icons.arrow_back, color: Colors.black),
             ),
-          );
-        },
+          ),
+
+          // ➕ Next Page Placeholder
+          Positioned(
+            top: 40,
+            right: 16,
+            child: FloatingActionButton(
+              onPressed: () {
+                // TODO: Add navigation
+              },
+              backgroundColor: Colors.white,
+              shape: const CircleBorder(),
+              elevation: 4,
+              child: const Icon(Icons.access_time, color: Colors.black),
+            ),
+          ),
+        ],
       ),
     );
   }
