@@ -57,12 +57,15 @@ class _CameraPageState extends State<CameraPage> {
   bool _processingImage = false;
   List<List<double>> _faceVectors = [];
 
+  /// Store matched user info here. If null => no match => no overlay.
+  Map<String, dynamic>? _matchedUser; // <-- ADDED
+
   @override
   void initState() {
     super.initState();
     // Lock orientation to portrait.
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    // Use a single initState to initialize camera, load model, and cache last image.
+    // Initialize camera, load model, and cache last image.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeCamera();
     });
@@ -73,10 +76,8 @@ class _CameraPageState extends State<CameraPage> {
   /// Load MobileFaceNet Model via TFLite
   Future<void> _loadModel() async {
     try {
-      // Explicitly load asset data first
       final modelData = await rootBundle.load('assets/MobileFaceNet.tflite');
       final buffer = modelData.buffer;
-
       interpreter = Interpreter.fromBuffer(buffer.asUint8List());
       print('✅ TFLite model loaded successfully from buffer!');
     } catch (e) {
@@ -141,8 +142,10 @@ class _CameraPageState extends State<CameraPage> {
         final int rowOffset1 = row * image.planes[1].bytesPerRow;
         final int rowOffset2 = row * image.planes[2].bytesPerRow;
         for (int col = 0; col < uvWidth; col++) {
-          nv21[offset++] = image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
-          nv21[offset++] = image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
+          nv21[offset++] =
+          image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
+          nv21[offset++] =
+          image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
         }
       }
       final imageSize = Size(image.width.toDouble(), image.height.toDouble());
@@ -205,7 +208,8 @@ class _CameraPageState extends State<CameraPage> {
   }
 
   Future<void> _takePicture() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+    if (_cameraController == null || !_cameraController!.value.isInitialized)
+      return;
     if (!_cameraController!.value.isTakingPicture) {
       try {
         final image = await _cameraController!.takePicture();
@@ -280,8 +284,10 @@ class _CameraPageState extends State<CameraPage> {
     return null;
   }
 
-  Uint8List _imageToByteListFloat32(img.Image image, int inputSize, double mean, double std) {
-    final Float32List convertedBytes = Float32List(1 * inputSize * inputSize * 3);
+  Uint8List _imageToByteListFloat32(
+      img.Image image, int inputSize, double mean, double std) {
+    final Float32List convertedBytes =
+    Float32List(1 * inputSize * inputSize * 3);
     int pixelIndex = 0;
     for (int y = 0; y < inputSize; y++) {
       for (int x = 0; x < inputSize; x++) {
@@ -299,7 +305,9 @@ class _CameraPageState extends State<CameraPage> {
 
   /// Build the camera preview.
   Widget _buildCameraPreview(BuildContext context) {
-    if (!_isCameraInitialized || _cameraController == null || !_cameraController!.value.isInitialized) {
+    if (!_isCameraInitialized ||
+        _cameraController == null ||
+        !_cameraController!.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
     final previewSize = _cameraController!.value.previewSize!;
@@ -316,7 +324,8 @@ class _CameraPageState extends State<CameraPage> {
     } else if (sensorOrientation == 270) {
       rotationAngle = -math.pi / 2;
     }
-    final bool isFrontCamera = _cameraController!.description.lensDirection == CameraLensDirection.front;
+    final bool isFrontCamera =
+        _cameraController!.description.lensDirection == CameraLensDirection.front;
     final Matrix4 transformMatrix = isFrontCamera
         ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
         : Matrix4.rotationZ(rotationAngle);
@@ -354,6 +363,124 @@ class _CameraPageState extends State<CameraPage> {
     );
   }
 
+  //////////////////////////////////////////////////////////////////////////////
+  // REAL-TIME FACE RECOGNITION FUNCTIONS
+  //////////////////////////////////////////////////////////////////////////////
+
+  /// Trigger face recognition in real time.
+  Future<void> _recognizeFace() async {
+    if (_isRecognizing) return;
+    _isRecognizing = true;
+    try {
+      // Stop image stream to capture a clear frame.
+      await _cameraController!.stopImageStream();
+
+      // Capture the picture.
+      final XFile imageFile = await _cameraController!.takePicture();
+      print("Real-time picture taken: ${imageFile.path}");
+
+      // Read and decode the image using package:image.
+      final Uint8List bytes = await imageFile.readAsBytes();
+      final img.Image? decodedImage = img.decodeImage(bytes);
+      if (decodedImage == null) {
+        print("Failed to decode captured image");
+        return;
+      }
+      // Use the first detected face bounding box.
+      if (_faces.isEmpty) return;
+      final face = _faces.first;
+      Rect bbox = face.boundingBox;
+
+      // Ensure the crop coordinates are within image bounds.
+      int cropX = bbox.left.floor().clamp(0, decodedImage.width - 1);
+      int cropY = bbox.top.floor().clamp(0, decodedImage.height - 1);
+      int cropW = bbox.width.floor().clamp(0, decodedImage.width - cropX);
+      int cropH = bbox.height.floor().clamp(0, decodedImage.height - cropY);
+      final img.Image croppedImage =
+      img.copyCrop(decodedImage, cropX, cropY, cropW, cropH);
+
+      // Resize the cropped face to the expected input size for MobileFaceNet (112x112).
+      final img.Image resizedFace =
+      img.copyResize(croppedImage, width: 112, height: 112);
+
+      final Uint8List processedBytes =
+      _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
+
+      // Run recognition.
+      List<double> vector = await _runFaceRecognition(processedBytes);
+      print("Real-time face vector: $vector");
+      if (vector.every((element) => element == 0)) {
+        print("Face vector is all zeros. Check image preprocessing.");
+      }
+
+      // Compare with database.
+      Map<String, dynamic>? matchedUser = await _findMatchingUser(vector);
+
+      // If match, set matched user; otherwise set null.
+      setState(() {
+        _matchedUser = matchedUser; // <-- ADDED
+      });
+    } catch (e) {
+      print("Error in real-time recognition: $e");
+    } finally {
+      // Restart image stream.
+      _cameraController!.startImageStream((CameraImage cameraImage) {
+        _detectFacesFromCamera(cameraImage);
+      });
+      _isRecognizing = false;
+    }
+  }
+
+  /// Run face recognition using tflite_flutter.
+  Future<List<double>> _runFaceRecognition(Uint8List imageBytes) async {
+    if (interpreter == null) {
+      print("Interpreter not initialized");
+      return List.filled(128, 0.0);
+    }
+    try {
+      var input = imageBytes.buffer.asFloat32List().reshape([1, 112, 112, 3]);
+      var output = List.filled(1 * 128, 0).reshape([1, 128]);
+      interpreter!.run(input, output);
+      return List<double>.from(output[0]);
+    } catch (e) {
+      print("Error running face recognition: $e");
+      return List.filled(128, 0.0);
+    }
+  }
+
+  /// Compute Euclidean distance between two vectors.
+  double _euclideanDistance(List<double> a, List<double> b) {
+    double sum = 0;
+    for (int i = 0; i < a.length; i++) {
+      sum += math.pow(a[i] - b[i], 2);
+    }
+    return math.sqrt(sum);
+  }
+
+  /// Find a matching user in the database by comparing face vectors.
+  Future<Map<String, dynamic>?> _findMatchingUser(List<double> vector) async {
+    final db = await _getDatabase();
+    final List<Map<String, dynamic>> users = await db.query('users');
+
+    double threshold = 0.6; // Adjust as needed
+    Map<String, dynamic>? bestMatch;
+    double bestDistance = double.infinity;
+
+    for (var user in users) {
+      String faceVectorJson = user['face_vector'];
+      List<dynamic> stored = jsonDecode(faceVectorJson);
+      List<double> storedVector = stored.map((e) => (e as num).toDouble()).toList();
+      double dist = _euclideanDistance(vector, storedVector);
+      print("😊😊😊😊😊Distance for user ${user['id']}: $dist");
+      if (dist < threshold && dist < bestDistance) {
+        bestDistance = dist;
+        bestMatch = user;
+      }
+    }
+    print("❤️❤️❤️❤️❤️Best distance: $bestDistance");
+    return bestMatch;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -361,6 +488,7 @@ class _CameraPageState extends State<CameraPage> {
         children: [
           // Camera preview with face overlay.
           Positioned.fill(child: _buildCameraPreview(context)),
+
           // Profile button (top-left)
           Positioned(
             top: 40,
@@ -378,6 +506,7 @@ class _CameraPageState extends State<CameraPage> {
               ),
             ),
           ),
+
           // Phone button (top-right)
           Positioned(
             top: 40,
@@ -389,7 +518,8 @@ class _CameraPageState extends State<CameraPage> {
                 onPressed: () async {
                   final prefs = await SharedPreferences.getInstance();
                   final name = prefs.getString('emergency_name') ?? 'ไม่พบชื่อ';
-                  final relation = prefs.getString('emergency_relation') ?? 'ไม่พบความสัมพันธ์';
+                  final relation =
+                      prefs.getString('emergency_relation') ?? 'ไม่พบความสัมพันธ์';
                   final phone = prefs.getString('emergency_phone') ?? 'ไม่พบเบอร์โทร';
                   showDialog(
                     context: context,
@@ -398,7 +528,8 @@ class _CameraPageState extends State<CameraPage> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 100),
+                      insetPadding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 100),
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
                         child: Column(
@@ -421,7 +552,8 @@ class _CameraPageState extends State<CameraPage> {
                                   onTap: () => Navigator.pop(context),
                                   child: const Padding(
                                     padding: EdgeInsets.all(8),
-                                    child: Icon(Icons.close, size: 22, color: Colors.grey),
+                                    child:
+                                    Icon(Icons.close, size: 22, color: Colors.grey),
                                   ),
                                 ),
                               ],
@@ -459,7 +591,8 @@ class _CameraPageState extends State<CameraPage> {
                                     Navigator.pop(context);
                                     Navigator.push(
                                       context,
-                                      MaterialPageRoute(builder: (context) => const SetPhoneNumber()),
+                                      MaterialPageRoute(
+                                          builder: (context) => const SetPhoneNumber()),
                                     );
                                   },
                                   child: Padding(
@@ -467,7 +600,8 @@ class _CameraPageState extends State<CameraPage> {
                                     child: CircleAvatar(
                                       radius: 25,
                                       backgroundColor: Colors.blue,
-                                      child: const Icon(Icons.edit, size: 25, color: Colors.white),
+                                      child: const Icon(Icons.edit,
+                                          size: 25, color: Colors.white),
                                     ),
                                   ),
                                 ),
@@ -482,6 +616,7 @@ class _CameraPageState extends State<CameraPage> {
               ),
             ),
           ),
+
           // Flip camera button (top center)
           Positioned(
             top: 40,
@@ -494,6 +629,7 @@ class _CameraPageState extends State<CameraPage> {
               ),
             ),
           ),
+
           // Bottom row with register, last image, map.
           Positioned(
             bottom: 80,
@@ -595,140 +731,48 @@ class _CameraPageState extends State<CameraPage> {
               ],
             ),
           ),
+
+          // ---------------------------------------------------------------------
+          // BLACK BOX OVERLAY: Only show if _matchedUser != null
+          // ---------------------------------------------------------------------
+          if (_matchedUser != null) // <-- ADDED
+            Positioned(
+              // Position it as you like. Here is an example near the top/middle.
+              bottom: 180,
+              left: 20,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ชื่อเล่น : ${_matchedUser!['nickname']}',
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                    Text(
+                      'ชื่อ : ${_matchedUser!['name']}',
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                    Text(
+                      'ความสัมพันธ์ : ${_matchedUser!['relation']}',
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
-    );
-  }
-
-  //////////////////////////////////////////////////////////////////////////////
-  // REAL-TIME FACE RECOGNITION FUNCTIONS
-  //////////////////////////////////////////////////////////////////////////////
-
-  /// Trigger face recognition in real time.
-  Future<void> _recognizeFace() async {
-    if (_isRecognizing) return;
-    _isRecognizing = true;
-    try {
-      // Stop image stream to capture a clear frame.
-      await _cameraController!.stopImageStream();
-      // Capture the picture.
-      final XFile imageFile = await _cameraController!.takePicture();
-      print("Real-time picture taken: ${imageFile.path}");
-      // Read and decode the image using package:image.
-      final Uint8List bytes = await imageFile.readAsBytes();
-      final img.Image? decodedImage = img.decodeImage(bytes);
-      if (decodedImage == null) {
-        print("Failed to decode captured image");
-        return;
-      }
-      // Use the first detected face bounding box.
-      if (_faces.isEmpty) return;
-      final face = _faces.first;
-      Rect bbox = face.boundingBox;
-      // Ensure the crop coordinates are within image bounds.
-      int cropX = bbox.left.floor().clamp(0, decodedImage.width - 1);
-      int cropY = bbox.top.floor().clamp(0, decodedImage.height - 1);
-      int cropW = bbox.width.floor().clamp(0, decodedImage.width - cropX);
-      int cropH = bbox.height.floor().clamp(0, decodedImage.height - cropY);
-      final img.Image croppedImage = img.copyCrop(decodedImage, cropX, cropY, cropW, cropH);
-      // Resize the cropped face to the expected input size for MobileFaceNet (112x112).
-      final img.Image resizedFace = img.copyResize(croppedImage, width: 112, height: 112);
-      final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
-      // Run recognition.
-      List<double> vector = await _runFaceRecognition(processedBytes);
-      print("Real-time face vector: $vector");
-      if (vector.every((element) => element == 0)) {
-        print("Face vector is all zeros. Check image preprocessing.");
-      }
-      // Compare with database.
-      Map<String, dynamic>? matchedUser = await _findMatchingUser(vector);
-      if (matchedUser != null) {
-        final BuildContext overlayContext = navigatorKey.currentState!.context;
-        _showUserInfoOverlay(matchedUser, overlayContext);
-      }
-    } catch (e) {
-      print("Error in real-time recognition: $e");
-    } finally {
-      // Restart image stream.
-      _cameraController!.startImageStream((CameraImage cameraImage) {
-        _detectFacesFromCamera(cameraImage);
-      });
-      _isRecognizing = false;
-    }
-  }
-
-  /// Run face recognition using tflite_flutter.
-  Future<List<double>> _runFaceRecognition(Uint8List imageBytes) async {
-    if (interpreter == null) {
-      print("Interpreter not initialized");
-      return List.filled(128, 0.0);
-    }
-    try {
-      var input = imageBytes.buffer.asFloat32List().reshape([1, 112, 112, 3]);
-      var output = List.filled(1 * 128, 0).reshape([1, 128]);
-      interpreter!.run(input, output);
-      return List<double>.from(output[0]);
-    } catch (e) {
-      print("Error running face recognition: $e");
-      return List.filled(128, 0.0);
-    }
-  }
-
-  /// Compute Euclidean distance between two vectors.
-  double _euclideanDistance(List<double> a, List<double> b) {
-    double sum = 0;
-    for (int i = 0; i < a.length; i++) {
-      sum += math.pow(a[i] - b[i], 2);
-    }
-    return math.sqrt(sum);
-  }
-
-  /// Find a matching user in the database by comparing face vectors.
-  Future<Map<String, dynamic>?> _findMatchingUser(List<double> vector) async {
-    final db = await _getDatabase();
-    final List<Map<String, dynamic>> users = await db.query('users');
-    double threshold = 0.6; // You might try a higher threshold, e.g., 0.8
-    Map<String, dynamic>? bestMatch;
-    double bestDistance = double.infinity;
-    for (var user in users) {
-      String faceVectorJson = user['face_vector'];
-      List<dynamic> stored = jsonDecode(faceVectorJson);
-      List<double> storedVector = stored.map((e) => (e as num).toDouble()).toList();
-      double dist = _euclideanDistance(vector, storedVector);
-      print("Distance for user ${user['id']}: $dist");
-      if (dist < threshold && dist < bestDistance) {
-        bestDistance = dist;
-        bestMatch = user;
-      }
-    }
-    print("Best distance: $bestDistance");
-    return bestMatch;
-  }
-
-  /// Display an overlay with user information.
-  void _showUserInfoOverlay(Map<String, dynamic> user, BuildContext overlayContext) {
-    showDialog(
-      context: overlayContext,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: Text(user['nickname'] ?? 'Unknown'),
-          content: Text("Name: ${user['name']}\nRelation: ${user['relation']}"),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text("OK"),
-            )
-          ],
-        );
-      },
     );
   }
 }
 
 /// A custom painter that rotates the face bounding boxes appropriately.
-/// This FacePainter rotates each bounding box 90° clockwise using the transformation:
-/// (x, y) → (y, originalWidth - x). For the front camera, it then mirrors the result
-/// both horizontally and vertically.
 class FacePainter extends CustomPainter {
   final List<Face> faces;
   final Size imageSize;
@@ -743,7 +787,6 @@ class FacePainter extends CustomPainter {
   });
 
   /// Rotates a rectangle 90° clockwise.
-  /// Transformation: (x, y) becomes (y, originalWidth - x)
   Rect _rotateRect90(Rect rect, Size originalSize) {
     double newLeft = rect.top;
     double newTop = originalSize.width - rect.right;
@@ -753,7 +796,6 @@ class FacePainter extends CustomPainter {
   }
 
   /// Mirrors a rectangle both horizontally and vertically.
-  /// mirrorWidth and mirrorHeight are the dimensions of the rotated coordinate system.
   Rect _mirrorRectBoth(Rect rect, double mirrorWidth, double mirrorHeight) {
     return Rect.fromLTRB(
       mirrorWidth - rect.right,
@@ -771,12 +813,12 @@ class FacePainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     // After a 90° rotation, the effective dimensions swap:
-    // rotatedWidth is the original image height and rotatedHeight is the original image width.
     double rotatedWidth = imageSize.height;
     double rotatedHeight = imageSize.width;
-    // Scale factors to map the rotated coordinates to the canvas.
+
     final double scaleX = size.width / rotatedWidth;
     final double scaleY = size.height / rotatedHeight;
+
     for (var face in faces) {
       Rect rotatedRect = _rotateRect90(face.boundingBox, imageSize);
       if (isFrontCamera) {
