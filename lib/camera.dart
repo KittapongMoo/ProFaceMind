@@ -77,8 +77,7 @@ class _CameraPageState extends State<CameraPage> {
         await _cameraController!.initialize();
 
         // Lock preview to portrait.
-        await _cameraController!
-            .lockCaptureOrientation(DeviceOrientation.portraitUp);
+        await _cameraController!.lockCaptureOrientation(DeviceOrientation.portraitUp);
 
         // Start image stream for face detection.
         _cameraController!.startImageStream((CameraImage cameraImage) {
@@ -99,11 +98,11 @@ class _CameraPageState extends State<CameraPage> {
   }
 
   /// Convert a [CameraImage] in YUV420 format to an [InputImage] for ML Kit.
-  InputImage? _convertCameraImage(
-      CameraImage image, CameraDescription camera) {
+  InputImage? _convertCameraImage(CameraImage image, CameraDescription camera) {
     try {
       final int ySize = image.planes[0].bytes.length;
-      final int uvSize = image.planes[1].bytes.length + image.planes[2].bytes.length;
+      final int uvSize =
+          image.planes[1].bytes.length + image.planes[2].bytes.length;
       final Uint8List nv21 = Uint8List(ySize + uvSize);
 
       // Copy Y plane.
@@ -111,7 +110,6 @@ class _CameraPageState extends State<CameraPage> {
 
       int offset = ySize;
       final int uvPixelStride = image.planes[1].bytesPerPixel!;
-      final int uvRowStride = image.planes[1].bytesPerRow;
       final int uvHeight = image.height ~/ 2;
       final int uvWidth = image.width ~/ 2;
 
@@ -284,6 +282,7 @@ class _CameraPageState extends State<CameraPage> {
 
     final bool isFrontCamera =
         _cameraController!.description.lensDirection == CameraLensDirection.front;
+    // Use the same transform as in your RegisterPage sample.
     final Matrix4 transformMatrix = isFrontCamera
         ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
         : Matrix4.rotationZ(rotationAngle);
@@ -296,26 +295,26 @@ class _CameraPageState extends State<CameraPage> {
             child: Center(
               child: AspectRatio(
                 aspectRatio: cameraAspectRatio,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Camera preview.
-                    Transform(
-                      alignment: Alignment.center,
-                      transform: transformMatrix,
-                      child: CameraPreview(_cameraController!),
-                    ),
-                    // Face painting overlay.
-                    CustomPaint(
-                      painter: FacePainter(
-                        faces: _faces,
-                        // Swap width/height if needed.
-                        imageSize: Size(previewSize.height, previewSize.width),
-                        isFrontCamera: isFrontCamera,
-                        screenSize: constraints.biggest,
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: transformMatrix,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Camera preview.
+                      CameraPreview(_cameraController!),
+                      // Face painting overlay.
+                      CustomPaint(
+                        painter: FacePainter(
+                          faces: _faces,
+                          // Pass swapped dimensions as in your sample.
+                          imageSize: Size(previewSize.height, previewSize.width),
+                          isFrontCamera: isFrontCamera,
+                          screenSize: constraints.biggest,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -332,7 +331,6 @@ class _CameraPageState extends State<CameraPage> {
         children: [
           // Camera preview with face paint overlay.
           Positioned.fill(child: _buildCameraPreview(context)),
-          // The rest of your UI (buttons, navigation, etc.)
           // Profile button (top-left)
           Positioned(
             top: 40,
@@ -491,8 +489,7 @@ class _CameraPageState extends State<CameraPage> {
                 ),
                 // Tappable rectangle for last image.
                 FutureBuilder<String?>(
-                  // Use the cached future.
-                  future: _lastImageFuture,
+                  future: _getLastImagePath(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return GestureDetector(
@@ -514,7 +511,6 @@ class _CameraPageState extends State<CameraPage> {
                       );
                     }
                     if (snapshot.hasData && snapshot.data != null) {
-                      // There is a last image.
                       return GestureDetector(
                         onTap: () {
                           Navigator.push(
@@ -535,7 +531,6 @@ class _CameraPageState extends State<CameraPage> {
                         ),
                       );
                     }
-                    // No image found: show a placeholder.
                     return GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -578,9 +573,10 @@ class _CameraPageState extends State<CameraPage> {
   }
 }
 
-/// A custom painter that rotates the face bounding boxes appropriately for each camera.
-/// For the back camera, it rotates the rectangle by 180°.
-/// For the front camera, it rotates the rectangle by +90° (clockwise).
+/// A custom painter that rotates the face bounding boxes appropriately.
+/// This FacePainter rotates each bounding box 90° clockwise using the transformation:
+/// (x, y) → (y, originalWidth - x). For the front camera, it then mirrors the result
+/// both horizontally and vertically.
 class FacePainter extends CustomPainter {
   final List<Face> faces;
   final Size imageSize;
@@ -594,39 +590,25 @@ class FacePainter extends CustomPainter {
     required this.screenSize,
   });
 
-  /// Rotates a rectangle 180°.
-  /// For a point (x, y) in the original image (with size w×h),
-  /// the rotated point becomes (w - x, h - y).
-  Rect _rotatePlus180(Rect rect, Size originalSize) {
-    return Rect.fromLTRB(
-      originalSize.width - rect.right,
-      originalSize.height - rect.bottom,
-      originalSize.width - rect.left,
-      originalSize.height - rect.top,
-    );
+  /// Rotates a rectangle 90° clockwise.
+  /// Transformation: (x, y) becomes (y, originalWidth - x)
+  Rect _rotateRect90(Rect rect, Size originalSize) {
+    double newLeft = rect.top;
+    double newTop = originalSize.width - rect.right;
+    double newRight = rect.bottom;
+    double newBottom = originalSize.width - rect.left;
+    return Rect.fromLTRB(newLeft, newTop, newRight, newBottom);
   }
 
-  /// Rotates a rectangle +90° (clockwise).
-  /// For a point (x, y) in the original image with width w,
-  /// the new coordinates become (y, w - x).
-  Rect _rotatePlus90(Rect rect, Size originalSize) {
-    // Map the four corners using the rotation formula.
-    Offset topLeft = Offset(rect.left, rect.top);
-    Offset topRight = Offset(rect.right, rect.top);
-    Offset bottomLeft = Offset(rect.left, rect.bottom);
-    Offset bottomRight = Offset(rect.right, rect.bottom);
-
-    Offset rTopLeft = Offset(topLeft.dy, originalSize.width - topLeft.dx);
-    Offset rTopRight = Offset(topRight.dy, originalSize.width - topRight.dx);
-    Offset rBottomLeft = Offset(bottomLeft.dy, originalSize.width - bottomLeft.dx);
-    Offset rBottomRight = Offset(bottomRight.dy, originalSize.width - bottomRight.dx);
-
-    double newLeft = [rTopLeft.dx, rTopRight.dx, rBottomLeft.dx, rBottomRight.dx].reduce(math.min);
-    double newTop = [rTopLeft.dy, rTopRight.dy, rBottomLeft.dy, rBottomRight.dy].reduce(math.min);
-    double newRight = [rTopLeft.dx, rTopRight.dx, rBottomLeft.dx, rBottomRight.dx].reduce(math.max);
-    double newBottom = [rTopLeft.dy, rTopRight.dy, rBottomLeft.dy, rBottomRight.dy].reduce(math.max);
-
-    return Rect.fromLTRB(newLeft, newTop, newRight, newBottom);
+  /// Mirrors a rectangle both horizontally and vertically.
+  /// mirrorWidth and mirrorHeight are the dimensions of the rotated coordinate system.
+  Rect _mirrorRectBoth(Rect rect, double mirrorWidth, double mirrorHeight) {
+    return Rect.fromLTRB(
+      mirrorWidth - rect.right,
+      mirrorHeight - rect.bottom,
+      mirrorWidth - rect.left,
+      mirrorHeight - rect.top,
+    );
   }
 
   @override
@@ -636,35 +618,29 @@ class FacePainter extends CustomPainter {
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
+    // After a 90° rotation, the effective dimensions swap:
+    // rotatedWidth is the original image height and rotatedHeight is the original image width.
+    double rotatedWidth = imageSize.height;
+    double rotatedHeight = imageSize.width;
+
+    // Scale factors to map the rotated coordinates to the canvas.
+    final double scaleX = size.width / rotatedWidth;
+    final double scaleY = size.height / rotatedHeight;
+
     for (var face in faces) {
-      Rect rotatedRect;
-      double rotatedWidth;
-      double rotatedHeight;
-      if (!isFrontCamera) {
-        // Back camera: rotate 180°.
-        rotatedRect = _rotatePlus180(face.boundingBox, imageSize);
-        rotatedWidth = imageSize.width;
-        rotatedHeight = imageSize.height;
-      } else {
-        // Front camera: rotate +90° (clockwise).
-        rotatedRect = _rotatePlus90(face.boundingBox, imageSize);
-        // Note: a 90° rotation swaps the image dimensions.
-        rotatedWidth = imageSize.height;
-        rotatedHeight = imageSize.width;
+      // Rotate the bounding box.
+      Rect rotatedRect = _rotateRect90(face.boundingBox, imageSize);
+      // For the front camera, mirror both horizontally and vertically.
+      if (isFrontCamera) {
+        rotatedRect = _mirrorRectBoth(rotatedRect, rotatedWidth, rotatedHeight);
       }
-
-      // Compute scaling factors to map rotated image coordinates to the canvas.
-      final double scaleX = size.width / rotatedWidth;
-      final double scaleY = size.height / rotatedHeight;
-
-      // Scale the rotated rectangle.
+      // Scale the rotated (and mirrored) rectangle to canvas size.
       Rect scaledRect = Rect.fromLTRB(
         rotatedRect.left * scaleX,
         rotatedRect.top * scaleY,
         rotatedRect.right * scaleX,
         rotatedRect.bottom * scaleY,
       );
-
       canvas.drawRect(scaledRect, paint);
     }
   }
@@ -674,8 +650,3 @@ class FacePainter extends CustomPainter {
     return oldDelegate.faces != faces;
   }
 }
-
-
-
-
-
