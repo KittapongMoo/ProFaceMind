@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -20,10 +21,25 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController relationController = TextEditingController();
 
+  final FlutterTts flutterTts = FlutterTts(); // ✅ TTS instance
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    @override
+    void initState() {
+      super.initState();
+      _loadUserData();
+      _checkTTSAvailability(); // ✅ เพิ่มการเช็ค
+    }
+  }
+  Future<void> _checkTTSAvailability() async {
+    var engines = await flutterTts.getEngines;
+    print("🔍 เครื่องนี้รองรับ TTS engines: $engines");
+
+    var languages = await flutterTts.getLanguages;
+    print("🌐 รองรับภาษาดังนี้: $languages");
   }
 
   Future<Database> _getDatabase() async {
@@ -67,6 +83,19 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
     });
   }
 
+  // ✅ ฟังก์ชันสำหรับอ่านออกเสียงข้อมูล
+  Future<void> _speakUserInfo() async {
+    String text = "ชื่อเล่น ${nicknameController.text}, "
+        "ชื่อ ${nameController.text}, "
+        "ความสัมพันธ์ ${relationController.text}";
+
+    print("📣 อ่านออกเสียงข้อความ: $text");
+
+    await flutterTts.setLanguage("th-TH");
+    await flutterTts.setSpeechRate(0.5);
+    await flutterTts.speak(text);
+  }
+
   Widget _buildEditableField(String label, TextEditingController controller) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -100,7 +129,7 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // ✅ รูปภาพสูง 60% ของหน้าจอ
+          // รูปภาพสูง 60%
           SizedBox(
             height: screenHeight * 0.6,
             child: imagePaths.isNotEmpty
@@ -119,7 +148,7 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
                 : const Center(child: CircularProgressIndicator()),
           ),
 
-          // ✅ Panel ซ้อนบนรูป
+          // Panel ซ้อนบนรูป
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
@@ -223,7 +252,7 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
             ),
           ),
 
-          // ✅ ปุ่มย้อนกลับ
+          // ปุ่มย้อนกลับ
           Positioned(
             top: 40,
             left: 16,
@@ -235,14 +264,12 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
             ),
           ),
 
-          // ✅ ปุ่มลำโพง
+          // ✅ ปุ่มลำโพง เชื่อมกับ TTS
           Positioned(
             top: 40,
             right: 16,
             child: FloatingActionButton(
-              onPressed: () {
-                // TODO: add speaker functionality
-              },
+              onPressed: _speakUserInfo,
               backgroundColor: Colors.white,
               shape: const CircleBorder(),
               child: const Icon(Icons.volume_up, color: Colors.blue),
