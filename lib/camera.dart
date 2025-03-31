@@ -383,7 +383,15 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
         return;
       }
 
-      // Use ML Kit to detect faces.
+      // *** FIX START ***
+      // If the camera is front-facing, flip the image horizontally.
+      img.Image processedImage = decodedImage;
+      if (_cameraController!.description.lensDirection == CameraLensDirection.front) {
+        processedImage = img.flipHorizontal(decodedImage);
+      }
+      // *** FIX END ***
+
+      // Use ML Kit to detect faces (using the image file path)
       final inputImage = InputImage.fromFilePath(imageFile.path);
       final List<Face> faces = await _faceDetector.processImage(inputImage);
 
@@ -404,11 +412,11 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
       Rect bbox = face.boundingBox;
 
       // Ensure crop coordinates are within image bounds.
-      int cropX = bbox.left.floor().clamp(0, decodedImage.width - 1);
-      int cropY = bbox.top.floor().clamp(0, decodedImage.height - 1);
-      int cropW = bbox.width.floor().clamp(0, decodedImage.width - cropX);
-      int cropH = bbox.height.floor().clamp(0, decodedImage.height - cropY);
-      final img.Image croppedImage = img.copyCrop(decodedImage, cropX, cropY, cropW, cropH);
+      int cropX = bbox.left.floor().clamp(0, processedImage.width - 1);
+      int cropY = bbox.top.floor().clamp(0, processedImage.height - 1);
+      int cropW = bbox.width.floor().clamp(0, processedImage.width - cropX);
+      int cropH = bbox.height.floor().clamp(0, processedImage.height - cropY);
+      final img.Image croppedImage = img.copyCrop(processedImage, cropX, cropY, cropW, cropH);
 
       // Resize the cropped face to 112x112.
       final img.Image resizedFace = img.copyResize(croppedImage, width: 112, height: 112);
