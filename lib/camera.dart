@@ -30,7 +30,7 @@ class CameraPage extends StatefulWidget {
   _CameraPageState createState() => _CameraPageState();
 }
 
-class _CameraPageState extends State<CameraPage> with RouteAware {
+class _CameraPageState extends State<CameraPage> with RouteAware{
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
   bool _isCameraInitialized = false;
@@ -122,7 +122,6 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     }
   }
 
-  // In _initializeCamera(), add the imageFormatGroup:
   Future<void> _initializeCamera() async {
     try {
       _cameras = await availableCameras();
@@ -139,16 +138,15 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
           selectedCamera,
           ResolutionPreset.high,
           enableAudio: false,
-          imageFormatGroup: ImageFormatGroup.yuv420, // <-- Explicit format
         );
         await _cameraController!.initialize();
 
         // Lock preview to portrait.
-        await _cameraController!
-            .lockCaptureOrientation(DeviceOrientation.portraitUp);
+        await _cameraController!.lockCaptureOrientation(DeviceOrientation.portraitUp);
 
         // Start image stream for face detection.
         _cameraController!.startImageStream((CameraImage cameraImage) {
+          // Avoid multiple concurrent detections.
           if (!_isDetectingFaces) {
             _detectFacesFromCamera(cameraImage);
           }
@@ -285,10 +283,14 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
 
   /// Process the camera image to detect faces.
   Future<void> _detectFacesFromCamera(CameraImage cameraImage) async {
-    _isDetectingFaces = true;
+    bool detecting = true;
     try {
-      final inputImage = _convertCameraImage(cameraImage, _cameraController!.description);
-      if (inputImage == null) return;
+      final inputImage =
+      _convertCameraImage(cameraImage, _cameraController!.description);
+      if (inputImage == null) {
+        detecting = false;
+        return;
+      }
       final faces = await _faceDetector.processImage(inputImage);
       if (mounted) {
         setState(() {
@@ -298,28 +300,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     } catch (e) {
       print("Error detecting faces: $e");
     } finally {
-      _isDetectingFaces = false;
+      detecting = false;
     }
-  }
-
-  /// Helper function to calculate the transformation matrix so that the preview always appears in portrait.
-  Matrix4 _calculateCameraTransform(bool isFront, int sensorOrientation) {
-    double rotationAngle = 0;
-    // Adjust rotation based on the sensor orientation.
-    if (sensorOrientation == 90) {
-      rotationAngle = -math.pi / 2;
-    } else if (sensorOrientation == 270) {
-      rotationAngle = math.pi / 2;
-    } else if (sensorOrientation == 180) {
-      rotationAngle = math.pi;
-    } else {
-      rotationAngle = 0;
-    }
-    Matrix4 transform = Matrix4.identity()..rotateZ(rotationAngle);
-    if (isFront) {
-      transform.rotateY(math.pi); // Mirror horizontally for front camera.
-    }
-    return transform;
   }
 
   /// Build the camera preview with FacePainter overlay.
@@ -336,12 +318,18 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     double scale = cameraAspectRatio / screenAspectRatio;
     double extraZoomFactor = 0.72;
     scale *= extraZoomFactor;
-
     final int sensorOrientation = _cameraController!.description.sensorOrientation;
-// For simulation on Android with laptop webcam, override sensorOrientation to 0.
-    final int adjustedOrientation = Platform.isAndroid ? 0 : sensorOrientation;
-    final Matrix4 transformMatrix = _calculateCameraTransform(_isFrontCamera, adjustedOrientation);
-
+    double rotationAngle = 0;
+    if (sensorOrientation == 90) {
+      rotationAngle = math.pi / 2;
+    } else if (sensorOrientation == 270) {
+      rotationAngle = -math.pi / 2;
+    }
+    final bool isFrontCamera =
+        _cameraController!.description.lensDirection == CameraLensDirection.front;
+    final Matrix4 transformMatrix = isFrontCamera
+        ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
+        : Matrix4.rotationZ(rotationAngle);
     return LayoutBuilder(
       builder: (context, constraints) {
         return ClipRect(
@@ -364,7 +352,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
                           faces: _faces,
                           // Note: swap dimensions if needed.
                           imageSize: Size(previewSize.height, previewSize.width),
-                          isFrontCamera: _isFrontCamera,
+                          isFrontCamera: isFrontCamera,
                           screenSize: constraints.biggest,
                         ),
                       ),
@@ -383,19 +371,9 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
   Future<void> _recognizeFace() async {
     if (_cameraController == null || !_cameraController!.value.isInitialized) return;
     try {
-      // Stop the image stream before taking a picture.
-      await _cameraController!.stopImageStream();
-
       // Capture the picture.
       final XFile imageFile = await _cameraController!.takePicture();
       print("Picture taken: ${imageFile.path}");
-
-      // Restart the image stream after taking the picture.
-      _cameraController!.startImageStream((CameraImage cameraImage) {
-        if (!_isDetectingFaces) {
-          _detectFacesFromCamera(cameraImage);
-        }
-      });
 
       // Read and decode the image.
       final Uint8List bytes = await imageFile.readAsBytes();
@@ -409,6 +387,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
       final inputImage = InputImage.fromFilePath(imageFile.path);
       final List<Face> faces = await _faceDetector.processImage(inputImage);
 
+      // If no face is detected, update overlay placeholders.
       if (faces.isEmpty) {
         setState(() {
           _matchedUser = {
@@ -525,6 +504,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     // Add a small constant to avoid division by zero.
     return dot / ((math.sqrt(normA) * math.sqrt(normB)) + 1e-10);
   }
+
 
   @override
   Widget build(BuildContext context) {
