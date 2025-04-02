@@ -1,9 +1,9 @@
-// ... ส่วน import คงเดิม
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import 'personinfo.dart';
+import 'history.dart'; // Import the history page
 
 class AllRegisterPage extends StatefulWidget {
   const AllRegisterPage({Key? key}) : super(key: key);
@@ -47,7 +47,7 @@ class _AllRegisterPageState extends State<AllRegisterPage> {
 
   Future<void> _deleteUser(int userId) async {
     final db = await _getDatabase();
-    // Optionally, you might also delete related images from the file system here.
+    // Optionally, delete related images from the file system here.
     await db.delete('user_images', where: 'user_id = ?', whereArgs: [userId]);
     await db.delete('users', where: 'id = ?', whereArgs: [userId]);
 
@@ -91,8 +91,7 @@ class _AllRegisterPageState extends State<AllRegisterPage> {
                       return const Center(child: CircularProgressIndicator());
                     }
                     if (snapshot.hasError) {
-                      return const Center(
-                          child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'));
+                      return const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'));
                     }
                     if (!snapshot.hasData || snapshot.data!.isEmpty) {
                       return const Center(child: Text('ยังไม่มีการลงทะเบียนผู้ใช้'));
@@ -121,8 +120,7 @@ class _AllRegisterPageState extends State<AllRegisterPage> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) =>
-                                      PersonInfoPage(userId: userId),
+                                  builder: (context) => PersonInfoPage(userId: userId),
                                 ),
                               ).then((result) {
                                 if (result == true) {
@@ -237,13 +235,16 @@ class _AllRegisterPageState extends State<AllRegisterPage> {
             ),
           ),
 
-          // ➕ Next Page Placeholder
+          // ➕ History Button: navigate to HistoryPage
           Positioned(
             top: 40,
             right: 16,
             child: FloatingActionButton(
               onPressed: () {
-                // TODO: Add navigation
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HistoryPage()),
+                );
               },
               backgroundColor: Colors.white,
               shape: const CircleBorder(),
