@@ -71,7 +71,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     _lastImageFuture = _getLastImagePath();
     _loadModel();
     // Start a timer to check for a face match every 10 seconds.
-    _timer = Timer.periodic(const Duration(seconds: 10), (Timer timer) {
+    _timer = Timer.periodic(const Duration(seconds: 2), (Timer timer) {
       _recognizeFace();
     });
   }
