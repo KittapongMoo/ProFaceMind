@@ -74,6 +74,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     _timer = Timer.periodic(const Duration(seconds: 2), (Timer timer) {
       _recognizeFace();
     });
+    _checkHistoryDatabase();
   }
 
   @override
@@ -87,17 +88,22 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
 
   @override
   void didPushNext() {
-    // When another page is pushed on top, stop face detection.
+    // When another page is pushed on top, stop the image stream and cancel the timer.
     _cameraController?.stopImageStream();
+    _timer?.cancel();
+    _timer = null;
   }
 
   @override
   void didPopNext() {
-    // When returning to this page, restart face detection.
+    // When returning to this page, restart the image stream and timer.
     _cameraController?.startImageStream((CameraImage cameraImage) {
       if (!_isDetectingFaces) {
         _detectFacesFromCamera(cameraImage);
       }
+    });
+    _timer = Timer.periodic(const Duration(seconds: 2), (Timer timer) {
+      _recognizeFace();
     });
   }
 
@@ -440,12 +446,14 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
           };
         });
       } else {
+        // Save history record here:
+        await _saveHistory(matchedUser['id'] as int);
         setState(() {
           _matchedUser = matchedUser;
         });
       }
     } catch (e) {
-      print("Error in recognition: $e");
+      print("❌❌❌Error in recognition: $e");
     }
   }
 
@@ -511,6 +519,79 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     }
     // Add a small constant to avoid division by zero.
     return dot / ((math.sqrt(normA) * math.sqrt(normB)) + 1e-10);
+  }
+
+  // Add these new functions to your CameraPage state
+
+  // Function to open or create the history database.
+  Future<Database> _getHistoryDatabase() async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, 'facemind.db');
+    // Open the database (version 2, shared with your users table).
+    Database db = await openDatabase(
+      path,
+      version: 2,
+      onOpen: (Database db) async {
+        // You can print a log here if needed.
+        print("Database opened: $path");
+      },
+    );
+    // Ensure the history table exists by executing this every time.
+    await db.execute('''
+    CREATE TABLE IF NOT EXISTS history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      matched_at TEXT
+    )
+  ''');
+    return db;
+  }
+
+  Future<void> _checkHistoryDatabase() async {
+    try {
+      final db = await _getHistoryDatabase();
+      final tableInfo = await db.rawQuery("PRAGMA table_info(history)");
+      print("Table info for 'history': $tableInfo");
+
+      final contents = await db.rawQuery("SELECT * FROM history");
+      print("⏳⏳⏳Contents of 'history': $contents");
+    } catch (e) {
+      print("❌❌❌Error checking history database: $e");
+    }
+  }
+
+
+  // Save a history record (user id and current time).
+  Future<void> _saveHistory(int userId) async {
+    final db = await _getHistoryDatabase();
+    DateTime now = DateTime.now();
+    // Format the current time as "yyyy-MM-dd HH:mm" (ignoring seconds).
+    String nowFormatted = "${now.year.toString().padLeft(4, '0')}-"
+        "${now.month.toString().padLeft(2, '0')}-"
+        "${now.day.toString().padLeft(2, '0')} "
+        "${now.hour.toString().padLeft(2, '0')}:"
+        "${now.minute.toString().padLeft(2, '0')}";
+
+    // Check if a history record exists for this user with the same date, hour and minute.
+    final List<Map<String, dynamic>> existing = await db.rawQuery('''
+    SELECT * FROM history
+    WHERE user_id = ? 
+      AND strftime('%Y-%m-%d %H:%M', matched_at) = ?
+  ''', [userId, nowFormatted]);
+
+    if (existing.isEmpty) {
+      // No record exists for this user at this time, so insert a new one.
+      await db.insert(
+        'history',
+        {
+          'user_id': userId,
+          'matched_at': now.toIso8601String(),
+        },
+      );
+      print("History record saved for user $userId at $nowFormatted");
+    } else {
+      print("History record already exists for user $userId at $nowFormatted");
+    }
   }
 
 
