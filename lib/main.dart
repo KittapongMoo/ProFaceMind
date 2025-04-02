@@ -1,17 +1,63 @@
 import 'package:flutter/material.dart';
-// import 'FirstPage.dart';
 import 'Ownerinfo.dart';
 import 'secondpage.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'register.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 
+// Global navigator key and route observer.
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
-void main() {
-  runApp(const MyApp(
-  ));
+// Make main() asynchronous.
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Initialize the history table.
+  await _initializeHistoryDatabase();
+  runApp(const MyApp());
+}
+
+// This function opens your shared database and creates the history table if it does not exist.
+Future<void> _initializeHistoryDatabase() async {
+  final dbPath = await getDatabasesPath();
+  final path = join(dbPath, 'facemind.db');
+  // Open (or create) the database.
+  Database db = await openDatabase(
+    path,
+    version: 2,
+    onCreate: (Database db, int version) async {
+      // Create your existing tables.
+      await db.execute('''
+        CREATE TABLE users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          face_vector TEXT,
+          nickname TEXT,
+          name TEXT,
+          relation TEXT,
+          primary_image TEXT
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE user_images (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          image_path TEXT,
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+      ''');
+    },
+  );
+  // Now, ensure the history table exists.
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      matched_at TEXT
+    )
+  ''');
+  print('History table initialized in database at $path');
 }
 
 class MyApp extends StatelessWidget {
@@ -29,9 +75,9 @@ class MyApp extends StatelessWidget {
       home: const PersonalInfoPage(),
       supportedLocales: const [
         Locale('en', 'US'),
-        Locale('th', 'TH'), // Ensure Thai locale is supported
+        Locale('th', 'TH'), // Ensure Thai locale is supported.
       ],
-      localizationsDelegates: [
+      localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -50,7 +96,7 @@ class PersonalInfoPage extends StatelessWidget {
       backgroundColor: const Color(0xFFB0C4DE),
       body: Stack(
         children: [
-          // Top section with large icon
+          // Top section with large icon.
           Positioned.fill(
             child: Column(
               children: [
@@ -64,20 +110,17 @@ class PersonalInfoPage extends StatelessWidget {
                     child: Align(
                       alignment: Alignment(0, -0.5),
                       child: Stack(
-                        alignment: Alignment
-                            .center, // Ensures both icons overlap perfectly
+                        alignment: Alignment.center,
                         children: [
                           Icon(
                             Icons.circle,
-                            size: MediaQuery.of(context).size.width *
-                                0.85, // Bigger for background
-                            color: Colors.grey[400], // Gray color (background)
+                            size: MediaQuery.of(context).size.width * 0.85,
+                            color: Colors.grey[400],
                           ),
                           Icon(
                             Icons.account_circle,
-                            size: MediaQuery.of(context).size.width *
-                                0.85, // Slightly smaller for foreground
-                            color: Colors.white, // White color (foreground)
+                            size: MediaQuery.of(context).size.width * 0.85,
+                            color: Colors.white,
                           ),
                         ],
                       ),
@@ -88,7 +131,7 @@ class PersonalInfoPage extends StatelessWidget {
             ),
           ),
 
-          // Bottom Section (Fixed at Bottom)
+          // Bottom section (fixed at bottom).
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
@@ -111,7 +154,7 @@ class PersonalInfoPage extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Page indicator dots
+                  // Page indicator dots.
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -145,7 +188,7 @@ class PersonalInfoPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
 
-                  // Title text
+                  // Title text.
                   const Text(
                     "ข้อมูลส่วนตัว",
                     style: TextStyle(
@@ -156,7 +199,7 @@ class PersonalInfoPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
 
-                  // Description text
+                  // Description text.
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 40.0),
                     child: Text(
@@ -170,7 +213,7 @@ class PersonalInfoPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
 
-                  // Button
+                  // Button.
                   ElevatedButton(
                     onPressed: () {
                       Navigator.push(
@@ -179,7 +222,7 @@ class PersonalInfoPage extends StatelessWidget {
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF007BFF), // Bright blue
+                      backgroundColor: const Color(0xFF007BFF),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 80, vertical: 15),
                       shape: RoundedRectangleBorder(
