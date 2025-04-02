@@ -45,6 +45,18 @@ class _AllRegisterPageState extends State<AllRegisterPage> {
     ''');
   }
 
+  Future<void> _deleteUser(int userId) async {
+    final db = await _getDatabase();
+    // Optionally, you might also delete related images from the file system here.
+    await db.delete('user_images', where: 'user_id = ?', whereArgs: [userId]);
+    await db.delete('users', where: 'id = ?', whereArgs: [userId]);
+
+    // Reload the user list.
+    setState(() {
+      _usersFuture = _loadUsers();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -79,7 +91,8 @@ class _AllRegisterPageState extends State<AllRegisterPage> {
                       return const Center(child: CircularProgressIndicator());
                     }
                     if (snapshot.hasError) {
-                      return const Center(child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'));
+                      return const Center(
+                          child: Text('เกิดข้อผิดพลาดในการโหลดข้อมูล'));
                     }
                     if (!snapshot.hasData || snapshot.data!.isEmpty) {
                       return const Center(child: Text('ยังไม่มีการลงทะเบียนผู้ใช้'));
@@ -95,19 +108,21 @@ class _AllRegisterPageState extends State<AllRegisterPage> {
                           crossAxisCount: 3,
                           crossAxisSpacing: 16,
                           mainAxisSpacing: 16,
-                          childAspectRatio: 0.75, // เพิ่มสัดส่วนให้ภาพใหญ่ขึ้น
+                          childAspectRatio: 0.75,
                         ),
                         itemBuilder: (context, index) {
                           final user = users[index];
                           final nickname = user['nickname'] ?? '';
                           final firstImage = user['first_image'] as String?;
+                          final userId = user['id'] as int;
 
                           return GestureDetector(
                             onTap: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => PersonInfoPage(userId: user['id']),
+                                  builder: (context) =>
+                                      PersonInfoPage(userId: userId),
                                 ),
                               ).then((result) {
                                 if (result == true) {
@@ -117,39 +132,86 @@ class _AllRegisterPageState extends State<AllRegisterPage> {
                                 }
                               });
                             },
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
+                            child: Stack(
+                              clipBehavior: Clip.none,
                               children: [
-                                if (firstImage != null &&
-                                    firstImage.isNotEmpty &&
-                                    File(firstImage).existsSync())
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(30),
-                                    child: Image.file(
-                                      File(firstImage),
-                                      width: 105,
-                                      height: 105,
-                                      fit: BoxFit.cover,
+                                Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (firstImage != null &&
+                                        firstImage.isNotEmpty &&
+                                        File(firstImage).existsSync())
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(30),
+                                        child: Image.file(
+                                          File(firstImage),
+                                          width: 105,
+                                          height: 105,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      )
+                                    else
+                                      Container(
+                                        width: 105,
+                                        height: 105,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey,
+                                          borderRadius: BorderRadius.circular(30),
+                                        ),
+                                        child: const Icon(Icons.person, color: Colors.white, size: 48),
+                                      ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      nickname.isNotEmpty ? nickname : 'ไม่มีข้อมูล',
+                                      style: const TextStyle(fontSize: 16),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  )
-                                else
-                                  Container(
-                                    width: 105,
-                                    height: 105,
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey,
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                    child: const Icon(Icons.person, color: Colors.white, size: 48),
-                                  ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  nickname.isNotEmpty ? nickname : 'ไม่มีข้อมูล',
-                                  style: const TextStyle(fontSize: 16),
-                                  textAlign: TextAlign.center,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                  ],
                                 ),
+                                // Delete button at top right corner, raised with elevation=10.
+                                Positioned(
+                                  top: -18,
+                                  right: -10,
+                                  child: Material(
+                                    elevation: 10,
+                                    shape: const CircleBorder(),
+                                    color: Colors.white,
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.delete,
+                                        color: Colors.red,
+                                        size: 20,
+                                      ),
+                                      onPressed: () {
+                                        // Confirm deletion (optional)
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) {
+                                            return AlertDialog(
+                                              title: const Text('Confirm Deletion'),
+                                              content: const Text('Are you sure you want to delete this user?'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(context),
+                                                  child: const Text('Cancel'),
+                                                ),
+                                                TextButton(
+                                                  onPressed: () async {
+                                                    Navigator.pop(context);
+                                                    await _deleteUser(userId);
+                                                  },
+                                                  child: const Text('Delete'),
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                )
                               ],
                             ),
                           );
