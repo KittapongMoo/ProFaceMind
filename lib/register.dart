@@ -203,20 +203,23 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _switchCamera() async {
     if (_cameras == null || _cameras!.isEmpty) return;
 
+    // Update the camera flag
     setState(() {
       _isFrontCamera = !_isFrontCamera;
     });
 
+    // Find the camera index that matches the new lens direction.
     int cameraIndex = 0;
     for (int i = 0; i < _cameras!.length; i++) {
       if ((_isFrontCamera &&
-              _cameras![i].lensDirection == CameraLensDirection.front) ||
+          _cameras![i].lensDirection == CameraLensDirection.front) ||
           (!_isFrontCamera &&
               _cameras![i].lensDirection == CameraLensDirection.back)) {
         cameraIndex = i;
         break;
       }
     }
+    // Dispose of the current controller and set up the new one.
     await _setCamera(cameraIndex);
   }
 
@@ -250,26 +253,36 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _setCamera(int cameraIndex) async {
     if (_cameras == null || _cameras!.isEmpty) return;
 
-    if (_cameraController != null) {
-      await _cameraController!.dispose();
+    // 1) Temporarily store the old controller and set our field to null
+    final oldController = _cameraController;
+    _cameraController = null;
+    setState(() {}); // Forces a rebuild, which will show a loading indicator
+
+    // 2) Dispose the old controller safely
+    if (oldController != null) {
+      await oldController.dispose();
     }
+
+    // 3) Create and initialize the new controller
     try {
-      CameraDescription selectedCamera = _cameras![cameraIndex];
-      _cameraController = CameraController(
+      final selectedCamera = _cameras![cameraIndex];
+      final newController = CameraController(
         selectedCamera,
-        ResolutionPreset.high, // high resolution for better face detection
+        ResolutionPreset.high,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.yuv420,
       );
-      await _cameraController!.initialize();
+      await newController.initialize();
 
-      // Start image stream
-      _cameraController!.startImageStream((CameraImage cameraImage) {
+      // 4) Start the image stream
+      newController.startImageStream((CameraImage cameraImage) {
         _detectFacesFromCamera(cameraImage);
       });
 
+      // 5) Update our state with the new controller
       if (!mounted) return;
       setState(() {
+        _cameraController = newController;
         _isCameraInitialized = true;
         _isFrontCamera =
             selectedCamera.lensDirection == CameraLensDirection.front;
