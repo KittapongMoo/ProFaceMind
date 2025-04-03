@@ -23,10 +23,11 @@ class _FillInfoPageState extends State<FillInfoPage> {
   List<String> imagePaths = [];
 
   final TextEditingController nicknameController =
-      TextEditingController(text: '');
-  final TextEditingController nameController = TextEditingController(text: '');
+  TextEditingController(text: '');
+  final TextEditingController nameController =
+  TextEditingController(text: '');
   final TextEditingController relationController =
-      TextEditingController(text: '');
+  TextEditingController(text: '');
 
   @override
   void initState() {
@@ -78,67 +79,87 @@ class _FillInfoPageState extends State<FillInfoPage> {
 
   @override
   Widget build(BuildContext context) {
-    // You can access the userId like this if needed:
-    // int currentUserId = widget.userId;
+    final screenHeight = MediaQuery
+        .of(context)
+        .size
+        .height;
 
     return Scaffold(
-      resizeToAvoidBottomInset: true,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: IntrinsicHeight(
-                  child: Column(
-                    children: [
-                      // 🔝 รูปภาพส่วนบน
-                      Stack(
-                        children: [
-                          SizedBox(
-                            width: double.infinity,
-                            height: 250,
-                            child: imagePaths.isNotEmpty
-                                ? PageView.builder(
-                              controller: _pageController,
-                              itemCount: imagePaths.length,
-                              itemBuilder: (context, index) {
-                                return GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => FullImagePage(
-                                          imagePath: imagePaths[index],
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  child: Image.file(
-                                    File(imagePaths[index]),
-                                    fit: BoxFit.cover,
-                                  ),
-                                );
-                              },
-                            )
-                                : const Center(child: CircularProgressIndicator()),
-                          ),
-                          Positioned(
-                            top: 40,
-                            left: 16,
-                            child: IconButton(
-                              icon: const Icon(Icons.arrow_back,
-                                  color: Colors.white, size: 30),
-                              onPressed: () => Navigator.pop(context),
+      body: Stack(
+        children: [
+          // ส่วนภาพด้านบน สูง 60%
+          SizedBox(
+            height: screenHeight * 0.6,
+            child: imagePaths.isNotEmpty
+                ? PageView.builder(
+              controller: _pageController,
+              itemCount: imagePaths.length,
+              itemBuilder: (context, index) {
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            FullImagePage(
+                              imagePath: imagePaths[index],
                             ),
-                          ),
-                        ],
                       ),
+                    );
+                  },
+                  child: Image.file(
+                    File(imagePaths[index]),
+                    fit: BoxFit.cover,
+                  ),
+                );
+              },
+            )
+                : const Center(child: CircularProgressIndicator()),
+          ),
 
-                      // 🔘 Indicator
-                      Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
+          // Floating ปุ่มย้อนกลับ
+          Positioned(
+            top: 40,
+            left: 16,
+            child: FloatingActionButton(
+              onPressed: () => Navigator.pop(context),
+              backgroundColor: Colors.white,
+              shape: const CircleBorder(),
+              child: const Icon(Icons.arrow_back, color: Colors.black),
+            ),
+          ),
+
+          // Panel ข้อมูลซ้อนทับภาพ
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(25),
+                  topRight: Radius.circular(25),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              constraints: BoxConstraints(
+                minHeight: screenHeight * 0.45,
+                maxHeight: screenHeight * 0.55,
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Indicator
+                    if (imagePaths.length > 1)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: List.generate(imagePaths.length, (index) {
@@ -149,7 +170,8 @@ class _FillInfoPageState extends State<FillInfoPage> {
                                     ? _pageController.page ?? 0
                                     : 0;
                                 return Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                                  margin: const EdgeInsets.symmetric(
+                                      horizontal: 4),
                                   width: (index == selected.round()) ? 12 : 8,
                                   height: 8,
                                   decoration: BoxDecoration(
@@ -165,113 +187,93 @@ class _FillInfoPageState extends State<FillInfoPage> {
                         ),
                       ),
 
-                      // 🔽 เนื้อหาข้อมูล
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(30),
-                              topRight: Radius.circular(30),
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Center(
-                                      child: Text(
-                                        'ข้อมูล',
-                                        style: TextStyle(
-                                            fontSize: 22,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black87),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 20),
-                              _buildEditableField('ชื่อเล่น', nicknameController, isEditing),
-                              _buildEditableField('ชื่อ', nameController, isEditing),
-                              _buildEditableField('ความสัมพันธ์', relationController, isEditing),
+                    // หัวข้อ ข้อมูล
+                    const Center(
+                      child: Text(
+                        'ข้อมูล',
+                        style:
+                        TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                    ),
 
-                              const SizedBox(height: 20),
+                    const SizedBox(height: 16),
 
-                              SizedBox(
-                                width: double.infinity,
-                                height: 50,
-                                child: ElevatedButton(
-                                  onPressed: () async {
-                                    final db = await openDatabase(
-                                        join(await getDatabasesPath(), 'facemind.db'));
-                                    await db.update(
-                                      'users',
-                                      {
-                                        'nickname': nicknameController.text,
-                                        'name': nameController.text,
-                                        'relation': relationController.text,
-                                      },
-                                      where: 'id = ?',
-                                      whereArgs: [widget.userId],
-                                    );
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => const CameraPage()),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'ยืนยัน',
-                                    style: TextStyle(fontSize: 18, color: Colors.white),
-                                  ),
-                                ),
-                              ),
+                    _buildEditableField(
+                        'ชื่อเล่น', nicknameController, isEditing),
+                    _buildEditableField('ชื่อ', nameController, isEditing),
+                    _buildEditableField(
+                        'ความสัมพันธ์', relationController, isEditing),
 
-                              const SizedBox(height: 20),
-                            ],
+                    const SizedBox(height: 20),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final db = await openDatabase(
+                              join(await getDatabasesPath(), 'facemind.db'));
+                          await db.update(
+                            'users',
+                            {
+                              'nickname': nicknameController.text,
+                              'name': nameController.text,
+                              'relation': relationController.text,
+                            },
+                            where: 'id = ?',
+                            whereArgs: [widget.userId],
+                          );
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const CameraPage()),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
+                        child: const Text('ยืนยัน',
+                            style:
+                            TextStyle(fontSize: 18, color: Colors.white)),
                       ),
-                    ],
-                  ),
+                    ),
+
+                    const SizedBox(height: 20),
+                  ],
                 ),
               ),
-            );
-          },
-        ),
+            ),
+          ),
+        ],
       ),
     );
-
   }
 
-  /// **📌 Widget ช่องข้อมูลที่แก้ไขได้เมื่อกดไอคอนดินสอ**
-  Widget _buildEditableField(
-      String label, TextEditingController controller, bool isEditable) {
+// Widget ช่องข้อมูลที่แก้ไขได้
+  Widget _buildEditableField(String label, TextEditingController controller,
+      bool isEditable) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('$label :',
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 5),
           TextField(
             controller: controller,
-            enabled: isEditable, // 🔹 เปิดให้แก้ไขเมื่อกดปุ่มดินสอ
+            enabled: isEditable,
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.grey[200],
+              contentPadding:
+              const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(20),
                 borderSide: BorderSide.none,
               ),
             ),
