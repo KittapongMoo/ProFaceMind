@@ -26,7 +26,7 @@ Future<void> _initializeHistoryDatabase() async {
   // Open (or create) the database.
   Database db = await openDatabase(
     path,
-    version: 2,
+    version: 3,
     onCreate: (Database db, int version) async {
       // Create your existing tables.
       await db.execute('''
@@ -47,16 +47,26 @@ Future<void> _initializeHistoryDatabase() async {
           FOREIGN KEY(user_id) REFERENCES users(id)
         )
       ''');
+      // Create the history table including a face_image column as a BLOB.
+      await db.execute('''
+        CREATE TABLE history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          matched_at TEXT,
+          face_image BLOB
+        )
+      ''');
+    },
+    onOpen: (Database db) async {
+      // In case the history table exists but lacks the face_image column,
+      // add it via an ALTER TABLE statement.
+      List<Map> columns = await db.rawQuery("PRAGMA table_info(history)");
+      bool hasFaceImage = columns.any((col) => col['name'] == 'face_image');
+      if (!hasFaceImage) {
+        await db.execute("ALTER TABLE history ADD COLUMN face_image BLOB");
+      }
     },
   );
-  // Now, ensure the history table exists.
-  await db.execute('''
-    CREATE TABLE IF NOT EXISTS history (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER,
-      matched_at TEXT
-    )
-  ''');
   print('History table initialized in database at $path');
 }
 
