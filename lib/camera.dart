@@ -397,6 +397,15 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
       }
       // *** FIX END ***
 
+      // Apply rotation correction based on the sensor orientation.
+      if (_cameraController!.description.sensorOrientation == 90) {
+        processedImage = img.copyRotate(processedImage, 90);
+      } else if (_cameraController!.description.sensorOrientation == 270) {
+        processedImage = img.copyRotate(processedImage, -90);
+      } else if (_cameraController!.description.sensorOrientation == 180) {
+        processedImage = img.copyRotate(processedImage, 180);
+      }
+
       // Use ML Kit to detect faces (using the image file path)
       final inputImage = InputImage.fromFilePath(imageFile.path);
       final List<Face> faces = await _faceDetector.processImage(inputImage);
@@ -417,16 +426,20 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
       final face = faces.first;
       Rect bbox = face.boundingBox;
 
-      // Ensure crop coordinates are within image bounds.
-      int cropX = bbox.left.floor().clamp(0, processedImage.width - 1);
-      int cropY = bbox.top.floor().clamp(0, processedImage.height - 1);
-      int cropW = bbox.width.floor().clamp(0, processedImage.width - cropX);
-      int cropH = bbox.height.floor().clamp(0, processedImage.height - cropY);
-      final img.Image croppedImage = img.copyCrop(processedImage, cropX, cropY, cropW, cropH);
+      // Instead of cropping to the face bounding box, use the full processed image.
+      final Uint8List fullImageBlob = Uint8List.fromList(img.encodePng(processedImage));
 
-      // Resize the cropped face to 112x112.
-      final img.Image resizedFace = img.copyResize(croppedImage, width: 112, height: 112);
+      // Optionally, still perform face recognition using the cropped face if needed.
+      // Resize the cropped face (if you still want to use it for recognition)...
+      final img.Image resizedFace = img.copyResize(
+        // Here you could use the cropped face for recognition, or if you want full image for both, you might need separate logic.
+        // For demonstration, assume you want to use full image for recognition as well:
+          processedImage,
+          width: 112,
+          height: 112
+      );
       final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
+
 
       // Run recognition.
       List<double> vector = await _runFaceRecognition(processedBytes);
@@ -437,7 +450,11 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
 
       // Compare with database.
       Map<String, dynamic>? matchedUser = await _findMatchingUser(vector);
+
+      // Always save the current face image blob in history.
+      // If no match is found, you can use a default user id (for example, 0) or handle it as an unknown user.
       if (matchedUser == null) {
+        await _saveHistory(0, fullImageBlob); // 0 indicates unknown user, adjust as needed.
         setState(() {
           _matchedUser = {
             "nickname": "??",
@@ -446,8 +463,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
           };
         });
       } else {
-        // Save history record here:
-        await _saveHistory(matchedUser['id'] as int);
+        await _saveHistory(matchedUser['id'] as int, fullImageBlob);
         setState(() {
           _matchedUser = matchedUser;
         });
@@ -562,7 +578,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
 
 
   // Save a history record (user id and current time).
-  Future<void> _saveHistory(int userId) async {
+  Future<void> _saveHistory(int userId, Uint8List faceImageBytes) async {
     final db = await _getHistoryDatabase();
     DateTime now = DateTime.now();
     // Format the current time as "yyyy-MM-dd HH:mm" (ignoring seconds).
@@ -572,7 +588,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
         "${now.hour.toString().padLeft(2, '0')}:"
         "${now.minute.toString().padLeft(2, '0')}";
 
-    // Check if a history record exists for this user with the same date, hour and minute.
+    // Check if a history record exists for this user at the same date and minute.
     final List<Map<String, dynamic>> existing = await db.rawQuery('''
     SELECT * FROM history
     WHERE user_id = ? 
@@ -580,15 +596,16 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
   ''', [userId, nowFormatted]);
 
     if (existing.isEmpty) {
-      // No record exists for this user at this time, so insert a new one.
+      // Insert the new history record with the face image blob.
       await db.insert(
         'history',
         {
           'user_id': userId,
           'matched_at': now.toIso8601String(),
+          'face_image': faceImageBytes,
         },
       );
-      print("History record saved for user $userId at $nowFormatted");
+      print("History record saved for user $userId at $nowFormatted with face image blob.");
     } else {
       print("History record already exists for user $userId at $nowFormatted");
     }
