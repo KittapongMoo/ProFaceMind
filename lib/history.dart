@@ -228,7 +228,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                 height: 70,
                                 child: faceImageBytes != null
                                     ? Transform.rotate(
-                                  angle: math.pi, // 180° rotation; adjust if needed
+                                  angle: math.pi/2, // 180° rotation; adjust if needed
                                   child: ClipOval(
                                     child: Image.memory(
                                       faceImageBytes,
@@ -316,7 +316,10 @@ class FullImageScreen extends StatelessWidget {
       ),
       body: Center(
         child: InteractiveViewer(
-          child: Image.memory(imageBytes),
+          child: Transform.rotate(
+            angle: -math.pi / 2, // rotates the image -90° (counterclockwise)
+            child: Image.memory(imageBytes),
+          ),
         ),
       ),
     );
