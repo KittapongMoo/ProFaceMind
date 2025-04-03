@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
@@ -35,12 +35,13 @@ class _HistoryPageState extends State<HistoryPage> {
         print("Database opened: $path");
       },
     );
-    // Ensure the history table exists.
+    // Ensure the history table exists, including the face_image BLOB column.
     await db.execute('''
       CREATE TABLE IF NOT EXISTS history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
-        matched_at TEXT
+        matched_at TEXT,
+        face_image BLOB
       )
     ''');
     return db;
@@ -55,7 +56,7 @@ class _HistoryPageState extends State<HistoryPage> {
         "${date.month.toString().padLeft(2, '0')}-"
         "${date.day.toString().padLeft(2, '0')}";
     return await db.rawQuery('''
-      SELECT h.*, u.nickname, u.primary_image
+      SELECT h.*, u.nickname
       FROM history h
       LEFT JOIN users u ON u.id = h.user_id
       WHERE date(h.matched_at) = ?
@@ -136,7 +137,8 @@ class _HistoryPageState extends State<HistoryPage> {
               GestureDetector(
                 onTap: () => _selectDate(context),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
@@ -146,7 +148,8 @@ class _HistoryPageState extends State<HistoryPage> {
                     children: [
                       Text(
                         displayDate,
-                        style: const TextStyle(fontSize: 16, color: Colors.black54),
+                        style: const TextStyle(
+                            fontSize: 16, color: Colors.black54),
                       ),
                       const Icon(Icons.arrow_drop_down, color: Colors.black54),
                     ],
@@ -167,7 +170,8 @@ class _HistoryPageState extends State<HistoryPage> {
                           child: Text('เกิดข้อผิดพลาดในการโหลดประวัติ'));
                     }
                     if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return const Center(child: Text('ไม่มีประวัติสำหรับวันที่นี้'));
+                      return const Center(
+                          child: Text('ไม่มีประวัติสำหรับวันที่นี้'));
                     }
                     final historyRecords = snapshot.data!;
                     return ListView.builder(
@@ -176,12 +180,27 @@ class _HistoryPageState extends State<HistoryPage> {
                         final record = historyRecords[index];
                         final recordId = record['id'] as int;
                         final nickname = record['nickname'] ?? 'ไม่ทราบชื่อ';
-                        final primaryImage = record['primary_image'] as String?;
                         final matchedAt = record['matched_at'] as String;
+
+                        // Retrieve the face_image blob as dynamic.
+                        final dynamic blobData = record['face_image'];
+                        Uint8List? faceImageBytes;
+                        if (blobData != null) {
+                          try {
+                            // Convert blobData to Uint8List.
+                            faceImageBytes = Uint8List.fromList(blobData.cast<int>());
+                            print("Retrieved face image blob of length: ${faceImageBytes.length}");
+                          } catch (e) {
+                            print("Error converting blob to Uint8List: $e");
+                          }
+                        }
+
                         // Parse matchedAt to a DateTime.
                         DateTime matchedDateTime = DateTime.parse(matchedAt);
-                        final timeString = "${matchedDateTime.hour.toString().padLeft(2, '0')}:"
+                        final timeString =
+                            "${matchedDateTime.hour.toString().padLeft(2, '0')}:"
                             "${matchedDateTime.minute.toString().padLeft(2, '0')}";
+
                         return Card(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
@@ -191,12 +210,9 @@ class _HistoryPageState extends State<HistoryPage> {
                           child: ListTile(
                             leading: CircleAvatar(
                               radius: 35,
-                              backgroundImage: (primaryImage != null &&
-                                  primaryImage.isNotEmpty &&
-                                  File(primaryImage).existsSync())
-                                  ? FileImage(File(primaryImage))
-                                  : const AssetImage('assets/images/test_user.jpg')
-                              as ImageProvider,
+                              backgroundImage: faceImageBytes != null
+                                  ? MemoryImage(faceImageBytes)
+                                  : const AssetImage('assets/images/test_user.jpg') as ImageProvider,
                             ),
                             title: Text(
                               'ชื่อ: $nickname',
@@ -221,8 +237,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                   builder: (context) {
                                     return AlertDialog(
                                       title: const Text('Confirm Deletion'),
-                                      content: const Text(
-                                          'Are you sure you want to delete this history record?'),
+                                      content: const Text('Are you sure you want to delete this history record?'),
                                       actions: [
                                         TextButton(
                                           onPressed: () => Navigator.pop(context),
