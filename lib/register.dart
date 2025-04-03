@@ -190,9 +190,9 @@ class _RegisterPageState extends State<RegisterPage> {
       _cameras = await availableCameras();
       if (_cameras != null && _cameras!.isNotEmpty) {
         // Find the front camera
-        int frontCameraIndex = _cameras!.indexWhere(
-            (camera) => camera.lensDirection == CameraLensDirection.front);
-        await _setCamera(frontCameraIndex != -1 ? frontCameraIndex : 0);
+        int backCameraIndex  = _cameras!.indexWhere(
+            (camera) => camera.lensDirection == CameraLensDirection.back);
+        await _setCamera(backCameraIndex  != -1 ? backCameraIndex  : 0);
       }
     } catch (e) {
       print('Error initializing camera: $e');
