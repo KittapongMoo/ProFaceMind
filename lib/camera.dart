@@ -398,13 +398,13 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
       // *** FIX END ***
 
       // Apply rotation correction based on the sensor orientation.
-      if (_cameraController!.description.sensorOrientation == 90) {
-        processedImage = img.copyRotate(processedImage, 90);
-      } else if (_cameraController!.description.sensorOrientation == 270) {
-        processedImage = img.copyRotate(processedImage, -90);
-      } else if (_cameraController!.description.sensorOrientation == 180) {
-        processedImage = img.copyRotate(processedImage, 180);
-      }
+      // if (_cameraController!.description.sensorOrientation == 90) {
+      //   processedImage = img.copyRotate(processedImage, 90);
+      // } else if (_cameraController!.description.sensorOrientation == 270) {
+      //   processedImage = img.copyRotate(processedImage, -90);
+      // } else if (_cameraController!.description.sensorOrientation == 180) {
+      //   processedImage = img.copyRotate(processedImage, 180);
+      // }
 
       // Use ML Kit to detect faces (using the image file path)
       final inputImage = InputImage.fromFilePath(imageFile.path);
