@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'dart:math' as math;
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({Key? key}) : super(key: key);
@@ -208,11 +209,25 @@ class _HistoryPageState extends State<HistoryPage> {
                           elevation: 1,
                           margin: const EdgeInsets.symmetric(vertical: 8),
                           child: ListTile(
-                            leading: CircleAvatar(
-                              radius: 35,
-                              backgroundImage: faceImageBytes != null
-                                  ? MemoryImage(faceImageBytes)
-                                  : const AssetImage('assets/images/test_user.jpg') as ImageProvider,
+                            leading: Container(
+                              width: 60,
+                              height: 70,
+                              child: faceImageBytes != null
+                                  ? Transform.rotate(
+                                angle: math.pi, // 180° rotation; adjust if needed
+                                child: ClipOval(
+                                  child: Image.memory(
+                                    faceImageBytes,
+                                    fit: BoxFit.cover,
+                                    width: 70,
+                                    height: 70,
+                                  ),
+                                ),
+                              )
+                                  : CircleAvatar(
+                                radius: 35,
+                                backgroundImage: const AssetImage('assets/images/test_user.jpg'),
+                              ),
                             ),
                             title: Text(
                               'ชื่อ: $nickname',
