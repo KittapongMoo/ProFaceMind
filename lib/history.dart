@@ -209,24 +209,40 @@ class _HistoryPageState extends State<HistoryPage> {
                           elevation: 1,
                           margin: const EdgeInsets.symmetric(vertical: 8),
                           child: ListTile(
-                            leading: Container(
-                              width: 60,
-                              height: 70,
-                              child: faceImageBytes != null
-                                  ? Transform.rotate(
-                                angle: math.pi, // 180° rotation; adjust if needed
-                                child: ClipOval(
-                                  child: Image.memory(
-                                    faceImageBytes,
-                                    fit: BoxFit.cover,
-                                    width: 70,
-                                    height: 70,
+                            leading: GestureDetector(
+                              onTap: () {
+                                if (faceImageBytes != null) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => FullImageScreen(
+                                        imageBytes: faceImageBytes!, // use ! to assert non-null
+                                        title: 'Scanned Image',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                              child: Container(
+                                width: 60,
+                                height: 70,
+                                child: faceImageBytes != null
+                                    ? Transform.rotate(
+                                  angle: math.pi, // 180° rotation; adjust if needed
+                                  child: ClipOval(
+                                    child: Image.memory(
+                                      faceImageBytes,
+                                      fit: BoxFit.cover,
+                                      width: 70,
+                                      height: 70,
+                                    ),
                                   ),
+                                )
+                                    : CircleAvatar(
+                                  radius: 35,
+                                  backgroundImage:
+                                  const AssetImage('assets/images/test_user.jpg'),
                                 ),
-                              )
-                                  : CircleAvatar(
-                                radius: 35,
-                                backgroundImage: const AssetImage('assets/images/test_user.jpg'),
                               ),
                             ),
                             title: Text(
@@ -280,6 +296,27 @@ class _HistoryPageState extends State<HistoryPage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class FullImageScreen extends StatelessWidget {
+  final Uint8List imageBytes;
+  final String? title;
+
+  const FullImageScreen({Key? key, required this.imageBytes, this.title}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title ?? 'Full Image'),
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          child: Image.memory(imageBytes),
         ),
       ),
     );
