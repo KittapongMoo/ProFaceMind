@@ -317,7 +317,7 @@ class FullImageScreen extends StatelessWidget {
       body: Center(
         child: InteractiveViewer(
           child: Transform.rotate(
-            angle: -math.pi / 2, // rotates the image -90° (counterclockwise)
+            angle: math.pi / 2, // rotates the image -90° (counterclockwise)
             child: Image.memory(imageBytes),
           ),
         ),
