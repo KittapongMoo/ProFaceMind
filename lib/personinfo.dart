@@ -21,19 +21,15 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController relationController = TextEditingController();
 
-  final FlutterTts flutterTts = FlutterTts(); // ✅ TTS instance
+  final FlutterTts flutterTts = FlutterTts();
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
-    @override
-    void initState() {
-      super.initState();
-      _loadUserData();
-      _checkTTSAvailability(); // ✅ เพิ่มการเช็ค
-    }
+    _checkTTSAvailability();
   }
+
   Future<void> _checkTTSAvailability() async {
     var engines = await flutterTts.getEngines;
     print("🔍 เครื่องนี้รองรับ TTS engines: $engines");
@@ -83,7 +79,6 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
     });
   }
 
-  // ✅ ฟังก์ชันสำหรับอ่านออกเสียงข้อมูล
   Future<void> _speakUserInfo() async {
     String text = "ชื่อเล่น ${nicknameController.text}, "
         "ชื่อ ${nameController.text}, "
@@ -129,7 +124,7 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // รูปภาพสูง 60%
+          // รูปภาพสูง 60% (กดเพื่อดูเต็มจอ)
           SizedBox(
             height: screenHeight * 0.6,
             child: imagePaths.isNotEmpty
@@ -137,18 +132,28 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
               controller: _pageController,
               itemCount: imagePaths.length,
               itemBuilder: (context, index) {
-                return Image.file(
-                  File(imagePaths[index]),
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  height: double.infinity,
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => FullImagePage(imagePath: imagePaths[index]),
+                      ),
+                    );
+                  },
+                  child: Image.file(
+                    File(imagePaths[index]),
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                  ),
                 );
               },
             )
                 : const Center(child: CircularProgressIndicator()),
           ),
 
-          // Panel ซ้อนบนรูป
+          // Panel ข้อมูล
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
@@ -264,7 +269,7 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
             ),
           ),
 
-          // ✅ ปุ่มลำโพง เชื่อมกับ TTS
+          // ปุ่มลำโพง
           Positioned(
             top: 40,
             right: 16,
@@ -276,6 +281,31 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class FullImagePage extends StatelessWidget {
+  final String imagePath;
+  const FullImagePage({Key? key, required this.imagePath}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("ดูรูปเต็ม"),
+        backgroundColor: Colors.black,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      backgroundColor: Colors.black,
+      body: Center(
+        child: InteractiveViewer(
+          child: Image.file(File(imagePath)),
+        ),
       ),
     );
   }
