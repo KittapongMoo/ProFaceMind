@@ -40,6 +40,9 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
   int _sensorOrientation = 0;
   Interpreter? interpreter;
 
+  // 👇 เพิ่มตรงนี้
+  File? _profileImageFile;
+
   // Face detection fields.
   final FaceDetector _faceDetector = FaceDetector(
     options: FaceDetectorOptions(
@@ -70,12 +73,30 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     });
     _lastImageFuture = _getLastImagePath();
     _loadModel();
+    _loadProfileImage();      // ✅ โหลดรูปโปรไฟล์  <<< ใส่ตรงนี้เลย
     // Start a timer to check for a face match every 10 seconds.
     _timer = Timer.periodic(const Duration(seconds: 2), (Timer timer) {
       _recognizeFace();
     });
     // _checkHistoryDatabase();
   }
+
+  // ✅ วางตรงนี้ได้เลย
+  Future<void> _loadProfileImage() async {
+    try {
+      final db = await _getDatabase();
+      final result = await db.query('users', orderBy: 'id DESC', limit: 1);
+      if (result.isNotEmpty && result.first['primary_image'] != null) {
+        final path = result.first['primary_image'] as String;
+        setState(() {
+          _profileImageFile = File(path);
+        });
+      }
+    } catch (e) {
+      print("❌ Error loading profile image: $e");
+    }
+  }
+
 
   @override
   void didChangeDependencies() {
@@ -696,18 +717,38 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
           Positioned(
             top: 40,
             left: 20,
-            child: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: IconButton(
-                icon: const Icon(Icons.person, color: Colors.blue),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const ProfilePage()),
-                  );
-                },
-              ),
-            ),
+            child: Column(
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ProfilePage()),
+                    );
+                  },
+                  child: CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.white,
+                    backgroundImage: _profileImageFile != null
+                        ? FileImage(_profileImageFile!)
+                        : null,
+                    child: _profileImageFile == null
+                        ? const Icon(Icons.person, color: Colors.blue)
+                        : null,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  "โปรไฟล์",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            )
+
           ),
 
           // Phone button (top-right)
