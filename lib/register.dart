@@ -610,7 +610,7 @@ class _RegisterPageState extends State<RegisterPage> {
     String path = join(dbPath, 'facemind.db');
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (Database db, int version) async {
         // Initial creation of all tables (when database is first created)
         await db.execute('''
