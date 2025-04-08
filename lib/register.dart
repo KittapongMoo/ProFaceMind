@@ -508,6 +508,12 @@ class _RegisterPageState extends State<RegisterPage> {
         userDir.createSync(recursive: true);
       }
 
+      // Additionally, ensure at least a placeholder or initial setup
+      if (userDir.listSync().isEmpty) {
+        print("⚠️ Warning: temp_faces directory is empty. Ensure you're saving images to this directory after capturing.");
+      }
+
+
 
       // Fetch current session images
       final List<FileSystemEntity> imagesList = userDir.listSync().whereType<File>().toList();
@@ -613,53 +619,47 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<Database> _getDatabase() async {
     String dbPath = await getDatabasesPath();
     String path = join(dbPath, 'facemind.db');
+
     return openDatabase(
       path,
-      version: 3, // <- Increment this to 3
+      version: 2, // important: always increment if schema changes
       onCreate: (Database db, int version) async {
         await db.execute('''
-        CREATE TABLE users (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          face_vector TEXT,
-          nickname TEXT,
-          name TEXT,
-          relation TEXT,
-          primary_image TEXT
-        )
-      ''');
+      CREATE TABLE users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        face_vector TEXT,
+        nickname TEXT,
+        name TEXT,
+        relation TEXT,
+        primary_image TEXT
+      )''');
 
         await db.execute('''
-        CREATE TABLE user_images (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER,
-          image_path TEXT,
-          FOREIGN KEY(user_id) REFERENCES users(id)
-        )
-      ''');
+      CREATE TABLE user_images (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        image_path TEXT,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+      )''');
 
         await db.execute('''
-        CREATE TABLE user_vectors (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER,
-          vector TEXT,
-          FOREIGN KEY(user_id) REFERENCES users(id)
-        )
-      ''');
+      CREATE TABLE user_vectors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        vector TEXT,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+      )''');
       },
       onUpgrade: (Database db, int oldVersion, int newVersion) async {
         if (oldVersion < 2) {
           await db.execute('ALTER TABLE users ADD COLUMN primary_image TEXT');
-        }
-        if (oldVersion < 3) {
-          // Create the missing table explicitly here:
           await db.execute('''
           CREATE TABLE IF NOT EXISTS user_vectors (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
             vector TEXT,
             FOREIGN KEY(user_id) REFERENCES users(id)
-          )
-        ''');
+          )''');
         }
       },
     );
