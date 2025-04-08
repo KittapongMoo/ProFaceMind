@@ -19,6 +19,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
+import 'package:facemind/database_helper.dart';
 
 // Import ML Kit face detection:
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
@@ -270,7 +271,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
   }
 
   Future<String?> _getLastImagePath() async {
-    final db = await _getDatabase();
+    final db = await DatabaseHelper().database;
     final List<Map<String, dynamic>> result = await db.query(
       'user_images',
       orderBy: 'id DESC',
@@ -566,7 +567,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
 
   /// Find a matching user in the database by comparing face vectors.
   Future<Map<String, dynamic>?> _findMatchingUser(List<double> vector) async {
-    final db = await _getDatabase();
+    final db = await DatabaseHelper().database;
 
     // Efficient JOIN query to fetch user data and vectors together.
     final results = await db.rawQuery('''
@@ -675,7 +676,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
 
   // Save a history record (user id and current time).
   Future<void> _saveHistory(int userId, Uint8List faceImageBytes) async {
-    final db = await _getDatabase();  // <-- updated
+    final db = await DatabaseHelper().database;
     DateTime now = DateTime.now();
     String nowFormatted = "${now.year.toString().padLeft(4, '0')}-"
         "${now.month.toString().padLeft(2, '0')}-"

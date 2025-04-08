@@ -4,8 +4,7 @@ import 'secondpage.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'register.dart';
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
+import 'package:facemind/database_helper.dart'; // adjust if it's in a subfolder
 
 // Global navigator key and route observer.
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -15,88 +14,8 @@ final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize the history table.
-  await _initializeHistoryDatabase();
+  await DatabaseHelper().database; // will automatically init tables if needed
   runApp(const MyApp());
-}
-
-// This function opens your shared database and creates the history table if it does not exist.
-Future<void> _initializeHistoryDatabase() async {
-  final dbPath = await getDatabasesPath();
-  final path = join(dbPath, 'facemind.db');
-
-  Database db = await openDatabase(
-    path,
-    version: 3, // Make sure this matches everywhere!
-    onCreate: (Database db, int version) async {
-      // Create users table
-      await db.execute('''
-        CREATE TABLE users (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          face_vector TEXT,
-          nickname TEXT,
-          name TEXT,
-          relation TEXT,
-          primary_image TEXT
-        )
-      ''');
-
-      // Create user_images table
-      await db.execute('''
-        CREATE TABLE user_images (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER,
-          image_path TEXT,
-          FOREIGN KEY(user_id) REFERENCES users(id)
-        )
-      ''');
-
-      // Create user_vectors table
-      await db.execute('''
-        CREATE TABLE user_vectors (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER,
-          vector TEXT,
-          FOREIGN KEY(user_id) REFERENCES users(id)
-        )
-      ''');
-
-      // Create history table with face_image
-      await db.execute('''
-        CREATE TABLE history (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER,
-          matched_at TEXT,
-          face_image BLOB
-        )
-      ''');
-    },
-    onUpgrade: (Database db, int oldVersion, int newVersion) async {
-      if (oldVersion < 2) {
-        // Version 2 updates (if missing)
-        await db.execute('ALTER TABLE users ADD COLUMN primary_image TEXT');
-      }
-
-      if (oldVersion < 3) {
-        // Version 3 updates (if missing)
-        await db.execute('''
-          CREATE TABLE IF NOT EXISTS user_vectors (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            vector TEXT,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-          )
-        ''');
-
-        List<Map> columns = await db.rawQuery("PRAGMA table_info(history)");
-        bool hasFaceImage = columns.any((col) => col['name'] == 'face_image');
-        if (!hasFaceImage) {
-          await db.execute("ALTER TABLE history ADD COLUMN face_image BLOB");
-        }
-      }
-    },
-  );
-
-  print('✅ Database initialized at $path with correct schema (version 3)');
 }
 
 class MyApp extends StatelessWidget {
