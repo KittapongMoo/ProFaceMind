@@ -85,7 +85,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
   // ✅ วางตรงนี้ได้เลย
   Future<void> _loadProfileImage() async {
     try {
-      final db = await _getDatabase();
+      final db = await DatabaseHelper().database;
       final result = await db.query('users', orderBy: 'id DESC', limit: 1);
       if (result.isNotEmpty && result.first['primary_image'] != null) {
         final path = result.first['primary_image'] as String;
