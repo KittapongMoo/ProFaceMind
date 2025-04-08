@@ -428,49 +428,51 @@ class _RegisterPageState extends State<RegisterPage> {
   /// Process the captured/selected image: validate face, convert to vector, and store.
   Future<void> _processCapturedImage(File imageFile) async {
     try {
-      bool valid = await _validateFace(imageFile);
+      final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
+      final List<Face> faces = await _faceDetector.processImage(inputImage);
       _hideDialog();
 
-      if (!valid) {
+      if (faces.isEmpty) {
         _showErrorPopup("No face detected in this image");
         return;
       }
 
-      // Save image locally
-      final Directory appDir = await getApplicationDocumentsDirectory();
-      final Directory userDir = Directory('${appDir.path}/temp_faces');
-      if (!userDir.existsSync()) {
-        userDir.createSync(recursive: true);
-      }
-
-      final String fileName =
-          'user_face_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final String newPath = join(userDir.path, fileName);
-      final File savedImage = await imageFile.copy(newPath);
-
-      // Convert to proper format for TFLite
-      final Uint8List imageBytes = await savedImage.readAsBytes();
-      final img.Image? decodedImage = img.decodeImage(imageBytes);
-
-      if (decodedImage == null) {
-        _showErrorPopup("Failed to process image");
+      // Load and decode the image
+      final Uint8List imageBytes = await imageFile.readAsBytes();
+      final img.Image? fullImage = img.decodeImage(imageBytes);
+      if (fullImage == null) {
+        _showErrorPopup("Failed to decode image");
         return;
       }
 
-      // Resize to the expected input size for MobileFaceNet (usually 112x112)
-      final img.Image resizedImage =
-          img.copyResize(decodedImage, width: 112, height: 112);
-      final Uint8List processedBytes =
-          _imageToByteListFloat32(resizedImage, 112, 127.5, 128.0);
+      // Use the first detected face
+      final Face face = faces.first;
+      final Rect box = face.boundingBox;
 
+      // Crop the face (add margin for better performance)
+      int x = math.max(0, box.left.toInt() - 20);
+      int y = math.max(0, box.top.toInt() - 20);
+      int w = math.min(fullImage.width - x, box.width.toInt() + 40);
+      int h = math.min(fullImage.height - y, box.height.toInt() + 40);
+      final img.Image croppedFace = img.copyCrop(fullImage, x, y, w, h);
+
+      // Resize to 112x112
+      final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
+
+      // Preprocess
+      final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
+
+      // Run recognition
       List<double> vector = await _runFaceRecognition(processedBytes);
-      print("😀Face vector: $vector"); // Add this line to inspect the vector
 
-      // Check if vector contains valid values
-      bool isValidVector = vector.any((value) => value != 0.0);
-      if (!isValidVector) {
-        _showErrorPopup(
-            "Face recognition failed. Please try again with better lighting");
+      // Normalize the vector (L2 norm)
+      final double norm = math.sqrt(vector.fold(0, (sum, val) => sum + val * val));
+      if (norm > 0) {
+        vector = vector.map((e) => e / norm).toList();
+      }
+
+      if (vector.every((v) => v == 0)) {
+        _showErrorPopup("Face recognition failed. Try again.");
         return;
       }
 
@@ -484,7 +486,8 @@ class _RegisterPageState extends State<RegisterPage> {
         await _registerUserWithImages();
       }
     } catch (e) {
-      print('Error processing image: $e');
+      _hideDialog();
+      print('❌ Error processing image: $e');
       _showErrorPopup("Error processing image: $e");
     }
   }

@@ -423,26 +423,34 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
       }
 
       // Use the first detected face.
-      final face = faces.first;
-      Rect bbox = face.boundingBox;
+      // final face = faces.first;
+      // Rect bbox = face.boundingBox;
 
       // Instead of cropping to the face bounding box, use the full processed image.
       final Uint8List fullImageBlob = Uint8List.fromList(img.encodePng(processedImage));
 
       // Optionally, still perform face recognition using the cropped face if needed.
       // Resize the cropped face (if you still want to use it for recognition)...
-      final img.Image resizedFace = img.copyResize(
-        // Here you could use the cropped face for recognition, or if you want full image for both, you might need separate logic.
-        // For demonstration, assume you want to use full image for recognition as well:
-          processedImage,
-          width: 112,
-          height: 112
-      );
+      // Crop to face bounding box
+      final Face face = faces.first;
+      final Rect box = face.boundingBox;
+
+      int x = math.max(0, box.left.toInt() - 20);
+      int y = math.max(0, box.top.toInt() - 20);
+      int w = math.min(processedImage.width - x, box.width.toInt() + 40);
+      int h = math.min(processedImage.height - y, box.height.toInt() + 40);
+
+      final img.Image croppedFace = img.copyCrop(processedImage, x, y, w, h);
+      final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
+
       final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
-
-
-      // Run recognition.
       List<double> vector = await _runFaceRecognition(processedBytes);
+
+// ✅ Normalize vector
+      final double norm = math.sqrt(vector.fold(0, (sum, val) => sum + val * val));
+      if (norm > 0) {
+        vector = vector.map((e) => e / norm).toList();
+      }
       print("Face vector: $vector");
       if (vector.every((element) => element == 0)) {
         print("Face vector is all zeros. Check image preprocessing.");
@@ -495,7 +503,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     final db = await _getDatabase();
     final List<Map<String, dynamic>> users = await db.query('users');
 
-    double similarityThreshold = 0.75; // Adjust threshold as needed (1.0 is a perfect match).
+    double similarityThreshold = 0.85; // Adjust threshold as needed (1.0 is a perfect match).
     Map<String, dynamic>? bestMatch;
     double bestSimilarity = -1; // Initialize with a low similarity.
 
