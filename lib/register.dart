@@ -622,37 +622,39 @@ class _RegisterPageState extends State<RegisterPage> {
 
     return openDatabase(
       path,
-      version: 2, // important: always increment if schema changes
+      version: 3, // <-- ✅ increase version to 3 here!
       onCreate: (Database db, int version) async {
         await db.execute('''
-      CREATE TABLE users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        face_vector TEXT,
-        nickname TEXT,
-        name TEXT,
-        relation TEXT,
-        primary_image TEXT
-      )''');
+        CREATE TABLE users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          face_vector TEXT,
+          nickname TEXT,
+          name TEXT,
+          relation TEXT,
+          primary_image TEXT
+        )''');
 
         await db.execute('''
-      CREATE TABLE user_images (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        image_path TEXT,
-        FOREIGN KEY(user_id) REFERENCES users(id)
-      )''');
+        CREATE TABLE user_images (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          image_path TEXT,
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        )''');
 
         await db.execute('''
-      CREATE TABLE user_vectors (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        vector TEXT,
-        FOREIGN KEY(user_id) REFERENCES users(id)
-      )''');
+        CREATE TABLE user_vectors (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          vector TEXT,
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        )''');
       },
       onUpgrade: (Database db, int oldVersion, int newVersion) async {
         if (oldVersion < 2) {
           await db.execute('ALTER TABLE users ADD COLUMN primary_image TEXT');
+        }
+        if (oldVersion < 3) {
           await db.execute('''
           CREATE TABLE IF NOT EXISTS user_vectors (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

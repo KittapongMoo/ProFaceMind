@@ -172,30 +172,33 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
   Future<Database> _getDatabase() async {
     String dbPath = await getDatabasesPath();
     String path = join(dbPath, 'facemind.db');
+
     return openDatabase(
       path,
-      version: 2,
+      version: 3, // <-- updated version to match everywhere
       onCreate: (Database db, int version) async {
         await db.execute('''
-          CREATE TABLE users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            face_vector TEXT,
-            nickname TEXT,
-            name TEXT,
-            relation TEXT,
-            primary_image TEXT
-          )
-        ''');
+        CREATE TABLE users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          face_vector TEXT,
+          nickname TEXT,
+          name TEXT,
+          relation TEXT,
+          primary_image TEXT
+        )
+      ''');
+
         await db.execute('''
-          CREATE TABLE user_images (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            image_path TEXT,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-          )
-        ''');
+        CREATE TABLE user_images (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          image_path TEXT,
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+      ''');
+
         await db.execute('''
-        CREATE TABLE IF NOT EXISTS user_vectors (
+        CREATE TABLE user_vectors (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           user_id INTEGER,
           vector TEXT,
@@ -203,10 +206,43 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
         )
       ''');
 
+        await db.execute('''
+        CREATE TABLE history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          matched_at TEXT,
+          face_image BLOB
+        )
+      ''');
       },
       onUpgrade: (Database db, int oldVersion, int newVersion) async {
-        if (oldVersion == 1 && newVersion == 2) {
+        if (oldVersion < 2) {
           await db.execute('ALTER TABLE users ADD COLUMN primary_image TEXT');
+        }
+        if (oldVersion < 3) {
+          await db.execute('''
+          CREATE TABLE IF NOT EXISTS user_vectors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            vector TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+          )
+        ''');
+
+          await db.execute('''
+          CREATE TABLE IF NOT EXISTS history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            matched_at TEXT,
+            face_image BLOB
+          )
+        ''');
+
+          List<Map> columns = await db.rawQuery("PRAGMA table_info(history)");
+          bool hasFaceImage = columns.any((col) => col['name'] == 'face_image');
+          if (!hasFaceImage) {
+            await db.execute("ALTER TABLE history ADD COLUMN face_image BLOB");
+          }
         }
       },
     );
@@ -618,16 +654,14 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
 
   // Save a history record (user id and current time).
   Future<void> _saveHistory(int userId, Uint8List faceImageBytes) async {
-    final db = await _getHistoryDatabase();
+    final db = await _getDatabase();  // <-- updated
     DateTime now = DateTime.now();
-    // Format the current time as "yyyy-MM-dd HH:mm" (ignoring seconds).
     String nowFormatted = "${now.year.toString().padLeft(4, '0')}-"
         "${now.month.toString().padLeft(2, '0')}-"
         "${now.day.toString().padLeft(2, '0')} "
         "${now.hour.toString().padLeft(2, '0')}:"
         "${now.minute.toString().padLeft(2, '0')}";
 
-    // Check if a history record exists for this user at the same date and minute.
     final List<Map<String, dynamic>> existing = await db.rawQuery('''
     SELECT * FROM history
     WHERE user_id = ? 
@@ -635,7 +669,6 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
   ''', [userId, nowFormatted]);
 
     if (existing.isEmpty) {
-      // Insert the new history record with the face image blob.
       await db.insert(
         'history',
         {

@@ -23,12 +23,12 @@ Future<void> main() async {
 Future<void> _initializeHistoryDatabase() async {
   final dbPath = await getDatabasesPath();
   final path = join(dbPath, 'facemind.db');
-  // Open (or create) the database.
+
   Database db = await openDatabase(
     path,
-    version: 3,
+    version: 3, // Make sure this matches everywhere!
     onCreate: (Database db, int version) async {
-      // Create your existing tables.
+      // Create users table
       await db.execute('''
         CREATE TABLE users (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,6 +39,8 @@ Future<void> _initializeHistoryDatabase() async {
           primary_image TEXT
         )
       ''');
+
+      // Create user_images table
       await db.execute('''
         CREATE TABLE user_images (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +49,18 @@ Future<void> _initializeHistoryDatabase() async {
           FOREIGN KEY(user_id) REFERENCES users(id)
         )
       ''');
-      // Create the history table including a face_image column as a BLOB.
+
+      // Create user_vectors table
+      await db.execute('''
+        CREATE TABLE user_vectors (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          vector TEXT,
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+      ''');
+
+      // Create history table with face_image
       await db.execute('''
         CREATE TABLE history (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,17 +70,33 @@ Future<void> _initializeHistoryDatabase() async {
         )
       ''');
     },
-    onOpen: (Database db) async {
-      // In case the history table exists but lacks the face_image column,
-      // add it via an ALTER TABLE statement.
-      List<Map> columns = await db.rawQuery("PRAGMA table_info(history)");
-      bool hasFaceImage = columns.any((col) => col['name'] == 'face_image');
-      if (!hasFaceImage) {
-        await db.execute("ALTER TABLE history ADD COLUMN face_image BLOB");
+    onUpgrade: (Database db, int oldVersion, int newVersion) async {
+      if (oldVersion < 2) {
+        // Version 2 updates (if missing)
+        await db.execute('ALTER TABLE users ADD COLUMN primary_image TEXT');
+      }
+
+      if (oldVersion < 3) {
+        // Version 3 updates (if missing)
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS user_vectors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            vector TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+          )
+        ''');
+
+        List<Map> columns = await db.rawQuery("PRAGMA table_info(history)");
+        bool hasFaceImage = columns.any((col) => col['name'] == 'face_image');
+        if (!hasFaceImage) {
+          await db.execute("ALTER TABLE history ADD COLUMN face_image BLOB");
+        }
       }
     },
   );
-  print('History table initialized in database at $path');
+
+  print('✅ Database initialized at $path with correct schema (version 3)');
 }
 
 class MyApp extends StatelessWidget {

@@ -31,7 +31,7 @@ class _HistoryPageState extends State<HistoryPage> {
     // Open the database.
     Database db = await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onOpen: (Database db) async {
         print("Database opened: $path");
       },
