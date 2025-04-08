@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'dart:math' as math;
+import 'package:facemind/database_helper.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({Key? key}) : super(key: key);
@@ -51,7 +52,7 @@ class _HistoryPageState extends State<HistoryPage> {
   // Load history records for the given date.
   // This query joins the history table with the users table.
   Future<List<Map<String, dynamic>>> _loadHistory(DateTime date) async {
-    final db = await _getHistoryDatabase();
+    final db = await DatabaseHelper().database;
     // Format date as yyyy-MM-dd to use with SQLite's date() function.
     final formattedDate = "${date.year.toString().padLeft(4, '0')}-"
         "${date.month.toString().padLeft(2, '0')}-"
@@ -84,7 +85,7 @@ class _HistoryPageState extends State<HistoryPage> {
   // Debug function to check the history database.
   Future<void> _checkHistoryDatabase() async {
     try {
-      final db = await _getHistoryDatabase();
+      final db = await DatabaseHelper().database;
       final tableInfo = await db.rawQuery("PRAGMA table_info(history)");
       print("Table info for 'history': $tableInfo");
 
@@ -97,7 +98,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   // Delete a history record by its id.
   Future<void> _deleteHistoryRecord(int id) async {
-    final db = await _getHistoryDatabase();
+    final db = await DatabaseHelper().database;
     await db.delete('history', where: 'id = ?', whereArgs: [id]);
     // Refresh the list.
     setState(() {

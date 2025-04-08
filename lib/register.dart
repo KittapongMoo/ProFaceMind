@@ -14,6 +14,7 @@ import 'package:path/path.dart';
 import 'dart:math' as math;
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:facemind/main.dart';
+import 'package:facemind/database_helper.dart';
 
 import 'fillinfo.dart'; // Make sure FillInfoPage({required this.userId}) is defined
 
@@ -500,7 +501,7 @@ class _RegisterPageState extends State<RegisterPage> {
         await _cameraController!.stopImageStream();
       }
 
-      final db = await _getDatabase(); // ✅ define db first!
+      final db = await DatabaseHelper().database;
       final Directory appDir = await getApplicationDocumentsDirectory();
       final Directory userDir = Directory('${appDir.path}/temp_faces');
 
