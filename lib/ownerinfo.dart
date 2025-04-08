@@ -510,7 +510,7 @@ class _OwnerinfoState extends State<Ownerinfo> {
                 _buildDropdownField(
                   label: 'ส่วนสูง',
                   value: _selectedHeight,
-                  items: List.generate(251, (index) => '${150 + index} ซม.'),
+                  items: List.generate(251, (index) => '${0 + index} ซม.'),
                   onChanged: (String? newValue) {
                     if (newValue != null) {
                       setState(() {
@@ -522,7 +522,7 @@ class _OwnerinfoState extends State<Ownerinfo> {
                 _buildDropdownField(
                   label: 'น้ำหนัก',
                   value: _selectedWeight,
-                  items: List.generate(151, (index) => '${50 + index} กก.'),
+                  items: List.generate(151, (index) => '${0 + index} กก.'),
                   onChanged: (String? newValue) {
                     if (newValue != null) {
                       setState(() {
