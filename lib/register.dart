@@ -610,9 +610,9 @@ class _RegisterPageState extends State<RegisterPage> {
     String path = join(dbPath, 'facemind.db');
     return openDatabase(
       path,
-      version: 2, // 🔴 Increase version number here!
+      version: 2,
       onCreate: (Database db, int version) async {
-        // Create initial database
+        // Initial creation of all tables (when database is first created)
         await db.execute('''
         CREATE TABLE users (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -634,19 +634,38 @@ class _RegisterPageState extends State<RegisterPage> {
       ''');
 
         await db.execute('''
-        CREATE TABLE IF NOT EXISTS user_vectors (
+        CREATE TABLE user_vectors (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           user_id INTEGER,
           vector TEXT,
           FOREIGN KEY(user_id) REFERENCES users(id)
         )
       ''');
-
       },
       onUpgrade: (Database db, int oldVersion, int newVersion) async {
-        if (oldVersion == 1 && newVersion == 2) {
-          // Add the new column to existing users table
+        if (oldVersion < 2) {
+          // Add missing primary_image column if upgrading from version 1
           await db.execute('ALTER TABLE users ADD COLUMN primary_image TEXT');
+
+          // Ensure user_vectors table is created
+          await db.execute('''
+          CREATE TABLE IF NOT EXISTS user_vectors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            vector TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+          )
+        ''');
+
+          // Ensure user_images table exists (just in case)
+          await db.execute('''
+          CREATE TABLE IF NOT EXISTS user_images (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            image_path TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+          )
+        ''');
         }
       },
     );
