@@ -490,21 +490,12 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     }
   }
 
-  /// Compute Euclidean distance between two vectors.
-  double _euclideanDistance(List<double> a, List<double> b) {
-    double sum = 0;
-    for (int i = 0; i < a.length; i++) {
-      sum += math.pow(a[i] - b[i], 2);
-    }
-    return math.sqrt(sum);
-  }
-
   /// Find a matching user in the database by comparing face vectors.
   Future<Map<String, dynamic>?> _findMatchingUser(List<double> vector) async {
     final db = await _getDatabase();
     final List<Map<String, dynamic>> users = await db.query('users');
 
-    double similarityThreshold = 0.8; // Adjust threshold as needed (1.0 is a perfect match).
+    double similarityThreshold = 0.6; // Adjust threshold as needed (1.0 is a perfect match).
     Map<String, dynamic>? bestMatch;
     double bestSimilarity = -1; // Initialize with a low similarity.
 
@@ -512,7 +503,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
       String faceVectorJson = user['face_vector'];
       List<dynamic> stored = jsonDecode(faceVectorJson);
       List<double> storedVector = stored.map((e) => (e as num).toDouble()).toList();
-      double similarity = _cosineSimilarity(vector, storedVector);
+      double similarity = _euclideanDistance(vector, storedVector);
       print("😀😀😀Cosine similarity for user ${user['id']}: $similarity");
 
       if (similarity > similarityThreshold && similarity > bestSimilarity) {
@@ -536,6 +527,15 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     // Add a small constant to avoid division by zero.
     return dot / ((math.sqrt(normA) * math.sqrt(normB)) + 1e-10);
   }
+
+  double _euclideanDistance(List<double> a, List<double> b) {
+    double sum = 0;
+    for (int i = 0; i < a.length; i++) {
+      sum += math.pow(a[i] - b[i], 2);
+    }
+    return math.sqrt(sum);
+  }
+
 
   // Add these new functions to your CameraPage state
 
