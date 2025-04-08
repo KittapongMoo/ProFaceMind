@@ -504,6 +504,11 @@ class _RegisterPageState extends State<RegisterPage> {
       final Directory appDir = await getApplicationDocumentsDirectory();
       final Directory userDir = Directory('${appDir.path}/temp_faces');
 
+      if (!userDir.existsSync()) {
+        userDir.createSync(recursive: true);
+      }
+
+
       // Fetch current session images
       final List<FileSystemEntity> imagesList = userDir.listSync().whereType<File>().toList();
       imagesList.sort((a, b) => a.statSync().modified.compareTo(b.statSync().modified));
