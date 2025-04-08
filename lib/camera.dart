@@ -74,7 +74,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     _timer = Timer.periodic(const Duration(seconds: 2), (Timer timer) {
       _recognizeFace();
     });
-    _checkHistoryDatabase();
+    // _checkHistoryDatabase();
   }
 
   @override
@@ -495,7 +495,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     final db = await _getDatabase();
     final List<Map<String, dynamic>> users = await db.query('users');
 
-    double similarityThreshold = 0.6; // Adjust threshold as needed (1.0 is a perfect match).
+    double similarityThreshold = 0.75; // Adjust threshold as needed (1.0 is a perfect match).
     Map<String, dynamic>? bestMatch;
     double bestSimilarity = -1; // Initialize with a low similarity.
 
@@ -503,7 +503,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
       String faceVectorJson = user['face_vector'];
       List<dynamic> stored = jsonDecode(faceVectorJson);
       List<double> storedVector = stored.map((e) => (e as num).toDouble()).toList();
-      double similarity = _manhattanDistance(vector, storedVector);
+      double similarity = _cosineSimilarity(vector, storedVector);
       print("😀😀😀Cosine similarity for user ${user['id']}: $similarity");
 
       if (similarity > similarityThreshold && similarity > bestSimilarity) {
