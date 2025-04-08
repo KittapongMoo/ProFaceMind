@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // เพิ่มสำหรับ inputFormatters
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -76,8 +77,7 @@ class _SetPhoneNumberState extends State<SetPhoneNumber> {
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
         return;
       }
     }
@@ -107,7 +107,6 @@ class _SetPhoneNumberState extends State<SetPhoneNumber> {
     return Scaffold(
       body: Stack(
         children: [
-          // 🔹 Google Map background
           GoogleMap(
             onMapCreated: (GoogleMapController controller) {
               _mapController = controller;
@@ -125,15 +124,12 @@ class _SetPhoneNumberState extends State<SetPhoneNumber> {
               Marker(
                 markerId: const MarkerId('current-location'),
                 position: _currentPosition,
-                icon: BitmapDescriptor.defaultMarkerWithHue(
-                    BitmapDescriptor.hueRed),
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
               ),
             },
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
           ),
-
-          // 🔙 Back button
           Positioned(
             top: 40,
             left: 16,
@@ -144,8 +140,6 @@ class _SetPhoneNumberState extends State<SetPhoneNumber> {
               child: const Icon(Icons.arrow_back, color: Colors.black),
             ),
           ),
-
-          // 🔹 Bottom sheet
           Positioned(
             left: 0,
             right: 0,
@@ -171,7 +165,6 @@ class _SetPhoneNumberState extends State<SetPhoneNumber> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // ✅ จุดไข่ปลา (จุดขวาสุดสีน้ำเงิน)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -204,7 +197,6 @@ class _SetPhoneNumberState extends State<SetPhoneNumber> {
                       ],
                     ),
                     const SizedBox(height: 20),
-
                     const Text(
                       'ตั้งค่าเบอร์โทรศัพท์ฉุกเฉินของคุณ',
                       style: TextStyle(
@@ -220,7 +212,6 @@ class _SetPhoneNumberState extends State<SetPhoneNumber> {
                       style: TextStyle(fontSize: 16, color: Colors.black54),
                     ),
                     const SizedBox(height: 20),
-
                     _buildRoundedField(
                       label: 'ชื่อ',
                       hint: 'กรุณาระบุชื่อ...',
@@ -237,9 +228,7 @@ class _SetPhoneNumberState extends State<SetPhoneNumber> {
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
                     ),
-
                     const SizedBox(height: 20),
-
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -288,14 +277,26 @@ class _SetPhoneNumberState extends State<SetPhoneNumber> {
           TextFormField(
             controller: controller,
             keyboardType: keyboardType,
-            validator: (value) =>
-            value == null || value.trim().isEmpty ? 'กรุณากรอก $label' : null,
+            inputFormatters: keyboardType == TextInputType.phone
+                ? [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ]
+                : [],
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'กรุณากรอก $label';
+              }
+              if (keyboardType == TextInputType.phone && value.trim().length != 10) {
+                return 'กรุณากรอกเบอร์โทรให้ครบ 10 หลัก';
+              }
+              return null;
+            },
             decoration: InputDecoration(
               hintText: hint,
               filled: true,
               fillColor: Colors.grey[200],
-              contentPadding:
-              const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
                 borderSide: BorderSide.none,
