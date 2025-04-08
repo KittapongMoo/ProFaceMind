@@ -503,7 +503,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
       String faceVectorJson = user['face_vector'];
       List<dynamic> stored = jsonDecode(faceVectorJson);
       List<double> storedVector = stored.map((e) => (e as num).toDouble()).toList();
-      double similarity = _euclideanDistance(vector, storedVector);
+      double similarity = _manhattanDistance(vector, storedVector);
       print("😀😀😀Cosine similarity for user ${user['id']}: $similarity");
 
       if (similarity > similarityThreshold && similarity > bestSimilarity) {
@@ -536,6 +536,27 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     return math.sqrt(sum);
   }
 
+  double _manhattanDistance(List<double> a, List<double> b) {
+    double sum = 0;
+    for (int i = 0; i < a.length; i++) {
+      sum += (a[i] - b[i]).abs();
+    }
+    return sum;
+  }
+
+  double _dotProduct(List<double> a, List<double> b) {
+    double dot = 0;
+    for (int i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+    }
+    return dot;
+  }
+
+  double _hybridScore(List<double> a, List<double> b) {
+    double cosine = _cosineSimilarity(a, b);
+    double euclidean = _euclideanDistance(a, b);
+    return (cosine * 0.7) - (euclidean * 0.3); // Adjust weights as needed
+  }
 
   // Add these new functions to your CameraPage state
 
