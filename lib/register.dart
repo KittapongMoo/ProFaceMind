@@ -496,50 +496,50 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       _showProgressIndicator("Registering user...");
 
-      if (_cameraController != null &&
-          _cameraController!.value.isStreamingImages) {
+      if (_cameraController != null && _cameraController!.value.isStreamingImages) {
         await _cameraController!.stopImageStream();
       }
 
-      List<double> averageVector = List.filled(128, 0.0);
-      for (var vector in _faceVectors) {
-        for (int i = 0; i < vector.length; i++) {
-          averageVector[i] += vector[i];
-        }
-      }
-      for (int i = 0; i < averageVector.length; i++) {
-        averageVector[i] /= _faceVectors.length;
-      }
-
-      final db = await _getDatabase();
+      final db = await _getDatabase(); // ✅ define db first!
       final Directory appDir = await getApplicationDocumentsDirectory();
       final Directory userDir = Directory('${appDir.path}/temp_faces');
 
-      // Fetch only current session images and filter for Files.
-      final List<FileSystemEntity> imagesList =
-          userDir.listSync().whereType<File>().toList();
+      // Fetch current session images
+      final List<FileSystemEntity> imagesList = userDir.listSync().whereType<File>().toList();
+      imagesList.sort((a, b) => a.statSync().modified.compareTo(b.statSync().modified));
 
-      // Sort the images by last modified time (oldest first)
-      imagesList.sort(
-          (a, b) => a.statSync().modified.compareTo(b.statSync().modified));
+      // Calculate the average vector (optional, you can store or skip it)
+      List<double> averageVector = List.filled(128, 0.0);
+      for (var vector in _faceVectors) {
+        for (int i = 0; i < 128; i++) {
+          averageVector[i] += vector[i];
+        }
+      }
+      averageVector = averageVector.map((val) => val / _faceVectors.length).toList();
 
-      // Insert user with a placeholder for primary_image
+      // Insert user to get userId
       int userId = await db.insert('users', {
-        'face_vector': jsonEncode(averageVector),
+        'face_vector': jsonEncode(averageVector),  // Optional
         'nickname': '',
         'name': '',
         'relation': '',
-        'primary_image': '', // Temporary, will update later
+        'primary_image': '', // to update later
       });
 
-      // Create a final folder for this user
+      // ✅ Insert each of the 5 vectors into user_vectors table
+      for (var vector in _faceVectors) {
+        await db.insert('user_vectors', {
+          'user_id': userId,
+          'vector': jsonEncode(vector),
+        });
+      }
+
+      // Move images to final user directory
       final Directory finalUserDir = Directory('${appDir.path}/user_$userId');
       if (!finalUserDir.existsSync()) {
         finalUserDir.createSync(recursive: true);
       }
 
-      // Move images from temp_faces to user-specific folder
-      // Also, collect the new file paths.
       List<String> finalImagePaths = [];
       for (var imageFile in imagesList) {
         String newFilePath = join(finalUserDir.path, basename(imageFile.path));
@@ -549,11 +549,10 @@ class _RegisterPageState extends State<RegisterPage> {
           'user_id': userId,
           'image_path': newFile.path,
         });
-        imageFile.deleteSync(); // Clean temp file after moving
+        imageFile.deleteSync();
       }
 
-      // Update the user record with the new primary image path,
-      // using the first image from the sorted finalImagePaths list.
+      // Update primary_image
       if (finalImagePaths.isNotEmpty) {
         await db.update(
           'users',
@@ -565,7 +564,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
       _faceVectors.clear();
 
-      print("User registered with id: $userId");
+      print("✅ User registered with id: $userId");
       _hideDialog();
 
       if (navigatorKey.currentContext != null) {
@@ -579,7 +578,7 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     } catch (e) {
       _hideDialog();
-      print('❌Error registering user: $e');
+      print('❌ Error registering user: $e');
       _showErrorPopup("Error registering user: $e");
     }
   }
@@ -633,6 +632,16 @@ class _RegisterPageState extends State<RegisterPage> {
           FOREIGN KEY(user_id) REFERENCES users(id)
         )
       ''');
+
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS user_vectors (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          vector TEXT,
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+      ''');
+
       },
       onUpgrade: (Database db, int oldVersion, int newVersion) async {
         if (oldVersion == 1 && newVersion == 2) {

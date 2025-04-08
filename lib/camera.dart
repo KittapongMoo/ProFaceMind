@@ -194,6 +194,15 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
             FOREIGN KEY(user_id) REFERENCES users(id)
           )
         ''');
+        await db.execute('''
+        CREATE TABLE IF NOT EXISTS user_vectors (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          vector TEXT,
+          FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+      ''');
+
       },
       onUpgrade: (Database db, int oldVersion, int newVersion) async {
         if (oldVersion == 1 && newVersion == 2) {
@@ -501,25 +510,29 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
   /// Find a matching user in the database by comparing face vectors.
   Future<Map<String, dynamic>?> _findMatchingUser(List<double> vector) async {
     final db = await _getDatabase();
-    final List<Map<String, dynamic>> users = await db.query('users');
 
-    double similarityThreshold = 0.85; // Adjust threshold as needed (1.0 is a perfect match).
+    // Efficient JOIN query to fetch user data and vectors together.
+    final results = await db.rawQuery('''
+    SELECT users.*, user_vectors.vector FROM users
+    JOIN user_vectors ON users.id = user_vectors.user_id
+  ''');
+
+    double similarityThreshold = 0.85;
     Map<String, dynamic>? bestMatch;
-    double bestSimilarity = -1; // Initialize with a low similarity.
+    double bestSimilarity = -1;
 
-    for (var user in users) {
-      String faceVectorJson = user['face_vector'];
-      List<dynamic> stored = jsonDecode(faceVectorJson);
-      List<double> storedVector = stored.map((e) => (e as num).toDouble()).toList();
-      double similarity = _cosineSimilarity(vector, storedVector);
-      print("😀😀😀Cosine similarity for user ${user['id']}: $similarity");
+    for (var row in results) {
+      final vectorString = row['vector'] as String;  // Explicitly cast
+      final List<double> storedVector = List<double>.from(jsonDecode(vectorString));
+      final sim = _cosineSimilarity(vector, storedVector);
 
-      if (similarity > similarityThreshold && similarity > bestSimilarity) {
-        bestSimilarity = similarity;
-        bestMatch = user;
+      if (sim > similarityThreshold && sim > bestSimilarity) {
+        bestSimilarity = sim;
+        bestMatch = row;
       }
     }
-    print("🅱️🅱️🅱️Best similarity: $bestSimilarity");
+
+    print("🧠 Best similarity: $bestSimilarity");
     return bestMatch;
   }
 
@@ -572,23 +585,20 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
   Future<Database> _getHistoryDatabase() async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'facemind.db');
-    // Open the database (version 2, shared with your users table).
-    Database db = await openDatabase(
-      path,
-      version: 2,
-      onOpen: (Database db) async {
-        // You can print a log here if needed.
-        print("Database opened: $path");
-      },
-    );
-    // Ensure the history table exists by executing this every time.
+
+    Database db = await openDatabase(path, version: 2, onOpen: (db) {
+      print("Database opened: $path");
+    });
+
     await db.execute('''
     CREATE TABLE IF NOT EXISTS history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER,
-      matched_at TEXT
+      matched_at TEXT,
+      face_image BLOB
     )
   ''');
+
     return db;
   }
 
