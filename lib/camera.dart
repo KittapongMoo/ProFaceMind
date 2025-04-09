@@ -40,6 +40,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
   File? _galleryImage;
   int _sensorOrientation = 0;
   Interpreter? interpreter;
+  Uint8List? _processedFaceImage;
 
   // 👇 เพิ่มตรงนี้
   File? _profileImageFile;
@@ -429,6 +430,11 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
       int h = math.min(processedImage.height - y, box.height.toInt() + 40);
       final img.Image croppedFace = img.copyCrop(processedImage, x, y, w, h);
       final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
+
+      // Save the cropped & resized face image for preview.
+      _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
+      setState(() {}); // Update UI to show the cropped face preview.
+
 
       final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
       List<double> vector = await _runFaceRecognition(processedBytes);
@@ -826,6 +832,32 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
               ],
             ),
           ),
+          if (_processedFaceImage != null)
+            Positioned(
+              top: 120,   // Adjust this vertical position as needed.
+              right: 20,  // Adjust the horizontal position as needed.
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => FullScreenImage(imageBytes: _processedFaceImage!),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 100,  // Set your desired width.
+                  height: 100, // Set your desired height.
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.blue, width: 2),
+                  ),
+                  child: Image.memory(
+                    _processedFaceImage!,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ),
 
 
           // Flip camera button (top center) with text
@@ -1108,5 +1140,20 @@ class FacePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant FacePainter oldDelegate) {
     return oldDelegate.faces != faces;
+  }
+}
+
+class FullScreenImage extends StatelessWidget {
+  final Uint8List imageBytes;
+  const FullScreenImage({Key? key, required this.imageBytes}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Full Screen Image")),
+      body: Center(
+        child: Image.memory(imageBytes, fit: BoxFit.contain),
+      ),
+    );
   }
 }

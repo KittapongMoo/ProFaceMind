@@ -15,7 +15,7 @@ import 'package:path/path.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:facemind/main.dart';
 import 'package:facemind/database_helper.dart';
-import 'package:exif/exif.dart'; // Add to your pubspec.yaml
+import 'package:exif/exif.dart';
 
 import 'fillinfo.dart'; // Make sure FillInfoPage({required this.userId}) is defined
 
