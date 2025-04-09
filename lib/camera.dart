@@ -82,21 +82,20 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     // _checkHistoryDatabase();
   }
 
-  // ✅ วางตรงนี้ได้เลย
   Future<void> _loadProfileImage() async {
-    try {
-      final db = await DatabaseHelper().database;
-      final result = await db.query('users', orderBy: 'id DESC', limit: 1);
-      if (result.isNotEmpty && result.first['primary_image'] != null) {
-        final path = result.first['primary_image'] as String;
-        setState(() {
-          _profileImageFile = File(path);
-        });
-      }
-    } catch (e) {
-      print("❌ Error loading profile image: $e");
+    final prefs = await SharedPreferences.getInstance();
+    final imagePath = prefs.getString('imagePath');
+    if (imagePath != null && imagePath.isNotEmpty) {
+      setState(() {
+        _profileImageFile = File(imagePath);
+      });
+    } else {
+      setState(() {
+        _profileImageFile = null; // ใช้ไอคอนแทน
+      });
     }
   }
+
 
 
   @override
@@ -124,6 +123,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
         _detectFacesFromCamera(cameraImage);
       }
     });
+    _loadProfileImage(); // ✅ โหลดรูปโปรไฟล์อีกครั้งเมื่อกลับเข้าหน้านี้
     _timer = Timer.periodic(const Duration(seconds: 2), (Timer timer) {
       _recognizeFace();
     });
