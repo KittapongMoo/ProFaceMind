@@ -433,7 +433,7 @@ class _RegisterPageState extends State<RegisterPage> {
   /// Process the captured/selected image: validate face, convert to vector, and store.
   Future<void> _processCapturedImage(File imageFile) async {
     try {
-      // 1) Face detection as before.
+      // 1) Detect faces using the file (as before).
       final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
       final List<Face> faces = await _faceDetector.processImage(inputImage);
       _hideDialog();
@@ -442,70 +442,100 @@ class _RegisterPageState extends State<RegisterPage> {
         return;
       }
 
-      // 2) Decode the image (raw pixels) using the image package.
+      // 2) Load and decode the image using the image package.
       final Uint8List imageBytes = await imageFile.readAsBytes();
-      final img.Image? rawImage = img.decodeImage(imageBytes);
-      if (rawImage == null) {
+      final img.Image? fullImage = img.decodeImage(imageBytes);
+      if (fullImage == null) {
         _showErrorPopup("Failed to decode image");
         return;
       }
 
-      // 3) Read EXIF data to determine orientation.
-      // Read EXIF orientation data.
+      // 3) Read EXIF orientation data.
       final Map<String, IfdTag> exifData = await readExifFromBytes(imageBytes);
       int rotationAngle = 0;
-      if (exifData.isNotEmpty && exifData.containsKey("Image Orientation")) {
-        final orientation = exifData["Image Orientation"]?.printable;
-        if (orientation == "Rotated 90 CW") {
-          rotationAngle = 90;
-        } else if (orientation == "Rotated 180") {
-          rotationAngle = 180;
-        } else if (orientation == "Rotated 270 CW") {
-          rotationAngle = -90;
+      if (!_isFrontCamera) {
+        if (exifData.isNotEmpty && exifData.containsKey("Image Orientation")) {
+          final orientation = exifData["Image Orientation"]?.printable;
+          if (orientation == "Rotated 90 CW") {
+            rotationAngle = 90;
+          } else if (orientation == "Rotated 180") {
+            rotationAngle = 180;
+          } else if (orientation == "Rotated 270 CW") {
+            rotationAngle = -90;
+          }
         }
-      }
-      // For front camera, if EXIF data is missing or not as expected, force rotation.
-      // Adjust the value (e.g., 90 or -90) to what your device expects.
-      if (_isFrontCamera) {
-        rotationAngle = 90; // Force a 90° rotation for front-camera images.
+      } else {
+        // For front-camera, force a rotation. Adjust the value as needed.
+        rotationAngle = -90;
       }
 
-      // 5) Rotate the raw image based on the final rotationAngle.
+      // 4) Rotate the full image using the determined rotation angle.
       final img.Image orientedImage = (rotationAngle != 0)
-          ? img.copyRotate(rawImage, rotationAngle)
-          : rawImage;
+          ? img.copyRotate(fullImage, rotationAngle)
+          : fullImage;
 
-      // 6) Pick the first detected face and get its bounding box.
-      Rect box = faces.first.boundingBox;
+      // 5) Use the first detected face and get its bounding box.
+      final Face face = faces.first;
+      Rect box = face.boundingBox;
 
-      // 7) For front camera, mirror the bounding box horizontally
-      //    so that we crop the correct region in the oriented image.
+      // 6) If using front-camera, mirror the bounding box horizontally.
       if (_isFrontCamera) {
         box = Rect.fromLTRB(
-          orientedImage.width - box.right,
+          orientedImage.width - box.right, // new left
           box.top,
-          orientedImage.width - box.left,
+          orientedImage.width - box.left,  // new right
           box.bottom,
         );
       }
 
-      // 8) Ensure the crop rectangle is within image bounds + add optional margin.
+      // 7) Add a margin and ensure crop rectangle is within the image bounds.
       const margin = 20;
       int x = (box.left - margin).toInt().clamp(0, orientedImage.width);
       int y = (box.top - margin).toInt().clamp(0, orientedImage.height);
       int w = (box.width + 2 * margin).toInt();
       int h = (box.height + 2 * margin).toInt();
-      if (x + w > orientedImage.width) w = orientedImage.width - x;
-      if (y + h > orientedImage.height) h = orientedImage.height - y;
+      if (x + w > orientedImage.width) {
+        w = orientedImage.width - x;
+      }
+      if (y + h > orientedImage.height) {
+        h = orientedImage.height - y;
+      }
 
-      // 9) Crop + resize.
+      // 8) Crop the face from the oriented image.
       final img.Image croppedFace = img.copyCrop(orientedImage, x, y, w, h);
-      final img.Image resizedFace =
-          img.copyResize(croppedFace, width: 112, height: 112);
+      // 9) Resize the cropped face (for example, to 112x112).
+      final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
 
-      // 10) Encode + store preview.
+      // 10) Encode the processed image for preview and update the state.
       _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
       setState(() {});
+
+      // 11) Preprocess for recognition: convert the face image to a normalized byte list.
+      final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
+
+      // 12) Run face recognition to get the vector.
+      List<double> vector = await _runFaceRecognition(processedBytes);
+
+      // 13) Normalize the vector (L2 norm normalization).
+      final double norm = math.sqrt(vector.fold(0, (sum, val) => sum + val * val));
+      if (norm > 0) {
+        vector = vector.map((e) => e / norm).toList();
+      }
+      if (vector.every((v) => v == 0)) {
+        _showErrorPopup("Face recognition failed. Try again.");
+        return;
+      }
+
+      // 14) Add the vector to your list and update state.
+      setState(() {
+        _faceVectors.add(vector);
+      });
+      print("Captured image processed. Count: ${_faceVectors.length}/5");
+
+      // 15) If you have enough face vectors, proceed to user registration.
+      if (_faceVectors.length >= 5) {
+        await _registerUserWithImages();
+      }
     } catch (e) {
       _hideDialog();
       print('❌ Error processing image: $e');
