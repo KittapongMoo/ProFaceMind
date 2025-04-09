@@ -707,110 +707,126 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
 
           ),
 
-          // Phone button (top-right)
+          // ปุ่มเบอร์ฉุกเฉิน (ขวาบน)
           Positioned(
             top: 40,
             right: 20,
-            child: CircleAvatar(
-              backgroundColor: Colors.red,
-              child: IconButton(
-                icon: const Icon(Icons.phone, color: Colors.white),
-                onPressed: () async {
-                  final prefs = await SharedPreferences.getInstance();
-                  final name = prefs.getString('emergency_name') ?? 'ไม่พบชื่อ';
-                  final relation = prefs.getString('emergency_relation') ?? 'ไม่พบความสัมพันธ์';
-                  final phone = prefs.getString('emergency_phone') ?? 'ไม่พบเบอร์โทร';
-                  showDialog(
-                    context: context,
-                    barrierDismissible: true,
-                    builder: (context) => Dialog(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 100),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const Text(
-                                  'เบอร์โทรศัพท์ฉุกเฉิน',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF1A2A43),
-                                  ),
-                                ),
-                                const Spacer(),
-                                GestureDetector(
-                                  onTap: () => Navigator.pop(context),
-                                  child: const Padding(
-                                    padding: EdgeInsets.all(8),
-                                    child: Icon(Icons.close, size: 22, color: Colors.grey),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '$name ($relation)',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          color: Color(0xFF6B7280),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        phone,
-                                        style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF6B7280),
-                                          letterSpacing: 1.2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => const SetPhoneNumber()),
-                                    );
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(left: 8, top: 2),
-                                    child: CircleAvatar(
-                                      radius: 25,
-                                      backgroundColor: Colors.blue,
-                                      child: const Icon(Icons.edit, size: 25, color: Colors.white),
+            child: Column(
+              children: [
+                GestureDetector(
+                  onTap: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    final name = prefs.getString('emergency_name') ?? 'ไม่พบชื่อ';
+                    final relation = prefs.getString('emergency_relation') ?? 'ไม่พบความสัมพันธ์';
+                    final phone = prefs.getString('emergency_phone') ?? 'ไม่พบเบอร์โทร';
+
+                    showDialog(
+                      context: context,
+                      barrierDismissible: true,
+                      builder: (context) => Dialog(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 100),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  const Text(
+                                    'เบอร์โทรศัพท์ฉุกเฉิน',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF1A2A43),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
+                                  const Spacer(),
+                                  GestureDetector(
+                                    onTap: () => Navigator.pop(context),
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(8),
+                                      child: Icon(Icons.close, size: 22, color: Colors.grey),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '$name ($relation)',
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            color: Color(0xFF6B7280),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          phone,
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF6B7280),
+                                            letterSpacing: 1.2,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (context) => const SetPhoneNumber()),
+                                      );
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(left: 8, top: 2),
+                                      child: CircleAvatar(
+                                        radius: 25,
+                                        backgroundColor: Colors.blue,
+                                        child: const Icon(Icons.edit, size: 25, color: Colors.white),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                  child: const CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.red,
+                    child: Icon(Icons.phone, color: Colors.white),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  "เบอร์ฉุกเฉิน",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
+
 
           // Flip camera button (top center).
           Positioned(
@@ -833,102 +849,136 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
 
           // Bottom row with register, last image, map.
           Positioned(
-            bottom: 80,
+            bottom: 50,
             left: 20,
             right: 20,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Register button.
-                FloatingActionButton(
-                  heroTag: 'register',
-                  backgroundColor: Colors.blue,
-                  child: const Icon(Icons.how_to_reg),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const RegisterPage()),
-                    );
-                  },
-                ),
-                // Tappable rectangle for last image.
-                FutureBuilder<String?>(
-                  future: _lastImageFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const AllRegisterPage()),
-                          );
-                        },
-                        child: Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            color: Colors.grey,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Center(child: CircularProgressIndicator()),
-                        ),
-                      );
-                    }
-                    if (snapshot.hasData && snapshot.data != null) {
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const AllRegisterPage()),
-                          );
-                        },
-                        child: Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            image: DecorationImage(
-                              image: FileImage(File(snapshot.data!)),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-                    return GestureDetector(
+                // ปุ่มลงทะเบียน (ล่างซ้าย)
+                Column(
+                  children: [
+                    GestureDetector(
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const AllRegisterPage()),
+                          MaterialPageRoute(builder: (context) => const RegisterPage()),
                         );
                       },
-                      child: Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: Colors.grey,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Center(
-                          child: Icon(Icons.image, color: Colors.white),
-                        ),
+                      child: const CircleAvatar(
+                        radius: 30,
+                        backgroundColor: Colors.blue,
+                        child: Icon(Icons.how_to_reg, color: Colors.white),
                       ),
-                    );
-                  },
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      "ลงทะเบียน",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
+
+                // ปุ่มข้อมูลบุคคลแบบเดิม + เพิ่มข้อความใต้ปุ่ม
+                Column(
+                  children: [
+                    FutureBuilder<String?>(
+                      future: _lastImageFuture,
+                      builder: (context, snapshot) {
+                        Widget child;
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          child = Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: Colors.grey,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Center(child: CircularProgressIndicator()),
+                          );
+                        } else if (snapshot.hasData && snapshot.data != null) {
+                          child = Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              image: DecorationImage(
+                                image: FileImage(File(snapshot.data!)),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          );
+                        } else {
+                          child = Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: Colors.grey,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.image, color: Colors.white),
+                            ),
+                          );
+                        }
+
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const AllRegisterPage()),
+                            );
+                          },
+                          child: child,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      "ข้อมูลบุคคล",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+
                 // Map button.
-                FloatingActionButton(
-                  heroTag: 'map',
-                  backgroundColor: Colors.green,
-                  child: const Icon(Icons.map),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const NavigationPage()),
-                    );
-                  },
+                // ปุ่มแผนที่ (ล่างขวา)
+                Column(
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const NavigationPage()),
+                        );
+                      },
+                      child: const CircleAvatar(
+                        radius: 30,
+                        backgroundColor: Colors.green,
+                        child: Icon(Icons.map, color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      "แผนที่",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
+
               ],
             ),
           ),
@@ -937,7 +987,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
           // BLACK BOX OVERLAY: Show matched user info (or placeholders "??")
           // ---------------------------------------------------------------------
           Positioned(
-            bottom: 200,
+            bottom: 190,
             left: 50,
             right: 50,
             child: Container(
