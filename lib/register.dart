@@ -432,7 +432,7 @@ class _RegisterPageState extends State<RegisterPage> {
   /// Process the captured/selected image: validate face, convert to vector, and store.
   Future<void> _processCapturedImage(File imageFile) async {
     try {
-      // Detect faces in the image (using the file path directly).
+      // 1) Face detection as before.
       final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
       final List<Face> faces = await _faceDetector.processImage(inputImage);
       _hideDialog();
@@ -441,66 +441,77 @@ class _RegisterPageState extends State<RegisterPage> {
         return;
       }
 
-      // Load and decode the image using the image package.
+      // 2) Decode the image (raw pixels) using the image package.
       final Uint8List imageBytes = await imageFile.readAsBytes();
-      final img.Image? fullImage = img.decodeImage(imageBytes);
-      if (fullImage == null) {
+      final img.Image? rawImage = img.decodeImage(imageBytes);
+      if (rawImage == null) {
         _showErrorPopup("Failed to decode image");
         return;
       }
 
-      // For back camera, correct image rotation using EXIF data;
-      // For front camera, skip correction (set rotationAngle = 0).
+      // 3) Read EXIF data to determine orientation.
+      final Map<String, IfdTag> exifData = await readExifFromBytes(imageBytes);
       int rotationAngle = 0;
-      if (!_isFrontCamera) {
-        final Map<String, IfdTag> exifData = await readExifFromBytes(imageBytes);
-        if (exifData.isNotEmpty && exifData.containsKey("Image Orientation")) {
-          final orientation = exifData["Image Orientation"]?.printable;
-          if (orientation == "Rotated 90 CW") {
+      if (exifData.isNotEmpty && exifData.containsKey("Image Orientation")) {
+        final orientation = exifData["Image Orientation"]?.printable;
+
+        // Common orientation strings: "Horizontal (normal)", "Rotated 90 CW", "Rotated 180", "Rotated 270 CW"
+        // Adjust to your device's exact strings.
+        switch (orientation) {
+          case "Rotated 90 CW":
             rotationAngle = 90;
-          } else if (orientation == "Rotated 180") {
+            break;
+          case "Rotated 180":
             rotationAngle = 180;
-          } else if (orientation == "Rotated 270 CW") {
-            rotationAngle = -90;
-          }
+            break;
+          case "Rotated 270 CW":
+            rotationAngle = -90; // same as 270
+            break;
         }
       }
-      final img.Image orientedImage = rotationAngle != 0
-          ? img.copyRotate(fullImage, rotationAngle)
-          : fullImage;
 
-      // Use the first detected face.
-      final Face face = faces.first;
-      Rect box = face.boundingBox;
+      // 4) If the camera is front-facing, some devices embed orientation as if it’s back camera, leading to a 90° mismatch.
+      //    Try flipping the rotation for front camera if the image is turning out sideways.
+      if (_isFrontCamera) {
+        // Example: invert the rotation for front camera to fix 90° mismatch.
+        // You can tweak or remove this if your device doesn't need it.
+        rotationAngle = -rotationAngle;
+      }
 
-      // Adjust the bounding box for front camera by mirroring it horizontally.
+      // 5) Rotate the raw image based on the final rotationAngle.
+      final img.Image orientedImage = (rotationAngle != 0)
+          ? img.copyRotate(rawImage, rotationAngle)
+          : rawImage;
+
+      // 6) Pick the first detected face and get its bounding box.
+      Rect box = faces.first.boundingBox;
+
+      // 7) For front camera, mirror the bounding box horizontally
+      //    so that we crop the correct region in the oriented image.
       if (_isFrontCamera) {
         box = Rect.fromLTRB(
-          orientedImage.width - box.right, // mirrored left
+          orientedImage.width - box.right,
           box.top,
-          orientedImage.width - box.left,  // mirrored right
+          orientedImage.width - box.left,
           box.bottom,
         );
       }
 
-      // Calculate crop coordinates ensuring they lie within the image.
-      int x = box.left.toInt().clamp(0, orientedImage.width);
-      int y = box.top.toInt().clamp(0, orientedImage.height);
-      int w = box.width.toInt();
-      int h = box.height.toInt();
-      if (x + w > orientedImage.width) {
-        w = orientedImage.width - x;
-      }
-      if (y + h > orientedImage.height) {
-        h = orientedImage.height - y;
-      }
+      // 8) Ensure the crop rectangle is within image bounds + add optional margin.
+      const margin = 20;
+      int x = (box.left - margin).toInt().clamp(0, orientedImage.width);
+      int y = (box.top - margin).toInt().clamp(0, orientedImage.height);
+      int w = (box.width + 2 * margin).toInt();
+      int h = (box.height + 2 * margin).toInt();
+      if (x + w > orientedImage.width) w = orientedImage.width - x;
+      if (y + h > orientedImage.height) h = orientedImage.height - y;
 
-      // Crop the face from the oriented image.
+      // 9) Crop + resize.
       final img.Image croppedFace = img.copyCrop(orientedImage, x, y, w, h);
-      // Optionally, resize the cropped face (example: 112x112).
       final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
-      _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
 
+      // 10) Encode + store preview.
+      _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
       setState(() {});
     } catch (e) {
       _hideDialog();
