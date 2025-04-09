@@ -551,7 +551,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     }
 
     // Set your required matching settings.
-    const double similarityThreshold = 0.6; // each sample must have cosine similarity above this to count
+    const double similarityThreshold = 0.5; // each sample must have cosine similarity above this to count
     const int requiredMatchCount = 3; // need at least three samples that match
 
     double bestScore = -1;
@@ -569,7 +569,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
         List<double> storedVector = (jsonDecode(vectorString) as List)
             .map((e) => (e is num ? e.toDouble() : 0.0))
             .toList();
-        double sim = _cosineSimilarity(queryVector, storedVector);
+        double sim = _dotProduct(queryVector, storedVector);
         if (sim >= similarityThreshold) {
           matchCount++;
           similaritySum += sim;
@@ -604,6 +604,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     return dot / ((math.sqrt(normA) * math.sqrt(normB)) + 1e-10);
   }
 
+  //ใช้ไม่ได้
   double _euclideanDistance(List<double> a, List<double> b) {
     double sum = 0;
     for (int i = 0; i < a.length; i++) {
@@ -612,6 +613,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     return math.sqrt(sum);
   }
 
+//ใช้ไม่ได้
   double _manhattanDistance(List<double> a, List<double> b) {
     double sum = 0;
     for (int i = 0; i < a.length; i++) {
@@ -620,6 +622,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     return sum;
   }
 
+// 0.4 - 0.5 เวอร์จาด
   double _dotProduct(List<double> a, List<double> b) {
     double dot = 0;
     for (int i = 0; i < a.length; i++) {
@@ -628,6 +631,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     return dot;
   }
 
+//ใช้ไม่ได้
   double hybridScore(List<double> a, List<double> b) {
     double cosine = _cosineSimilarity(a, b);
     double euclidean = _euclideanDistance(a, b);
