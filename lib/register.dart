@@ -454,7 +454,7 @@ class _RegisterPageState extends State<RegisterPage> {
       int rotationAngle = 0;
       if (exifData.isNotEmpty && exifData.containsKey("Image Orientation")) {
         final orientation = exifData["Image Orientation"]?.printable;
-        // Typical orientation strings from EXIF (you may need to adjust based on your device)
+        // Adjust these strings as needed for your device.
         if (orientation == "Rotated 90 CW") {
           rotationAngle = 90;
         } else if (orientation == "Rotated 180") {
@@ -472,11 +472,22 @@ class _RegisterPageState extends State<RegisterPage> {
       final Face face = faces.first;
       final Rect box = face.boundingBox;
 
+      // For front camera, mirror the box horizontally relative to the image.
+      Rect effectiveBox = box;
+      if (_isFrontCamera) {
+        effectiveBox = Rect.fromLTRB(
+          orientedImage.width - box.right,
+          box.top,
+          orientedImage.width - box.left,
+          box.bottom,
+        );
+      }
+
       // Ensure the crop rectangle is within image bounds.
-      int x = box.left.toInt().clamp(0, orientedImage.width);
-      int y = box.top.toInt().clamp(0, orientedImage.height);
-      int w = box.width.toInt();
-      int h = box.height.toInt();
+      int x = effectiveBox.left.toInt().clamp(0, orientedImage.width);
+      int y = effectiveBox.top.toInt().clamp(0, orientedImage.height);
+      int w = effectiveBox.width.toInt();
+      int h = effectiveBox.height.toInt();
       if (x + w > orientedImage.width) {
         w = orientedImage.width - x;
       }
@@ -484,7 +495,7 @@ class _RegisterPageState extends State<RegisterPage> {
         h = orientedImage.height - y;
       }
 
-      // Crop the face from the (oriented) image.
+      // Crop the face from the oriented image.
       final img.Image croppedFace = img.copyCrop(orientedImage, x, y, w, h);
       // Optionally, resize the cropped face (e.g., to 112x112).
       final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
