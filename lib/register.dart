@@ -432,7 +432,7 @@ class _RegisterPageState extends State<RegisterPage> {
   /// Process the captured/selected image: validate face, convert to vector, and store.
   Future<void> _processCapturedImage(File imageFile) async {
     try {
-      // Process face detection as before.
+      // Detect faces in the image (using the file path directly).
       final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
       final List<Face> faces = await _faceDetector.processImage(inputImage);
       _hideDialog();
@@ -449,45 +449,45 @@ class _RegisterPageState extends State<RegisterPage> {
         return;
       }
 
-      // Read EXIF orientation data.
-      final Map<String, IfdTag> exifData = await readExifFromBytes(imageBytes);
+      // For back camera, correct image rotation using EXIF data;
+      // For front camera, skip correction (set rotationAngle = 0).
       int rotationAngle = 0;
-      if (exifData.isNotEmpty && exifData.containsKey("Image Orientation")) {
-        final orientation = exifData["Image Orientation"]?.printable;
-        // Adjust these strings as needed for your device.
-        if (orientation == "Rotated 90 CW") {
-          rotationAngle = 90;
-        } else if (orientation == "Rotated 180") {
-          rotationAngle = 180;
-        } else if (orientation == "Rotated 270 CW") {
-          rotationAngle = -90;
+      if (!_isFrontCamera) {
+        final Map<String, IfdTag> exifData = await readExifFromBytes(imageBytes);
+        if (exifData.isNotEmpty && exifData.containsKey("Image Orientation")) {
+          final orientation = exifData["Image Orientation"]?.printable;
+          if (orientation == "Rotated 90 CW") {
+            rotationAngle = 90;
+          } else if (orientation == "Rotated 180") {
+            rotationAngle = 180;
+          } else if (orientation == "Rotated 270 CW") {
+            rotationAngle = -90;
+          }
         }
       }
-
-      // Rotate the full image if needed.
-      final img.Image orientedImage =
-      rotationAngle != 0 ? img.copyRotate(fullImage, rotationAngle) : fullImage;
+      final img.Image orientedImage = rotationAngle != 0
+          ? img.copyRotate(fullImage, rotationAngle)
+          : fullImage;
 
       // Use the first detected face.
       final Face face = faces.first;
-      final Rect box = face.boundingBox;
+      Rect box = face.boundingBox;
 
-      // For front camera, mirror the box horizontally relative to the image.
-      Rect effectiveBox = box;
+      // Adjust the bounding box for front camera by mirroring it horizontally.
       if (_isFrontCamera) {
-        effectiveBox = Rect.fromLTRB(
-          orientedImage.width - box.right,
+        box = Rect.fromLTRB(
+          orientedImage.width - box.right, // mirrored left
           box.top,
-          orientedImage.width - box.left,
+          orientedImage.width - box.left,  // mirrored right
           box.bottom,
         );
       }
 
-      // Ensure the crop rectangle is within image bounds.
-      int x = effectiveBox.left.toInt().clamp(0, orientedImage.width);
-      int y = effectiveBox.top.toInt().clamp(0, orientedImage.height);
-      int w = effectiveBox.width.toInt();
-      int h = effectiveBox.height.toInt();
+      // Calculate crop coordinates ensuring they lie within the image.
+      int x = box.left.toInt().clamp(0, orientedImage.width);
+      int y = box.top.toInt().clamp(0, orientedImage.height);
+      int w = box.width.toInt();
+      int h = box.height.toInt();
       if (x + w > orientedImage.width) {
         w = orientedImage.width - x;
       }
@@ -497,7 +497,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
       // Crop the face from the oriented image.
       final img.Image croppedFace = img.copyCrop(orientedImage, x, y, w, h);
-      // Optionally, resize the cropped face (e.g., to 112x112).
+      // Optionally, resize the cropped face (example: 112x112).
       final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
       _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
 
