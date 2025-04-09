@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,7 +12,6 @@ import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'dart:math' as math;
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:facemind/main.dart';
 import 'package:facemind/database_helper.dart';
@@ -36,8 +36,7 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isFrontCamera = true;
   final FaceDetector _faceDetector = FaceDetector(
     options: FaceDetectorOptions(
-      performanceMode:
-          FaceDetectorMode.accurate, // accurate for better detection
+      performanceMode: FaceDetectorMode.accurate, // accurate for better detection
       enableTracking: true,
     ),
   );
@@ -50,6 +49,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
   // ImagePicker for gallery selection
   final ImagePicker _picker = ImagePicker();
+
+  // New state variable to hold the processed face image bytes for preview
+  Uint8List? _processedFaceImage;
 
   Uint8List _imageToByteListFloat32(
       img.Image image, int inputSize, double mean, double std) {
@@ -101,9 +103,9 @@ class _RegisterPageState extends State<RegisterPage> {
         for (int col = 0; col < uvWidth; col++) {
           // In NV21 the order is V then U.
           nv21[offset++] =
-              image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
+          image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
           nv21[offset++] =
-              image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
+          image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
         }
       }
 
@@ -190,10 +192,10 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       _cameras = await availableCameras();
       if (_cameras != null && _cameras!.isNotEmpty) {
-        // Find the front camera
-        int backCameraIndex  = _cameras!.indexWhere(
-            (camera) => camera.lensDirection == CameraLensDirection.back);
-        await _setCamera(backCameraIndex  != -1 ? backCameraIndex  : 0);
+        // Find the back camera first (you can adjust this logic)
+        int backCameraIndex = _cameras!.indexWhere(
+                (camera) => camera.lensDirection == CameraLensDirection.back);
+        await _setCamera(backCameraIndex != -1 ? backCameraIndex : 0);
       }
     } catch (e) {
       print('Error initializing camera: $e');
@@ -230,7 +232,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       final inputImage =
-          _convertCameraImage(cameraImage, _cameraController!.description);
+      _convertCameraImage(cameraImage, _cameraController!.description);
       if (inputImage == null) {
         _isDetectingFaces = false;
         return;
@@ -411,7 +413,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       final XFile? imageFile =
-          await _picker.pickImage(source: ImageSource.gallery);
+      await _picker.pickImage(source: ImageSource.gallery);
       if (imageFile != null) {
         _showProgressIndicator("Processing image...");
         await _processCapturedImage(File(imageFile.path));
@@ -460,7 +462,11 @@ class _RegisterPageState extends State<RegisterPage> {
       // Resize to 112x112
       final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
 
-      // Preprocess
+      // **New: Encode the processed image for preview and update state**
+      _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
+      setState(() {});
+
+      // Preprocess for recognition
       final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
 
       // Run recognition
@@ -513,8 +519,6 @@ class _RegisterPageState extends State<RegisterPage> {
       if (userDir.listSync().isEmpty) {
         print("⚠️ Warning: temp_faces directory is empty. Ensure you're saving images to this directory after capturing.");
       }
-
-
 
       // Fetch current session images
       final List<FileSystemEntity> imagesList = userDir.listSync().whereType<File>().toList();
@@ -623,7 +627,34 @@ class _RegisterPageState extends State<RegisterPage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
+          // Main Camera Preview and Overlays.
           Positioned.fill(child: _buildCameraPreview(context)),
+
+          // Processed Face Image Preview (displayed if not null)
+          if (_processedFaceImage != null)
+            Positioned(
+              bottom: 120,
+              left: 20,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => FullScreenImage(imageBytes: _processedFaceImage!),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.blue, width: 2),
+                  ),
+                  child: Image.memory(_processedFaceImage!, fit: BoxFit.cover),
+                ),
+              ),
+            ),
+
           // Instructions at the top
           Positioned(
             top: 50,
@@ -635,10 +666,10 @@ class _RegisterPageState extends State<RegisterPage> {
                 color: Colors.black54,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
+              child: const Text(
                 "Take 5 clear pictures of your face from different angles",
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 16),
+                style: TextStyle(color: Colors.white, fontSize: 16),
               ),
             ),
           ),
@@ -693,11 +724,10 @@ class _RegisterPageState extends State<RegisterPage> {
                     "Images: ${_faceVectors.length}/5",
                     style: const TextStyle(color: Colors.white),
                   ),
-                  SizedBox(width: 5),
+                  const SizedBox(width: 5),
                   _faceVectors.length >= 5
-                      ? Icon(Icons.check_circle, color: Colors.green, size: 20)
-                      : Icon(Icons.circle_outlined,
-                          color: Colors.white, size: 20),
+                      ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
+                      : const Icon(Icons.circle_outlined, color: Colors.white, size: 20),
                 ],
               ),
             ),
@@ -727,12 +757,11 @@ class _RegisterPageState extends State<RegisterPage> {
 
     // Optional extra zoom factor
     double extraZoomFactor = 0.72;
-    // First multiply the scale by 0.82
+    // First multiply the scale by extra zoom factor
     scale *= extraZoomFactor;
 
     // Determine rotation based on sensor orientation
-    final int sensorOrientation =
-        _cameraController!.description.sensorOrientation;
+    final int sensorOrientation = _cameraController!.description.sensorOrientation;
     double rotationAngle = 0;
     if (sensorOrientation == 90) {
       rotationAngle = math.pi / 2;
@@ -741,11 +770,9 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     // Check if it is front camera to mirror horizontally
-    final bool isFrontCamera = _cameraController!.description.lensDirection ==
-        CameraLensDirection.front;
+    final bool isFrontCamera = _cameraController!.description.lensDirection == CameraLensDirection.front;
 
-    // Build a transform matrix that mirrors if front camera
-    // plus rotates based on sensor orientation
+    // Build a transform matrix that mirrors if front camera plus rotates based on sensor orientation
     final Matrix4 transformMatrix = isFrontCamera
         ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
         : Matrix4.rotationZ(rotationAngle);
@@ -754,7 +781,7 @@ class _RegisterPageState extends State<RegisterPage> {
       builder: (layoutContext, constraints) {
         return ClipRect(
           child: Transform.scale(
-            // Apply the scale again so total factor is scale * extraZoomFactor
+            // Apply the scale again so the total factor is scale * extraZoomFactor
             scale: scale * extraZoomFactor,
             child: Center(
               child: AspectRatio(
@@ -767,13 +794,11 @@ class _RegisterPageState extends State<RegisterPage> {
                     children: [
                       // Camera preview
                       CameraPreview(_cameraController!),
-
                       // Draw bounding boxes for detected faces
                       CustomPaint(
                         painter: FacePainter(
                           faces: _faces,
                           imageSize: Size(
-                            // Note: swap width/height here if needed
                             previewSize.height,
                             previewSize.width,
                           ),
@@ -870,5 +895,21 @@ class FacePainter extends CustomPainter {
   }
 }
 
+class FullScreenImage extends StatelessWidget {
+  final Uint8List imageBytes;
 
+  const FullScreenImage({Key? key, required this.imageBytes}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Full Screen Image"),
+      ),
+      body: Center(
+        child: Image.memory(imageBytes, fit: BoxFit.contain),
+      ),
+    );
+  }
+}
 
