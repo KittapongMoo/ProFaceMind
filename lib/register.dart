@@ -667,47 +667,135 @@ class _RegisterPageState extends State<RegisterPage> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text(
-                "Take 5 clear pictures of your face from different angles",
+                "กรุณาลงทะเบียนใบหน้าของคุณผ่านการถ่ายรูปใบหน้าของคุณในมุมที่แตกต่างกัน",
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 16),
+                style: TextStyle(color: Colors.white, fontSize: 15),
               ),
             ),
           ),
-          // Switch camera button
-          Positioned(
-            top: 120,
-            right: 20,
-            child: FloatingActionButton(
-              heroTag: 'switch',
-              backgroundColor: Colors.blue,
-              child: const Icon(Icons.switch_camera),
-              onPressed: _switchCamera,
-            ),
-          ),
-          // Capture button
+          // ปุ่มสลับกล้อง มุมล่างซ้าย
           Positioned(
             bottom: 50,
-            left: MediaQuery.of(context).size.width / 2 - 30,
-            child: FloatingActionButton(
-              heroTag: 'capture',
-              backgroundColor: _processingImage ? Colors.grey : Colors.black,
-              child: _processingImage
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Icon(Icons.camera_alt),
-              onPressed: _processingImage ? null : _takePicture,
+            left: 20,
+            child: Column(
+              children: [
+                GestureDetector(
+                  onTap: _switchCamera,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 5,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(10),
+                    child: const Icon(Icons.flip_camera_ios, color: Colors.black),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  "สลับกล้อง",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
-          // Gallery button
+
+
+          Positioned(
+            bottom: 50,
+            left: MediaQuery.of(context).size.width / 2 - 35,
+            child: Column(
+              children: [
+                GestureDetector(
+                  onTap: _processingImage ? null : _takePicture,
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 5,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: _processingImage
+                          ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                          : const Icon(Icons.camera_alt, color: Colors.black),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  "ถ่ายภาพ", // ✅ แก้ตรงนี้
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ปุ่มเลือกรูป มุมล่างขวา
           Positioned(
             bottom: 50,
             right: 20,
-            child: FloatingActionButton(
-              heroTag: 'gallery',
-              backgroundColor: _processingImage ? Colors.grey : Colors.green,
-              child: const Icon(Icons.photo_library),
-              onPressed: _processingImage ? null : _pickImage,
+            child: Column(
+              children: [
+                GestureDetector(
+                  onTap: _processingImage ? null : _pickImage,
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 5,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.photo_library, color: Colors.black),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  "เลือกรูป", // ✅ ข้อความใต้ปุ่ม
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
+
           // Image count indicator
           Positioned(
             top: 120,
@@ -721,7 +809,7 @@ class _RegisterPageState extends State<RegisterPage> {
               child: Row(
                 children: [
                   Text(
-                    "Images: ${_faceVectors.length}/5",
+                    "จำนวนรูป: ${_faceVectors.length}/5",
                     style: const TextStyle(color: Colors.white),
                   ),
                   const SizedBox(width: 5),
