@@ -20,6 +20,7 @@ import 'package:path/path.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:facemind/database_helper.dart';
+import 'package:exif/exif.dart';
 
 // Import ML Kit face detection:
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
@@ -378,12 +379,31 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
         return;
       }
 
-      // *** FIX START ***
-      // If the camera is front-facing, flip the image horizontally.
-      img.Image processedImage = decodedImage;
-      if (_cameraController!.description.lensDirection == CameraLensDirection.front) {
-        processedImage = img.flipHorizontal(decodedImage);
+      // Read EXIF data for orientation.
+      final Map<String, IfdTag> exifData = await readExifFromBytes(bytes);
+      int rotationAngle = 0;
+      if (!_isFrontCamera) {
+        // Use EXIF data if available.
+        if (exifData.isNotEmpty && exifData.containsKey("Image Orientation")) {
+          final orientation = exifData["Image Orientation"]?.printable;
+          if (orientation == "Rotated 90 CW") {
+            rotationAngle = 90;
+          } else if (orientation == "Rotated 180") {
+            rotationAngle = 180;
+          } else if (orientation == "Rotated 270 CW") {
+            rotationAngle = -90;
+          }
+        }
+      } else {
+        // For front-camera, force a rotation (adjust as needed).
+        rotationAngle = -90;
       }
+
+      // Rotate the decoded image accordingly.
+      final img.Image orientedImage = (rotationAngle != 0)
+          ? img.copyRotate(decodedImage, rotationAngle)
+          : decodedImage;
+
       // *** FIX END ***
 
       // Apply rotation correction based on the sensor orientation.
@@ -416,19 +436,36 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
       // Rect bbox = face.boundingBox;
 
       // Instead of cropping to the face bounding box, use the full processed image.
-      final Uint8List fullImageBlob = Uint8List.fromList(img.encodePng(processedImage));
-
+      final Uint8List fullImageBlob = Uint8List.fromList(img.encodePng(orientedImage));
       // Optionally, still perform face recognition using the cropped face if needed.
       // Resize the cropped face (if you still want to use it for recognition)...
       // Crop to face bounding box
       final Face face = faces.first;
-      final Rect box = face.boundingBox;
+      Rect box = face.boundingBox;
 
-      int x = math.max(0, box.left.toInt() - 20);
-      int y = math.max(0, box.top.toInt() - 20);
-      int w = math.min(processedImage.width - x, box.width.toInt() + 40);
-      int h = math.min(processedImage.height - y, box.height.toInt() + 40);
-      final img.Image croppedFace = img.copyCrop(processedImage, x, y, w, h);
+      // If using the front camera, mirror the bounding box.
+      if (_isFrontCamera) {
+        box = Rect.fromLTRB(
+          orientedImage.width - box.right, // new left
+          box.top,
+          orientedImage.width - box.left,  // new right
+          box.bottom,
+        );
+      }
+
+      const margin = 20;
+      int x = (box.left - margin).toInt().clamp(0, orientedImage.width);
+      int y = (box.top - margin).toInt().clamp(0, orientedImage.height);
+      int w = (box.width + 2 * margin).toInt();
+      int h = (box.height + 2 * margin).toInt();
+      if (x + w > orientedImage.width) {
+        w = orientedImage.width - x;
+      }
+      if (y + h > orientedImage.height) {
+        h = orientedImage.height - y;
+      }
+
+      final img.Image croppedFace = img.copyCrop(orientedImage, x, y, w, h);
       final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
 
       // Save the cropped & resized face image for preview.
