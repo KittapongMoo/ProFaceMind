@@ -191,85 +191,6 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     }
   }
 
-  Future<Database> _getDatabase() async {
-    String dbPath = await getDatabasesPath();
-    String path = join(dbPath, 'facemind.db');
-
-    return openDatabase(
-      path,
-      version: 3, // <-- updated version to match everywhere
-      onCreate: (Database db, int version) async {
-        await db.execute('''
-        CREATE TABLE users (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          face_vector TEXT,
-          nickname TEXT,
-          name TEXT,
-          relation TEXT,
-          primary_image TEXT
-        )
-      ''');
-
-        await db.execute('''
-        CREATE TABLE user_images (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER,
-          image_path TEXT,
-          FOREIGN KEY(user_id) REFERENCES users(id)
-        )
-      ''');
-
-        await db.execute('''
-        CREATE TABLE user_vectors (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER,
-          vector TEXT,
-          FOREIGN KEY(user_id) REFERENCES users(id)
-        )
-      ''');
-
-        await db.execute('''
-        CREATE TABLE history (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER,
-          matched_at TEXT,
-          face_image BLOB
-        )
-      ''');
-      },
-      onUpgrade: (Database db, int oldVersion, int newVersion) async {
-        if (oldVersion < 2) {
-          await db.execute('ALTER TABLE users ADD COLUMN primary_image TEXT');
-        }
-        if (oldVersion < 3) {
-          await db.execute('''
-          CREATE TABLE IF NOT EXISTS user_vectors (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            vector TEXT,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-          )
-        ''');
-
-          await db.execute('''
-          CREATE TABLE IF NOT EXISTS history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            matched_at TEXT,
-            face_image BLOB
-          )
-        ''');
-
-          List<Map> columns = await db.rawQuery("PRAGMA table_info(history)");
-          bool hasFaceImage = columns.any((col) => col['name'] == 'face_image');
-          if (!hasFaceImage) {
-            await db.execute("ALTER TABLE history ADD COLUMN face_image BLOB");
-          }
-        }
-      },
-    );
-  }
-
   Future<String?> _getLastImagePath() async {
     final db = await DatabaseHelper().database;
     final List<Map<String, dynamic>> result = await db.query(
@@ -506,7 +427,6 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
       int y = math.max(0, box.top.toInt() - 20);
       int w = math.min(processedImage.width - x, box.width.toInt() + 40);
       int h = math.min(processedImage.height - y, box.height.toInt() + 40);
-
       final img.Image croppedFace = img.copyCrop(processedImage, x, y, w, h);
       final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
 
@@ -538,7 +458,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
           };
         });
       } else {
-        await _saveHistory(matchedUser['id'] as int, fullImageBlob);
+        // await _saveHistory(matchedUser['id'] as int, fullImageBlob);
+        await _saveHistory(matchedUser['userId'] as int, fullImageBlob);
         setState(() {
           _matchedUser = matchedUser;
         });
@@ -566,32 +487,65 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
   }
 
   /// Find a matching user in the database by comparing face vectors.
-  Future<Map<String, dynamic>?> _findMatchingUser(List<double> vector) async {
+  Future<Map<String, dynamic>?> _findMatchingUser(List<double> queryVector) async {
     final db = await DatabaseHelper().database;
-
-    // Efficient JOIN query to fetch user data and vectors together.
+    // Query to join user information with each stored vector.
     final results = await db.rawQuery('''
-    SELECT users.*, user_vectors.vector FROM users
+    SELECT users.id as userId, users.nickname, users.name, users.relation, users.primary_image, user_vectors.vector 
+    FROM users 
     JOIN user_vectors ON users.id = user_vectors.user_id
   ''');
 
-    double similarityThreshold = 0.85;
-    Map<String, dynamic>? bestMatch;
-    double bestSimilarity = -1;
-
+    // Group the rows by user ID.
+    Map<int, List<Map<String, dynamic>>> groupedResults = {};
     for (var row in results) {
-      final vectorString = row['vector'] as String;  // Explicitly cast
-      final List<double> storedVector = List<double>.from(jsonDecode(vectorString));
-      final sim = _cosineSimilarity(vector, storedVector);
-
-      if (sim > similarityThreshold && sim > bestSimilarity) {
-        bestSimilarity = sim;
-        bestMatch = row;
+      int userId = row['userId'] as int;
+      if (groupedResults.containsKey(userId)) {
+        groupedResults[userId]!.add(row);
+      } else {
+        groupedResults[userId] = [row];
       }
     }
 
-    print("🧠 Best similarity: $bestSimilarity");
-    return bestMatch;
+    // Set your required matching settings.
+    const double similarityThreshold = 0.6; // each sample must have cosine similarity above this to count
+    const int requiredMatchCount = 3; // need at least three samples that match
+
+    double bestScore = -1;
+    Map<String, dynamic>? bestUser;
+
+    // For each user, count matching samples.
+    groupedResults.forEach((userId, rows) {
+      int matchCount = 0;
+      double similaritySum = 0;
+      // Iterate over every stored vector (each row for that user).
+      for (var row in rows) {
+        // The stored vector is stored as JSON string.
+        String vectorString = row['vector'] as String;
+        // Parse the JSON list and ensure values are double.
+        List<double> storedVector = (jsonDecode(vectorString) as List)
+            .map((e) => (e is num ? e.toDouble() : 0.0))
+            .toList();
+        double sim = _cosineSimilarity(queryVector, storedVector);
+        if (sim >= similarityThreshold) {
+          matchCount++;
+          similaritySum += sim;
+        }
+      }
+      // Only consider a user if at least the required number of samples match.
+      if (matchCount >= requiredMatchCount) {
+        double avgSim = similaritySum / matchCount;
+        // We can weight the score by both the average similarity and the number of matching samples.
+        double score = avgSim * matchCount;
+        if (score > bestScore) {
+          bestScore = score;
+          bestUser = rows.first; // Use the user info from the first row.
+        }
+      }
+    });
+
+    print("🧠 Best user score: $bestScore");
+    return bestUser;
   }
 
   double _cosineSimilarity(List<double> a, List<double> b) {
@@ -631,10 +585,11 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     return dot;
   }
 
-  double _hybridScore(List<double> a, List<double> b) {
+  double hybridScore(List<double> a, List<double> b) {
     double cosine = _cosineSimilarity(a, b);
     double euclidean = _euclideanDistance(a, b);
-    return (cosine * 0.7) - (euclidean * 0.3); // Adjust weights as needed
+    // For example, you might use: higher cosine similarity and lower Euclidean means a closer match.
+    return (cosine * 0.7) - (euclidean * 0.3);
   }
 
   // Add these new functions to your CameraPage state

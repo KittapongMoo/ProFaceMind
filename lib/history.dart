@@ -25,30 +25,6 @@ class _HistoryPageState extends State<HistoryPage> {
     _checkHistoryDatabase(); // Debug function call.
   }
 
-  // Use the same database (facemind.db) for both users and history.
-  Future<Database> _getHistoryDatabase() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'facemind.db');
-    // Open the database.
-    Database db = await openDatabase(
-      path,
-      version: 3,
-      onOpen: (Database db) async {
-        print("Database opened: $path");
-      },
-    );
-    // Ensure the history table exists, including the face_image BLOB column.
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        matched_at TEXT,
-        face_image BLOB
-      )
-    ''');
-    return db;
-  }
-
   // Load history records for the given date.
   // This query joins the history table with the users table.
   Future<List<Map<String, dynamic>>> _loadHistory(DateTime date) async {
