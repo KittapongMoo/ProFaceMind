@@ -37,7 +37,8 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isFrontCamera = true;
   final FaceDetector _faceDetector = FaceDetector(
     options: FaceDetectorOptions(
-      performanceMode: FaceDetectorMode.accurate, // accurate for better detection
+      performanceMode:
+          FaceDetectorMode.accurate, // accurate for better detection
       enableTracking: true,
     ),
   );
@@ -104,9 +105,9 @@ class _RegisterPageState extends State<RegisterPage> {
         for (int col = 0; col < uvWidth; col++) {
           // In NV21 the order is V then U.
           nv21[offset++] =
-          image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
+              image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
           nv21[offset++] =
-          image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
+              image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
         }
       }
 
@@ -195,7 +196,7 @@ class _RegisterPageState extends State<RegisterPage> {
       if (_cameras != null && _cameras!.isNotEmpty) {
         // Find the back camera first (you can adjust this logic)
         int backCameraIndex = _cameras!.indexWhere(
-                (camera) => camera.lensDirection == CameraLensDirection.back);
+            (camera) => camera.lensDirection == CameraLensDirection.back);
         await _setCamera(backCameraIndex != -1 ? backCameraIndex : 0);
       }
     } catch (e) {
@@ -216,7 +217,7 @@ class _RegisterPageState extends State<RegisterPage> {
     int cameraIndex = 0;
     for (int i = 0; i < _cameras!.length; i++) {
       if ((_isFrontCamera &&
-          _cameras![i].lensDirection == CameraLensDirection.front) ||
+              _cameras![i].lensDirection == CameraLensDirection.front) ||
           (!_isFrontCamera &&
               _cameras![i].lensDirection == CameraLensDirection.back)) {
         cameraIndex = i;
@@ -233,7 +234,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       final inputImage =
-      _convertCameraImage(cameraImage, _cameraController!.description);
+          _convertCameraImage(cameraImage, _cameraController!.description);
       if (inputImage == null) {
         _isDetectingFaces = false;
         return;
@@ -414,7 +415,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       final XFile? imageFile =
-      await _picker.pickImage(source: ImageSource.gallery);
+          await _picker.pickImage(source: ImageSource.gallery);
       if (imageFile != null) {
         _showProgressIndicator("Processing image...");
         await _processCapturedImage(File(imageFile.path));
@@ -450,32 +451,23 @@ class _RegisterPageState extends State<RegisterPage> {
       }
 
       // 3) Read EXIF data to determine orientation.
+      // Read EXIF orientation data.
       final Map<String, IfdTag> exifData = await readExifFromBytes(imageBytes);
       int rotationAngle = 0;
       if (exifData.isNotEmpty && exifData.containsKey("Image Orientation")) {
         final orientation = exifData["Image Orientation"]?.printable;
-
-        // Common orientation strings: "Horizontal (normal)", "Rotated 90 CW", "Rotated 180", "Rotated 270 CW"
-        // Adjust to your device's exact strings.
-        switch (orientation) {
-          case "Rotated 90 CW":
-            rotationAngle = 90;
-            break;
-          case "Rotated 180":
-            rotationAngle = 180;
-            break;
-          case "Rotated 270 CW":
-            rotationAngle = -90; // same as 270
-            break;
+        if (orientation == "Rotated 90 CW") {
+          rotationAngle = 90;
+        } else if (orientation == "Rotated 180") {
+          rotationAngle = 180;
+        } else if (orientation == "Rotated 270 CW") {
+          rotationAngle = -90;
         }
       }
-
-      // 4) If the camera is front-facing, some devices embed orientation as if it’s back camera, leading to a 90° mismatch.
-      //    Try flipping the rotation for front camera if the image is turning out sideways.
+      // For front camera, if EXIF data is missing or not as expected, force rotation.
+      // Adjust the value (e.g., 90 or -90) to what your device expects.
       if (_isFrontCamera) {
-        // Example: invert the rotation for front camera to fix 90° mismatch.
-        // You can tweak or remove this if your device doesn't need it.
-        rotationAngle = -rotationAngle;
+        rotationAngle = 90; // Force a 90° rotation for front-camera images.
       }
 
       // 5) Rotate the raw image based on the final rotationAngle.
@@ -508,7 +500,8 @@ class _RegisterPageState extends State<RegisterPage> {
 
       // 9) Crop + resize.
       final img.Image croppedFace = img.copyCrop(orientedImage, x, y, w, h);
-      final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
+      final img.Image resizedFace =
+          img.copyResize(croppedFace, width: 112, height: 112);
 
       // 10) Encode + store preview.
       _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
@@ -524,7 +517,8 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       _showProgressIndicator("Registering user...");
 
-      if (_cameraController != null && _cameraController!.value.isStreamingImages) {
+      if (_cameraController != null &&
+          _cameraController!.value.isStreamingImages) {
         await _cameraController!.stopImageStream();
       }
 
@@ -538,12 +532,15 @@ class _RegisterPageState extends State<RegisterPage> {
 
       // Additionally, ensure at least a placeholder or initial setup
       if (userDir.listSync().isEmpty) {
-        print("⚠️ Warning: temp_faces directory is empty. Ensure you're saving images to this directory after capturing.");
+        print(
+            "⚠️ Warning: temp_faces directory is empty. Ensure you're saving images to this directory after capturing.");
       }
 
       // Fetch current session images
-      final List<FileSystemEntity> imagesList = userDir.listSync().whereType<File>().toList();
-      imagesList.sort((a, b) => a.statSync().modified.compareTo(b.statSync().modified));
+      final List<FileSystemEntity> imagesList =
+          userDir.listSync().whereType<File>().toList();
+      imagesList.sort(
+          (a, b) => a.statSync().modified.compareTo(b.statSync().modified));
 
       // Calculate the average vector (optional, you can store or skip it)
       List<double> averageVector = List.filled(128, 0.0);
@@ -552,11 +549,12 @@ class _RegisterPageState extends State<RegisterPage> {
           averageVector[i] += vector[i];
         }
       }
-      averageVector = averageVector.map((val) => val / _faceVectors.length).toList();
+      averageVector =
+          averageVector.map((val) => val / _faceVectors.length).toList();
 
       // Insert user to get userId
       int userId = await db.insert('users', {
-        'face_vector': jsonEncode(averageVector),  // Optional
+        'face_vector': jsonEncode(averageVector), // Optional
         'nickname': '',
         'name': '',
         'relation': '',
@@ -661,7 +659,8 @@ class _RegisterPageState extends State<RegisterPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => FullScreenImage(imageBytes: _processedFaceImage!),
+                      builder: (context) =>
+                          FullScreenImage(imageBytes: _processedFaceImage!),
                     ),
                   );
                 },
@@ -715,7 +714,8 @@ class _RegisterPageState extends State<RegisterPage> {
                       ],
                     ),
                     padding: const EdgeInsets.all(10),
-                    child: const Icon(Icons.flip_camera_ios, color: Colors.black),
+                    child:
+                        const Icon(Icons.flip_camera_ios, color: Colors.black),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -730,7 +730,6 @@ class _RegisterPageState extends State<RegisterPage> {
               ],
             ),
           ),
-
 
           Positioned(
             bottom: 50,
@@ -756,10 +755,10 @@ class _RegisterPageState extends State<RegisterPage> {
                     child: Center(
                       child: _processingImage
                           ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : const Icon(Icons.camera_alt, color: Colors.black),
                     ),
                   ),
@@ -835,8 +834,10 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   const SizedBox(width: 5),
                   _faceVectors.length >= 5
-                      ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
-                      : const Icon(Icons.circle_outlined, color: Colors.white, size: 20),
+                      ? const Icon(Icons.check_circle,
+                          color: Colors.green, size: 20)
+                      : const Icon(Icons.circle_outlined,
+                          color: Colors.white, size: 20),
                 ],
               ),
             ),
@@ -870,7 +871,8 @@ class _RegisterPageState extends State<RegisterPage> {
     scale *= extraZoomFactor;
 
     // Determine rotation based on sensor orientation
-    final int sensorOrientation = _cameraController!.description.sensorOrientation;
+    final int sensorOrientation =
+        _cameraController!.description.sensorOrientation;
     double rotationAngle = 0;
     if (sensorOrientation == 90) {
       rotationAngle = math.pi / 2;
@@ -879,7 +881,8 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     // Check if it is front camera to mirror horizontally
-    final bool isFrontCamera = _cameraController!.description.lensDirection == CameraLensDirection.front;
+    final bool isFrontCamera = _cameraController!.description.lensDirection ==
+        CameraLensDirection.front;
 
     // Build a transform matrix that mirrors if front camera plus rotates based on sensor orientation
     final Matrix4 transformMatrix = isFrontCamera
@@ -1021,4 +1024,3 @@ class FullScreenImage extends StatelessWidget {
     );
   }
 }
-
