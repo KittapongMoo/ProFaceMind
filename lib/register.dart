@@ -15,6 +15,7 @@ import 'package:path/path.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:facemind/main.dart';
 import 'package:facemind/database_helper.dart';
+import 'package:exif/exif.dart'; // Add to your pubspec.yaml
 
 import 'fillinfo.dart'; // Make sure FillInfoPage({required this.userId}) is defined
 
@@ -431,16 +432,16 @@ class _RegisterPageState extends State<RegisterPage> {
   /// Process the captured/selected image: validate face, convert to vector, and store.
   Future<void> _processCapturedImage(File imageFile) async {
     try {
+      // Process face detection as before.
       final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
       final List<Face> faces = await _faceDetector.processImage(inputImage);
       _hideDialog();
-
       if (faces.isEmpty) {
         _showErrorPopup("No face detected in this image");
         return;
       }
 
-      // Load and decode the image
+      // Load and decode the image using the image package.
       final Uint8List imageBytes = await imageFile.readAsBytes();
       final img.Image? fullImage = img.decodeImage(imageBytes);
       if (fullImage == null) {
@@ -448,50 +449,48 @@ class _RegisterPageState extends State<RegisterPage> {
         return;
       }
 
-      // Use the first detected face
+      // Read EXIF orientation data.
+      final Map<String, IfdTag> exifData = await readExifFromBytes(imageBytes);
+      int rotationAngle = 0;
+      if (exifData.isNotEmpty && exifData.containsKey("Image Orientation")) {
+        final orientation = exifData["Image Orientation"]?.printable;
+        // Typical orientation strings from EXIF (you may need to adjust based on your device)
+        if (orientation == "Rotated 90 CW") {
+          rotationAngle = 90;
+        } else if (orientation == "Rotated 180") {
+          rotationAngle = 180;
+        } else if (orientation == "Rotated 270 CW") {
+          rotationAngle = -90;
+        }
+      }
+
+      // Rotate the full image if needed.
+      final img.Image orientedImage =
+      rotationAngle != 0 ? img.copyRotate(fullImage, rotationAngle) : fullImage;
+
+      // Use the first detected face.
       final Face face = faces.first;
       final Rect box = face.boundingBox;
 
-      // Crop the face (add margin for better performance)
-      int x = math.max(0, box.left.toInt() - 20);
-      int y = math.max(0, box.top.toInt() - 20);
-      int w = math.min(fullImage.width - x, box.width.toInt() + 40);
-      int h = math.min(fullImage.height - y, box.height.toInt() + 40);
-      final img.Image croppedFace = img.copyCrop(fullImage, x, y, w, h);
+      // Ensure the crop rectangle is within image bounds.
+      int x = box.left.toInt().clamp(0, orientedImage.width);
+      int y = box.top.toInt().clamp(0, orientedImage.height);
+      int w = box.width.toInt();
+      int h = box.height.toInt();
+      if (x + w > orientedImage.width) {
+        w = orientedImage.width - x;
+      }
+      if (y + h > orientedImage.height) {
+        h = orientedImage.height - y;
+      }
 
-      // Resize to 112x112
+      // Crop the face from the (oriented) image.
+      final img.Image croppedFace = img.copyCrop(orientedImage, x, y, w, h);
+      // Optionally, resize the cropped face (e.g., to 112x112).
       final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
-
-      // **New: Encode the processed image for preview and update state**
       _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
+
       setState(() {});
-
-      // Preprocess for recognition
-      final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
-
-      // Run recognition
-      List<double> vector = await _runFaceRecognition(processedBytes);
-
-      // Normalize the vector (L2 norm)
-      final double norm = math.sqrt(vector.fold(0, (sum, val) => sum + val * val));
-      if (norm > 0) {
-        vector = vector.map((e) => e / norm).toList();
-      }
-
-      if (vector.every((v) => v == 0)) {
-        _showErrorPopup("Face recognition failed. Try again.");
-        return;
-      }
-
-      setState(() {
-        _faceVectors.add(vector);
-      });
-
-      print("Captured image processed. Count: ${_faceVectors.length}/5");
-
-      if (_faceVectors.length >= 5) {
-        await _registerUserWithImages();
-      }
     } catch (e) {
       _hideDialog();
       print('❌ Error processing image: $e');
