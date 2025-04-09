@@ -828,24 +828,48 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
           ),
 
 
-          // Flip camera button (top center).
+          // Flip camera button (top center) with text
           Positioned(
             top: 40,
-            left: MediaQuery.of(context).size.width / 2 - 25,
-            child: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: IconButton(
-                icon: const Icon(Icons.flip_camera_ios, color: Colors.black),
-                onPressed: () {
-                  setState(() {
-                    _isFrontCamera = !_isFrontCamera;
-                    _isCameraInitialized = false;
-                  });
-                  _initializeCamera();
-                },
-              ),
+            left: MediaQuery.of(context).size.width / 2 - 30,
+            child: Column(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 5,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.flip_camera_ios, color: Colors.black),
+                    onPressed: () {
+                      setState(() {
+                        _isFrontCamera = !_isFrontCamera;
+                        _isCameraInitialized = false;
+                      });
+                      _initializeCamera();
+                    },
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  "สลับกล้อง",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
+
 
           // Bottom row with register, last image, map.
           Positioned(
