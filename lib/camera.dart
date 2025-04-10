@@ -81,7 +81,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     _loadModel();
     _loadProfileImage(); // ✅ โหลดรูปโปรไฟล์  <<< ใส่ตรงนี้เลย
     // Start a timer to check for a face match every 10 seconds.
-    _timer = Timer.periodic(const Duration(seconds: 2), (Timer timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (Timer timer) {
       _recognizeFace();
     });
     // _checkHistoryDatabase();
@@ -1012,7 +1012,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
-                'จับภาพใบหน้า: $_vectorProgress / $_maxBufferLength',
+                'ความคืบหน้า: ${((_vectorProgress / _maxBufferLength) * 100).toStringAsFixed(0)}%',
                 style: const TextStyle(color: Colors.white, fontSize: 16),
               ),
             ),
