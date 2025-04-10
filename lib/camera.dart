@@ -481,7 +481,15 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
       if (norm > 0) {
         vector = vector.map((e) => e / norm).toList();
       }
+
+      // Debug: Validate and show embedding distribution.
+      await _validateEmbeddingDistribution(vector);
+
       print("Face vector: $vector");
+
+      // Call our debug function to validate distribution.
+      await _validateEmbeddingDistribution(vector);
+
       if (vector.every((element) => element == 0)) {
         print("Face vector is all zeros. Check image preprocessing.");
       }
@@ -618,15 +626,6 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     return sum;
   }
 
-// 0.4 - 0.5 เวอร์จาด
-//   double _dotProduct(List<double> a, List<double> b) {
-//     double dot = 0;
-//     for (int i = 0; i < a.length; i++) {
-//       dot += a[i] * b[i];
-//     }
-//     return dot;
-//   }
-
 //ใช้ไม่ได้
   double hybridScore(List<double> a, List<double> b) {
     double cosine = _cosineSimilarity(a, b);
@@ -635,7 +634,66 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     return (cosine * 0.7) - (euclidean * 0.3);
   }
 
-  // Add these new functions to your CameraPage state
+  // Helper function to compute and log distribution statistics.
+  // Function to validate and log embedding distribution.
+  Future<void> _validateEmbeddingDistribution(List<double> queryVector) async {
+    final db = await DatabaseHelper().database;
+    final results = await db.rawQuery('SELECT vector FROM user_vectors');
+
+    List<double> similarities = [];
+    for (var row in results) {
+      String vectorString = row['vector'] as String;
+      List<double> storedVector = (jsonDecode(vectorString) as List)
+          .map((e) => (e is num ? e.toDouble() : 0.0))
+          .toList();
+      double sim = _cosineSimilarity(queryVector, storedVector);
+      similarities.add(sim);
+    }
+
+    if (similarities.isEmpty) {
+      print("No stored embeddings found.");
+      return;
+    }
+
+    double sum = similarities.reduce((a, b) => a + b);
+    double avg = sum / similarities.length;
+    double min = similarities.reduce(math.min);
+    double max = similarities.reduce(math.max);
+    double variance = similarities
+        .map((sim) => (sim - avg) * (sim - avg))
+        .reduce((a, b) => a + b) / similarities.length;
+    double stdDev = math.sqrt(variance);
+
+    String stats = "Embedding Distribution Statistics:\n"
+        "Count: ${similarities.length}\n"
+        "Average: ${avg.toStringAsFixed(3)}\n"
+        "Min: ${min.toStringAsFixed(3)}\n"
+        "Max: ${max.toStringAsFixed(3)}\n"
+        "Std Dev: ${stdDev.toStringAsFixed(3)}";
+
+    print(stats);
+    _showDistributionDialog(stats);
+  }
+
+  // <-- Place this helper function inside the state class, for example here:
+  void _showDistributionDialog(String stats) {
+    if (!mounted) return;
+    showDialog(
+      context: context as BuildContext,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: Text("Embedding Distribution"),
+          content: Text(stats),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text("Close"),
+            )
+          ],
+        );
+      },
+    );
+  }
 
   // Function to open or create the history database.
   Future<Database> _getHistoryDatabase() async {
