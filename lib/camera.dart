@@ -530,65 +530,61 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
   }
 
   /// Find a matching user in the database by comparing face vectors.
+  /// Find a matching user by comparing the query face vector with the averaged stored vector per user.
+  /// Returns null if no user's average cosine similarity exceeds the rejection threshold.
   Future<Map<String, dynamic>?> _findMatchingUser(List<double> queryVector) async {
     final db = await DatabaseHelper().database;
-    // Query to join user information with each stored vector.
+    // Query to join user information with stored user vectors.
     final results = await db.rawQuery('''
     SELECT users.id as userId, users.nickname, users.name, users.relation, users.primary_image, user_vectors.vector 
     FROM users 
     JOIN user_vectors ON users.id = user_vectors.user_id
   ''');
 
-    // Group the rows by user ID.
+    // Group rows by user id.
     Map<int, List<Map<String, dynamic>>> groupedResults = {};
     for (var row in results) {
       int userId = row['userId'] as int;
-      if (groupedResults.containsKey(userId)) {
-        groupedResults[userId]!.add(row);
-      } else {
-        groupedResults[userId] = [row];
-      }
+      groupedResults.putIfAbsent(userId, () => []).add(row);
     }
 
-    // Set your required matching settings.
-    const double similarityThreshold = 0.5; // each sample must have cosine similarity above this to count
-    const int requiredMatchCount = 3; // need at least three samples that match
+    // Define matching parameters.
+    const int requiredVectorCount = 1; // With an average vector stored, we require one valid sample.
+    const double rejectionThreshold = 0.5; // Minimum average cosine similarity to be considered a match.
 
-    double bestScore = -1;
+    double bestAvgSim = -1.0;
     Map<String, dynamic>? bestUser;
 
-    // For each user, count matching samples.
+    // For each user, compute the average similarity between the stored vector and the query.
     groupedResults.forEach((userId, rows) {
-      int matchCount = 0;
-      double similaritySum = 0;
-      // Iterate over every stored vector (each row for that user).
-      for (var row in rows) {
-        // The stored vector is stored as JSON string.
-        String vectorString = row['vector'] as String;
-        // Parse the JSON list and ensure values are double.
-        List<double> storedVector = (jsonDecode(vectorString) as List)
-            .map((e) => (e is num ? e.toDouble() : 0.0))
-            .toList();
-        double sim = _dotProduct(queryVector, storedVector);
-        if (sim >= similarityThreshold) {
-          matchCount++;
-          similaritySum += sim;
-        }
-      }
-      // Only consider a user if at least the required number of samples match.
-      if (matchCount >= requiredMatchCount) {
-        double avgSim = similaritySum / matchCount;
-        // We can weight the score by both the average similarity and the number of matching samples.
-        double score = avgSim * matchCount;
-        if (score > bestScore) {
-          bestScore = score;
-          bestUser = rows.first; // Use the user info from the first row.
-        }
+      // If there are not enough records, skip user (ideally you store one averaged vector).
+      if (rows.length < requiredVectorCount) return;
+
+      // For this design, we assume there is one vector per user in the table.
+      // We decode it and compute the cosine similarity:
+      String vectorString = rows.first['vector'] as String;
+      List<double> storedVector = (jsonDecode(vectorString) as List)
+          .map((e) => (e is num ? e.toDouble() : 0.0))
+          .toList();
+      double sim = _dotProduct(queryVector, storedVector);
+
+      if (sim >= rejectionThreshold && sim > bestAvgSim) {
+        bestAvgSim = sim;
+        bestUser = rows.first;
       }
     });
 
-    print("🧠 Best user score: $bestScore");
+    print("🧠 Best average similarity: $bestAvgSim");
     return bestUser;
+  }
+
+  /// Helper: Compute dot product (for cosine similarity on already normalized vectors).
+  double _dotProduct(List<double> a, List<double> b) {
+    double dot = 0;
+    for (int i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+    }
+    return dot;
   }
 
   double _cosineSimilarity(List<double> a, List<double> b) {
@@ -623,13 +619,13 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
   }
 
 // 0.4 - 0.5 เวอร์จาด
-  double _dotProduct(List<double> a, List<double> b) {
-    double dot = 0;
-    for (int i = 0; i < a.length; i++) {
-      dot += a[i] * b[i];
-    }
-    return dot;
-  }
+//   double _dotProduct(List<double> a, List<double> b) {
+//     double dot = 0;
+//     for (int i = 0; i < a.length; i++) {
+//       dot += a[i] * b[i];
+//     }
+//     return dot;
+//   }
 
 //ใช้ไม่ได้
   double hybridScore(List<double> a, List<double> b) {

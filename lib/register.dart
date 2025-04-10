@@ -480,13 +480,13 @@ class _RegisterPageState extends State<RegisterPage> {
       final db = await DatabaseHelper().database;
       final Directory appDir = await getApplicationDocumentsDirectory();
 
-      // Insert user with empty face_vector.
+      // Insert the user record.
       int userId = await db.insert('users', {
-        'face_vector': '',
+        'face_vector': '', // this field is now not used for matching.
         'nickname': '',
         'name': '',
         'relation': '',
-        'primary_image': '', // will update later
+        'primary_image': '', // will update later.
       });
 
       // Create a final directory for the user images.
@@ -517,6 +517,29 @@ class _RegisterPageState extends State<RegisterPage> {
           whereArgs: [userId],
         );
       }
+
+      // Compute the average face vector from the 5 captured vectors.
+      List<double> avgVector = List.filled(128, 0.0);
+      for (var vector in _faceVectors) {
+        for (int i = 0; i < vector.length; i++) {
+          avgVector[i] += vector[i];
+        }
+      }
+      for (int i = 0; i < avgVector.length; i++) {
+        avgVector[i] /= _faceVectors.length;
+      }
+
+      // Optionally, you can (re-)normalize the averaged vector.
+      double norm = math.sqrt(avgVector.fold(0, (sum, element) => sum + element * element));
+      if (norm > 0) {
+        avgVector = avgVector.map((e) => e / norm).toList();
+      }
+
+      // Insert the average vector into a separate table (user_vectors).
+      await db.insert('user_vectors', {
+        'user_id': userId,
+        'vector': jsonEncode(avgVector),
+      });
 
       // Clear stored vectors and image paths.
       _faceVectors.clear();
