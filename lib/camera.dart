@@ -469,8 +469,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
       final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
 
       // Save the cropped & resized face image for preview.
-      // _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
-      // setState(() {}); // Update UI to show the cropped face preview.
+      _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
+      setState(() {}); // Update UI to show the cropped face preview.
 
 
       final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
@@ -558,7 +558,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
 
     // Define matching parameters.
     const int requiredVectorCount = 1; // With an average vector stored, we require one valid sample.
-    const double rejectionThreshold = 0.79; // Minimum average cosine similarity to be considered a match.
+    const double rejectionThreshold = 0.7; // Minimum average cosine similarity to be considered a match.
 
     double bestAvgSim = -1.0;
     Map<String, dynamic>? bestUser;
@@ -930,6 +930,32 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
               ],
             ),
           ),
+          if (_processedFaceImage != null)
+            Positioned(
+              top: 120,   // Adjust this vertical position as needed.
+              right: 20,  // Adjust the horizontal position as needed.
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => FullScreenImage(imageBytes: _processedFaceImage!),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 100,  // Set your desired width.
+                  height: 100, // Set your desired height.
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.blue, width: 2),
+                  ),
+                  child: Image.memory(
+                    _processedFaceImage!,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ),
 
 
           // Flip camera button (top center) with text
