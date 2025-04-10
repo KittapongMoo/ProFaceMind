@@ -45,9 +45,16 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
   List<List<double>> _vectorBuffer = [];
   final int _maxBufferLength = 5;
   int _vectorProgress = 0; // Track number of collected vectors
-
+  double? _lastConfidence;
   // 👇 เพิ่มตรงนี้
   File? _profileImageFile;
+
+  Color _getConfidenceColor(double? confidence) {
+    if (confidence == null) return Colors.grey;
+    if (confidence >= 0.8) return Colors.green;
+    if (confidence >= 0.6) return Colors.orange;
+    return Colors.red;
+  }
 
   // Face detection fields.
   final FaceDetector _faceDetector = FaceDetector(
@@ -531,49 +538,45 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
   Future<Map<String, dynamic>?> _findMatchingUser(
       List<double> queryVector) async {
     final db = await DatabaseHelper().database;
-    // Query to join user information with stored user vectors.
     final results = await db.rawQuery('''
     SELECT users.id as userId, users.nickname, users.name, users.relation, users.primary_image, user_vectors.vector 
     FROM users 
     JOIN user_vectors ON users.id = user_vectors.user_id
   ''');
 
-    // Group rows by user id.
     Map<int, List<Map<String, dynamic>>> groupedResults = {};
     for (var row in results) {
       int userId = row['userId'] as int;
       groupedResults.putIfAbsent(userId, () => []).add(row);
     }
 
-    // Define matching parameters.
-    const int requiredVectorCount =
-        1; // With an average vector stored, we require one valid sample.
-    const double rejectionThreshold =
-        0.6; // Minimum average cosine similarity to be considered a match.
-
-    double bestAvgSim = -1.0;
+    const double rejectionThreshold = 0.6;
+    double bestSim = -1.0;
     Map<String, dynamic>? bestUser;
 
-    // For each user, compute the average similarity between the stored vector and the query.
-    groupedResults.forEach((userId, rows) {
-      // If there are not enough records, skip user (ideally you store one averaged vector).
-      if (rows.length < requiredVectorCount) return;
-
-      // For this design, we assume there is one vector per user in the table.
-      // We decode it and compute the cosine similarity:
-      String vectorString = rows.first['vector'] as String;
-      List<double> storedVector = (jsonDecode(vectorString) as List)
+    for (var entry in groupedResults.entries) {
+      final row = entry.value.first;
+      List<double> storedVector = (jsonDecode(row['vector']) as List)
           .map((e) => (e is num ? e.toDouble() : 0.0))
           .toList();
       double sim = _dotProduct(queryVector, storedVector);
 
-      if (sim >= rejectionThreshold && sim > bestAvgSim) {
-        bestAvgSim = sim;
-        bestUser = rows.first;
+      if (sim > bestSim) {
+        bestSim = sim;
+        bestUser = row;
       }
+    }
+
+    // 👉 Return null if not confident enough
+    if (bestSim < rejectionThreshold) {
+      return null;
+    }
+
+    // ✅ Save the similarity in _lastConfidence
+    setState(() {
+      _lastConfidence = bestSim;
     });
 
-    print("🧠 Best average similarity: $bestAvgSim");
     return bestUser;
   }
 
@@ -1175,7 +1178,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                children: <Widget>[
                   Text(
                     'ชื่อเล่น : ${_matchedUser?['nickname'] ?? "??"}',
                     style: const TextStyle(color: Colors.white, fontSize: 16),
@@ -1188,6 +1191,27 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
                     'ความสัมพันธ์ : ${_matchedUser?['relation'] ?? "??"}',
                     style: const TextStyle(color: Colors.white, fontSize: 16),
                   ),
+                  if (_lastConfidence != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        children: [
+                          Text(
+                            "ความมั่นใจ: ",
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 14),
+                          ),
+                          Text(
+                            "${(_lastConfidence! * 100).toStringAsFixed(1)}%",
+                            style: TextStyle(
+                              color: _getConfidenceColor(_lastConfidence),
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
