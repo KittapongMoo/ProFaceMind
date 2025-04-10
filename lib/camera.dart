@@ -25,14 +25,6 @@ import 'package:exif/exif.dart';
 // Import ML Kit face detection:
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
-class _SimilarityResult {
-  final int userId;
-  final double sim;
-  final Map<String, dynamic> row;
-
-  _SimilarityResult(this.userId, this.sim, this.row);
-}
-
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
 
@@ -40,7 +32,7 @@ class CameraPage extends StatefulWidget {
   _CameraPageState createState() => _CameraPageState();
 }
 
-class _CameraPageState extends State<CameraPage> with RouteAware{
+class _CameraPageState extends State<CameraPage> with RouteAware {
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
   bool _isCameraInitialized = false;
@@ -50,6 +42,9 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
   int _sensorOrientation = 0;
   Interpreter? interpreter;
   Uint8List? _processedFaceImage;
+  List<List<double>> _vectorBuffer = [];
+  final int _maxBufferLength = 5;
+  int _vectorProgress = 0; // Track number of collected vectors
 
   // 👇 เพิ่มตรงนี้
   File? _profileImageFile;
@@ -84,9 +79,9 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     });
     _lastImageFuture = _getLastImagePath();
     _loadModel();
-    _loadProfileImage();      // ✅ โหลดรูปโปรไฟล์  <<< ใส่ตรงนี้เลย
+    _loadProfileImage(); // ✅ โหลดรูปโปรไฟล์  <<< ใส่ตรงนี้เลย
     // Start a timer to check for a face match every 10 seconds.
-    _timer = Timer.periodic(const Duration(seconds: 2), (Timer timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (Timer timer) {
       _recognizeFace();
     });
     // _checkHistoryDatabase();
@@ -105,8 +100,6 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
       });
     }
   }
-
-
 
   @override
   void didChangeDependencies() {
@@ -167,10 +160,10 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
         CameraDescription selectedCamera = _isFrontCamera
             ? _cameras!.firstWhere(
                 (camera) => camera.lensDirection == CameraLensDirection.front,
-            orElse: () => _cameras!.first)
+                orElse: () => _cameras!.first)
             : _cameras!.firstWhere(
                 (camera) => camera.lensDirection == CameraLensDirection.back,
-            orElse: () => _cameras!.first);
+                orElse: () => _cameras!.first);
 
         _cameraController = CameraController(
           selectedCamera,
@@ -180,7 +173,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
         await _cameraController!.initialize();
 
         // Lock preview to portrait.
-        await _cameraController!.lockCaptureOrientation(DeviceOrientation.portraitUp);
+        await _cameraController!
+            .lockCaptureOrientation(DeviceOrientation.portraitUp);
 
         // Start image stream for face detection.
         _cameraController!.startImageStream((CameraImage cameraImage) {
@@ -214,8 +208,10 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     return null;
   }
 
-  Uint8List _imageToByteListFloat32(img.Image image, int inputSize, double mean, double std) {
-    final Float32List convertedBytes = Float32List(1 * inputSize * inputSize * 3);
+  Uint8List _imageToByteListFloat32(
+      img.Image image, int inputSize, double mean, double std) {
+    final Float32List convertedBytes =
+        Float32List(1 * inputSize * inputSize * 3);
     int pixelIndex = 0;
     for (int y = 0; y < inputSize; y++) {
       for (int x = 0; x < inputSize; x++) {
@@ -250,8 +246,10 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
         final int rowOffset1 = row * image.planes[1].bytesPerRow;
         final int rowOffset2 = row * image.planes[2].bytesPerRow;
         for (int col = 0; col < uvWidth; col++) {
-          nv21[offset++] = image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
-          nv21[offset++] = image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
+          nv21[offset++] =
+              image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
+          nv21[offset++] =
+              image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
         }
       }
       final imageSize = Size(image.width.toDouble(), image.height.toDouble());
@@ -290,7 +288,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     bool detecting = true;
     try {
       final inputImage =
-      _convertCameraImage(cameraImage, _cameraController!.description);
+          _convertCameraImage(cameraImage, _cameraController!.description);
       if (inputImage == null) {
         detecting = false;
         return;
@@ -322,15 +320,16 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     double scale = cameraAspectRatio / screenAspectRatio;
     double extraZoomFactor = 0.72;
     scale *= extraZoomFactor;
-    final int sensorOrientation = _cameraController!.description.sensorOrientation;
+    final int sensorOrientation =
+        _cameraController!.description.sensorOrientation;
     double rotationAngle = 0;
     if (sensorOrientation == 90) {
       rotationAngle = math.pi / 2;
     } else if (sensorOrientation == 270) {
       rotationAngle = -math.pi / 2;
     }
-    final bool isFrontCamera =
-        _cameraController!.description.lensDirection == CameraLensDirection.front;
+    final bool isFrontCamera = _cameraController!.description.lensDirection ==
+        CameraLensDirection.front;
     final Matrix4 transformMatrix = isFrontCamera
         ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
         : Matrix4.rotationZ(rotationAngle);
@@ -355,7 +354,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
                         painter: FacePainter(
                           faces: _faces,
                           // Note: swap dimensions if needed.
-                          imageSize: Size(previewSize.height, previewSize.width),
+                          imageSize:
+                              Size(previewSize.height, previewSize.width),
                           isFrontCamera: isFrontCamera,
                           screenSize: constraints.biggest,
                         ),
@@ -373,13 +373,13 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
 
   /// Trigger face recognition every 10 seconds.
   Future<void> _recognizeFace() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+    if (_cameraController == null || !_cameraController!.value.isInitialized)
+      return;
+
     try {
-      // Capture the picture.
       final XFile imageFile = await _cameraController!.takePicture();
       print("Picture taken: ${imageFile.path}");
 
-      // Read and decode the image.
       final Uint8List bytes = await imageFile.readAsBytes();
       final img.Image? decodedImage = img.decodeImage(bytes);
       if (decodedImage == null) {
@@ -387,76 +387,45 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
         return;
       }
 
-      // Read EXIF data for orientation.
       final Map<String, IfdTag> exifData = await readExifFromBytes(bytes);
       int rotationAngle = 0;
       if (!_isFrontCamera) {
-        // Use EXIF data if available.
         if (exifData.isNotEmpty && exifData.containsKey("Image Orientation")) {
           final orientation = exifData["Image Orientation"]?.printable;
-          if (orientation == "Rotated 90 CW") {
+          if (orientation == "Rotated 90 CW")
             rotationAngle = 90;
-          } else if (orientation == "Rotated 180") {
+          else if (orientation == "Rotated 180")
             rotationAngle = 180;
-          } else if (orientation == "Rotated 270 CW") {
-            rotationAngle = -90;
-          }
+          else if (orientation == "Rotated 270 CW") rotationAngle = -90;
         }
       } else {
-        // For front-camera, force a rotation (adjust as needed).
         rotationAngle = -90;
       }
 
-      // Rotate the decoded image accordingly.
       final img.Image orientedImage = (rotationAngle != 0)
           ? img.copyRotate(decodedImage, rotationAngle)
           : decodedImage;
 
-      // *** FIX END ***
-
-      // Apply rotation correction based on the sensor orientation.
-      // if (_cameraController!.description.sensorOrientation == 90) {
-      //   processedImage = img.copyRotate(processedImage, 90);
-      // } else if (_cameraController!.description.sensorOrientation == 270) {
-      //   processedImage = img.copyRotate(processedImage, -90);
-      // } else if (_cameraController!.description.sensorOrientation == 180) {
-      //   processedImage = img.copyRotate(processedImage, 180);
-      // }
-
-      // Use ML Kit to detect faces (using the image file path)
       final inputImage = InputImage.fromFilePath(imageFile.path);
       final List<Face> faces = await _faceDetector.processImage(inputImage);
 
-      // If no face is detected, update overlay placeholders.
       if (faces.isEmpty) {
         setState(() {
-          _matchedUser = {
-            "nickname": "??",
-            "name": "??",
-            "relation": "??"
-          };
+          _matchedUser = {"nickname": "??", "name": "??", "relation": "??"};
         });
         return;
       }
 
-      // Use the first detected face.
-      // final face = faces.first;
-      // Rect bbox = face.boundingBox;
-
-      // Instead of cropping to the face bounding box, use the full processed image.
-      final Uint8List fullImageBlob = Uint8List.fromList(img.encodePng(orientedImage));
-      // Optionally, still perform face recognition using the cropped face if needed.
-      // Resize the cropped face (if you still want to use it for recognition)...
-      // Crop to face bounding box
+      final Uint8List fullImageBlob =
+          Uint8List.fromList(img.encodePng(orientedImage));
       final Face face = faces.first;
       Rect box = face.boundingBox;
 
-      // If using the front camera, mirror the bounding box.
       if (_isFrontCamera) {
         box = Rect.fromLTRB(
-          orientedImage.width - box.right, // new left
+          orientedImage.width - box.right,
           box.top,
-          orientedImage.width - box.left,  // new right
+          orientedImage.width - box.left,
           box.bottom,
         );
       }
@@ -466,63 +435,74 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
       int y = (box.top - margin).toInt().clamp(0, orientedImage.height);
       int w = (box.width + 2 * margin).toInt();
       int h = (box.height + 2 * margin).toInt();
-      if (x + w > orientedImage.width) {
-        w = orientedImage.width - x;
-      }
-      if (y + h > orientedImage.height) {
-        h = orientedImage.height - y;
-      }
+      if (x + w > orientedImage.width) w = orientedImage.width - x;
+      if (y + h > orientedImage.height) h = orientedImage.height - y;
 
       final img.Image croppedFace = img.copyCrop(orientedImage, x, y, w, h);
-      final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
-
-      // Save the cropped & resized face image for preview.
+      final img.Image resizedFace =
+          img.copyResize(croppedFace, width: 112, height: 112);
       _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
-      setState(() {}); // Update UI to show the cropped face preview.
+      setState(() {});
 
-
-      final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
+      final Uint8List processedBytes =
+          _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
       List<double> vector = await _runFaceRecognition(processedBytes);
 
-// ✅ Normalize vector
-      final double norm = math.sqrt(vector.fold(0, (sum, val) => sum + val * val));
+      // ✅ Normalize
+      final double norm =
+          math.sqrt(vector.fold(0, (sum, val) => sum + val * val));
       if (norm > 0) {
         vector = vector.map((e) => e / norm).toList();
       }
 
-      // Debug: Validate and show embedding distribution.
-      await _validateEmbeddingDistribution(vector);
+      // ✅ Add to buffer
+      if (_vectorBuffer.length >= _maxBufferLength) {
+        _vectorBuffer.removeAt(0);
+      }
+      _vectorBuffer.add(vector);
 
-      print("Face vector: $vector");
+      // ✅ Update progress
+      setState(() {
+        _vectorProgress = _vectorBuffer.length;
+      });
 
-      // Call our debug function to validate distribution.
-      await _validateEmbeddingDistribution(vector);
-
-      if (vector.every((element) => element == 0)) {
-        print("Face vector is all zeros. Check image preprocessing.");
+      // ✅ Wait until we have 5 vectors
+      if (_vectorBuffer.length < _maxBufferLength) {
+        print(
+            "Waiting for more vectors... ($_vectorProgress/$_maxBufferLength)");
+        return;
       }
 
-      // Compare with database.
-      Map<String, dynamic>? matchedUser = await _findMatchingUser(vector);
+      // ✅ Average the buffer
+      List<double> avgVector = List.filled(128, 0);
+      for (var v in _vectorBuffer) {
+        for (int i = 0; i < 128; i++) {
+          avgVector[i] += v[i];
+        }
+      }
+      avgVector = avgVector.map((e) => e / _maxBufferLength).toList();
 
-      // Always save the current face image blob in history.
-      // If no match is found, you can use a default user id (for example, 0) or handle it as an unknown user.
+      // ✅ Use average vector for match and validation
+      await _validateEmbeddingDistribution(avgVector);
+      Map<String, dynamic>? matchedUser = await _findMatchingUser(avgVector);
+
       if (matchedUser == null) {
-        await _saveHistory(0, fullImageBlob); // 0 indicates unknown user, adjust as needed.
+        await _saveHistory(0, fullImageBlob);
         setState(() {
-          _matchedUser = {
-            "nickname": "??",
-            "name": "??",
-            "relation": "??"
-          };
+          _matchedUser = {"nickname": "??", "name": "??", "relation": "??"};
         });
       } else {
-        // await _saveHistory(matchedUser['id'] as int, fullImageBlob);
         await _saveHistory(matchedUser['userId'] as int, fullImageBlob);
         setState(() {
           _matchedUser = matchedUser;
         });
       }
+
+      // ✅ Clear buffer after recognition
+      _vectorBuffer.clear();
+      setState(() {
+        _vectorProgress = 0;
+      });
     } catch (e) {
       print("❌❌❌Error in recognition: $e");
     }
@@ -548,54 +528,53 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
   /// Find a matching user in the database by comparing face vectors.
   /// Find a matching user by comparing the query face vector with the averaged stored vector per user.
   /// Returns null if no user's average cosine similarity exceeds the rejection threshold.
-  Future<Map<String, dynamic>?> _findMatchingUser(List<double> queryVector) async {
+  Future<Map<String, dynamic>?> _findMatchingUser(
+      List<double> queryVector) async {
     final db = await DatabaseHelper().database;
+    // Query to join user information with stored user vectors.
     final results = await db.rawQuery('''
     SELECT users.id as userId, users.nickname, users.name, users.relation, users.primary_image, user_vectors.vector 
     FROM users 
     JOIN user_vectors ON users.id = user_vectors.user_id
   ''');
 
+    // Group rows by user id.
     Map<int, List<Map<String, dynamic>>> groupedResults = {};
     for (var row in results) {
       int userId = row['userId'] as int;
       groupedResults.putIfAbsent(userId, () => []).add(row);
     }
 
-    const int requiredVectorCount = 1;
-    const double rejectionThreshold = 0.6;
+    // Define matching parameters.
+    const int requiredVectorCount =
+        1; // With an average vector stored, we require one valid sample.
+    const double rejectionThreshold =
+        0.6; // Minimum average cosine similarity to be considered a match.
 
-    List<_SimilarityResult> similarities = [];
+    double bestAvgSim = -1.0;
+    Map<String, dynamic>? bestUser;
 
+    // For each user, compute the average similarity between the stored vector and the query.
     groupedResults.forEach((userId, rows) {
+      // If there are not enough records, skip user (ideally you store one averaged vector).
       if (rows.length < requiredVectorCount) return;
 
+      // For this design, we assume there is one vector per user in the table.
+      // We decode it and compute the cosine similarity:
       String vectorString = rows.first['vector'] as String;
       List<double> storedVector = (jsonDecode(vectorString) as List)
           .map((e) => (e is num ? e.toDouble() : 0.0))
           .toList();
       double sim = _dotProduct(queryVector, storedVector);
 
-      similarities.add(_SimilarityResult(userId, sim, rows.first));
+      if (sim >= rejectionThreshold && sim > bestAvgSim) {
+        bestAvgSim = sim;
+        bestUser = rows.first;
+      }
     });
 
-    // Sort similarities descending
-    similarities.sort((a, b) => b.sim.compareTo(a.sim));
-
-    if (similarities.isEmpty || similarities.first.sim < rejectionThreshold) {
-      return null; // Reject: not confident enough
-    }
-
-    if (similarities.length >= 2) {
-      final double best = similarities[0].sim;
-      final double secondBest = similarities[1].sim;
-      if ((best - secondBest) < 0.05) {
-        return null; // Too close to second best
-      }
-    }
-
-    print("🧠 Best match with confidence: ${similarities.first.sim}");
-    return similarities.first.row;
+    print("🧠 Best average similarity: $bestAvgSim");
+    return bestUser;
   }
 
   /// Helper: Compute dot product (for cosine similarity on already normalized vectors).
@@ -672,8 +651,9 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     double min = similarities.reduce(math.min);
     double max = similarities.reduce(math.max);
     double variance = similarities
-        .map((sim) => (sim - avg) * (sim - avg))
-        .reduce((a, b) => a + b) / similarities.length;
+            .map((sim) => (sim - avg) * (sim - avg))
+            .reduce((a, b) => a + b) /
+        similarities.length;
     double stdDev = math.sqrt(variance);
 
     String stats = "Embedding Distribution Statistics:\n"
@@ -744,7 +724,6 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     }
   }
 
-
   // Save a history record (user id and current time).
   Future<void> _saveHistory(int userId, Uint8List faceImageBytes) async {
     final db = await DatabaseHelper().database;
@@ -770,12 +749,12 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
           'face_image': faceImageBytes,
         },
       );
-      print("History record saved for user $userId at $nowFormatted with face image blob.");
+      print(
+          "History record saved for user $userId at $nowFormatted with face image blob.");
     } else {
       print("History record already exists for user $userId at $nowFormatted");
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -787,41 +766,40 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
 
           // Profile button (top-left)
           Positioned(
-            top: 40,
-            left: 20,
-            child: Column(
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const ProfilePage()),
-                    );
-                  },
-                  child: CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.white,
-                    backgroundImage: _profileImageFile != null
-                        ? FileImage(_profileImageFile!)
-                        : null,
-                    child: _profileImageFile == null
-                        ? const Icon(Icons.person, color: Colors.blue)
-                        : null,
+              top: 40,
+              left: 20,
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const ProfilePage()),
+                      );
+                    },
+                    child: CircleAvatar(
+                      radius: 30,
+                      backgroundColor: Colors.white,
+                      backgroundImage: _profileImageFile != null
+                          ? FileImage(_profileImageFile!)
+                          : null,
+                      child: _profileImageFile == null
+                          ? const Icon(Icons.person, color: Colors.blue)
+                          : null,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  "โปรไฟล์",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                  const SizedBox(height: 4),
+                  const Text(
+                    "โปรไฟล์",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
-            )
-
-          ),
+                ],
+              )),
 
           // ปุ่มเบอร์ฉุกเฉิน (ขวาบน)
           Positioned(
@@ -832,9 +810,12 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
                 GestureDetector(
                   onTap: () async {
                     final prefs = await SharedPreferences.getInstance();
-                    final name = prefs.getString('emergency_name') ?? 'ไม่พบชื่อ';
-                    final relation = prefs.getString('emergency_relation') ?? 'ไม่พบความสัมพันธ์';
-                    final phone = prefs.getString('emergency_phone') ?? 'ไม่พบเบอร์โทร';
+                    final name =
+                        prefs.getString('emergency_name') ?? 'ไม่พบชื่อ';
+                    final relation = prefs.getString('emergency_relation') ??
+                        'ไม่พบความสัมพันธ์';
+                    final phone =
+                        prefs.getString('emergency_phone') ?? 'ไม่พบเบอร์โทร';
 
                     showDialog(
                       context: context,
@@ -843,7 +824,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 100),
+                        insetPadding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 100),
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
                           child: Column(
@@ -866,7 +848,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
                                     onTap: () => Navigator.pop(context),
                                     child: const Padding(
                                       padding: EdgeInsets.all(8),
-                                      child: Icon(Icons.close, size: 22, color: Colors.grey),
+                                      child: Icon(Icons.close,
+                                          size: 22, color: Colors.grey),
                                     ),
                                   ),
                                 ],
@@ -877,7 +860,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
                                 children: [
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           '$name ($relation)',
@@ -904,15 +888,19 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
                                       Navigator.pop(context);
                                       Navigator.push(
                                         context,
-                                        MaterialPageRoute(builder: (context) => const SetPhoneNumber()),
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                const SetPhoneNumber()),
                                       );
                                     },
                                     child: Padding(
-                                      padding: const EdgeInsets.only(left: 8, top: 2),
+                                      padding: const EdgeInsets.only(
+                                          left: 8, top: 2),
                                       child: CircleAvatar(
                                         radius: 25,
                                         backgroundColor: Colors.blue,
-                                        child: const Icon(Icons.edit, size: 25, color: Colors.white),
+                                        child: const Icon(Icons.edit,
+                                            size: 25, color: Colors.white),
                                       ),
                                     ),
                                   ),
@@ -944,19 +932,20 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
           ),
           if (_processedFaceImage != null)
             Positioned(
-              top: 120,   // Adjust this vertical position as needed.
-              right: 20,  // Adjust the horizontal position as needed.
+              top: 120, // Adjust this vertical position as needed.
+              right: 20, // Adjust the horizontal position as needed.
               child: GestureDetector(
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => FullScreenImage(imageBytes: _processedFaceImage!),
+                      builder: (context) =>
+                          FullScreenImage(imageBytes: _processedFaceImage!),
                     ),
                   );
                 },
                 child: Container(
-                  width: 100,  // Set your desired width.
+                  width: 100, // Set your desired width.
                   height: 100, // Set your desired height.
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.blue, width: 2),
@@ -968,7 +957,6 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
                 ),
               ),
             ),
-
 
           // Flip camera button (top center) with text
           Positioned(
@@ -989,7 +977,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
                     ],
                   ),
                   child: IconButton(
-                    icon: const Icon(Icons.flip_camera_ios, color: Colors.black),
+                    icon:
+                        const Icon(Icons.flip_camera_ios, color: Colors.black),
                     onPressed: () {
                       setState(() {
                         _isFrontCamera = !_isFrontCamera;
@@ -1012,6 +1001,24 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
             ),
           ),
 
+          // Progress indicator for vector capture
+          Positioned(
+            top: 160,
+            left: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: _vectorProgress >= _maxBufferLength
+                    ? Colors.green
+                    : Colors.black87,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'ความคืบหน้า: ${((_vectorProgress / _maxBufferLength) * 100).toStringAsFixed(0)}%',
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ),
+          ),
 
           // Bottom row with register, last image, map.
           Positioned(
@@ -1029,7 +1036,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const RegisterPage()),
+                          MaterialPageRoute(
+                              builder: (context) => const RegisterPage()),
                         );
                       },
                       child: const CircleAvatar(
@@ -1057,7 +1065,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
                       future: _lastImageFuture,
                       builder: (context, snapshot) {
                         Widget child;
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
                           child = Container(
                             width: 100,
                             height: 100,
@@ -1065,7 +1074,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
                               color: Colors.grey,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Center(child: CircularProgressIndicator()),
+                            child: const Center(
+                                child: CircularProgressIndicator()),
                           );
                         } else if (snapshot.hasData && snapshot.data != null) {
                           child = Container(
@@ -1097,7 +1107,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const AllRegisterPage()),
+                              MaterialPageRoute(
+                                  builder: (_) => const AllRegisterPage()),
                             );
                           },
                           child: child,
@@ -1124,7 +1135,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const NavigationPage()),
+                          MaterialPageRoute(
+                              builder: (context) => const NavigationPage()),
                         );
                       },
                       child: const CircleAvatar(
@@ -1144,7 +1156,6 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
                     ),
                   ],
                 ),
-
               ],
             ),
           ),
