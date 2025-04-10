@@ -550,7 +550,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
       groupedResults.putIfAbsent(userId, () => []).add(row);
     }
 
-    const double rejectionThreshold = 0.6;
+    const double rejectionThreshold = 0.7;
     double bestSim = -1.0;
     Map<String, dynamic>? bestUser;
 
