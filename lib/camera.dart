@@ -665,42 +665,45 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
     double stdDev = math.sqrt(variance);
 
     String stats = "Embedding Distribution Statistics:\n"
-        "Count: ${similarities.length}\n"
-        "Average: ${avg.toStringAsFixed(3)}\n"
-        "Min: ${min.toStringAsFixed(3)}\n"
-        "Max: ${max.toStringAsFixed(3)}\n"
+        "🔄️Count: ${similarities.length}\n"
+        "➗Average: ${avg.toStringAsFixed(3)}\n"
+        "➖Min: ${min.toStringAsFixed(3)}\n"
+        "➕Max: ${max.toStringAsFixed(3)}\n"
         "Std Dev: ${stdDev.toStringAsFixed(3)}";
 
     print(stats);
-    _showDistributionDialog(stats);
+    // _showDistributionDialog(stats);
   }
 
   // <-- Place this helper function inside the state class, for example here:
-  void _showDistributionDialog(String stats) {
-    if (!mounted) return;
-    showDialog(
-      context: context as BuildContext,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: Text("Embedding Distribution"),
-          content: Text(stats),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text("Close"),
-            )
-          ],
-        );
-      },
-    );
-  }
+  // void _showDistributionDialog(String stats) {
+  //   // Use the context from the global navigator key.
+  //   final BuildContext? dialogContext = navigatorKey.currentContext;
+  //   if (dialogContext == null || !mounted) return;
+  //
+  //   showDialog(
+  //     context: dialogContext,
+  //     builder: (BuildContext innerContext) {
+  //       return AlertDialog(
+  //         title: const Text("Embedding Distribution"),
+  //         content: Text(stats),
+  //         actions: [
+  //           TextButton(
+  //             onPressed: () => Navigator.of(innerContext).pop(),
+  //             child: const Text("Close"),
+  //           )
+  //         ],
+  //       );
+  //     },
+  //   );
+  // }
 
   // Function to open or create the history database.
   Future<Database> _getHistoryDatabase() async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'facemind.db');
 
-    Database db = await openDatabase(path, version: 2, onOpen: (db) {
+    Database db = await openDatabase(path, version: 3, onOpen: (db) {
       print("Database opened: $path");
     });
 
