@@ -19,8 +19,6 @@ import 'package:exif/exif.dart';
 
 import 'fillinfo.dart'; // Make sure FillInfoPage({required this.userId}) is defined
 
-/// Make sure you set this in main.dart:
-/// MaterialApp(navigatorKey: navigatorKey, home: RegisterPage())
 // final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class RegisterPage extends StatefulWidget {
@@ -37,8 +35,7 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isFrontCamera = true;
   final FaceDetector _faceDetector = FaceDetector(
     options: FaceDetectorOptions(
-      performanceMode:
-          FaceDetectorMode.accurate, // accurate for better detection
+      performanceMode: FaceDetectorMode.accurate,
       enableTracking: true,
     ),
   );
@@ -49,15 +46,17 @@ class _RegisterPageState extends State<RegisterPage> {
   // List to store the face vectors (each from one image)
   List<List<double>> _faceVectors = [];
 
-  // ImagePicker for gallery selection
+  // List to store the full (uncropped) image paths.
+  List<String> fullImagePaths = [];
+
+  // ImagePicker for gallery selection.
   final ImagePicker _picker = ImagePicker();
 
-  // New state variable to hold the processed face image bytes for preview
+  // New state variable to hold the processed face image bytes for preview.
   Uint8List? _processedFaceImage;
 
   Uint8List _imageToByteListFloat32(
       img.Image image, int inputSize, double mean, double std) {
-    // Create a buffer for 1 image, of shape (inputSize, inputSize, 3)
     var convertedBytes = Float32List(1 * inputSize * inputSize * 3);
     int pixelIndex = 0;
     for (int y = 0; y < inputSize; y++) {
@@ -66,7 +65,6 @@ class _RegisterPageState extends State<RegisterPage> {
         double r = img.getRed(pixel).toDouble();
         double g = img.getGreen(pixel).toDouble();
         double b = img.getBlue(pixel).toDouble();
-        // Normalize the pixel values.
         convertedBytes[pixelIndex++] = (r - 127.5) / 128.0;
         convertedBytes[pixelIndex++] = (g - 127.5) / 128.0;
         convertedBytes[pixelIndex++] = (b - 127.5) / 128.0;
@@ -75,67 +73,41 @@ class _RegisterPageState extends State<RegisterPage> {
     return convertedBytes.buffer.asUint8List();
   }
 
-  // Improved conversion function for camera images
   InputImage? _convertCameraImage(CameraImage image, CameraDescription camera) {
     try {
-      // Convert YUV420 to NV21.
-      // Calculate the size of the Y plane.
       final int ySize = image.planes[0].bytes.length;
-      // The U and V planes.
-      final int uvSize =
-          image.planes[1].bytes.length + image.planes[2].bytes.length;
+      final int uvSize = image.planes[1].bytes.length + image.planes[2].bytes.length;
       final Uint8List nv21 = Uint8List(ySize + uvSize);
-
-      // Copy the Y plane as-is.
       nv21.setRange(0, ySize, image.planes[0].bytes);
-
-      // Many devices provide U and V in separate planes.
-      // NV21 requires that the chroma components are interleaved as V then U.
-      // Note: Some devices may swap U and V; you might need to adjust if you see color issues.
       int offset = ySize;
-      final int uvPixelStride = image.planes[1].bytesPerPixel!; // normally 2
+      final int uvPixelStride = image.planes[1].bytesPerPixel!;
       final int uvRowStride = image.planes[1].bytesPerRow;
-      // The height and width for the UV planes.
       final int uvHeight = image.height ~/ 2;
       final int uvWidth = image.width ~/ 2;
-
       for (int row = 0; row < uvHeight; row++) {
         final int rowOffset1 = row * image.planes[1].bytesPerRow;
         final int rowOffset2 = row * image.planes[2].bytesPerRow;
         for (int col = 0; col < uvWidth; col++) {
-          // In NV21 the order is V then U.
-          nv21[offset++] =
-              image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
-          nv21[offset++] =
-              image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
+          nv21[offset++] = image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
+          nv21[offset++] = image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
         }
       }
-
       final imageSize = Size(image.width.toDouble(), image.height.toDouble());
       final imageRotation = _getInputImageRotation(camera.sensorOrientation);
       if (imageRotation == null) return null;
-
-      // Create metadata explicitly using NV21.
       final metadata = InputImageMetadata(
         size: imageSize,
         rotation: imageRotation,
-        // We set the format explicitly to NV21.
         format: InputImageFormat.nv21,
-        // For NV21, the bytesPerRow can be taken from the Y plane.
         bytesPerRow: image.planes[0].bytesPerRow,
       );
-
-      return InputImage.fromBytes(
-        bytes: nv21,
-        metadata: metadata,
-      );
+      return InputImage.fromBytes(bytes: nv21, metadata: metadata);
     } catch (e) {
       print("Error converting camera image: $e");
       return null;
     }
   }
 
-  // Helper function to get the image rotation
   InputImageRotation _getInputImageRotation(int sensorOrientation) {
     switch (sensorOrientation) {
       case 0:
@@ -158,7 +130,7 @@ class _RegisterPageState extends State<RegisterPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeCamera();
     });
-    _loadModel(); // Call the new function correctly
+    _loadModel();
   }
 
   @override
@@ -170,13 +142,10 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Interpreter? interpreter;
 
-  /// Load MobileFaceNet Model via TFLite
   Future<void> _loadModel() async {
     try {
-      // Explicitly load asset data first
       final modelData = await rootBundle.load('assets/MobileFaceNet.tflite');
       final buffer = modelData.buffer;
-
       interpreter = Interpreter.fromBuffer(buffer.asUint8List());
       print('✅ TFLite model loaded successfully from buffer!');
     } catch (e) {
@@ -184,7 +153,6 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Initialize Camera
   Future<void> _initializeCamera() async {
     final permission = await Permission.camera.request();
     if (!permission.isGranted) {
@@ -194,9 +162,8 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       _cameras = await availableCameras();
       if (_cameras != null && _cameras!.isNotEmpty) {
-        // Find the back camera first (you can adjust this logic)
         int backCameraIndex = _cameras!.indexWhere(
-            (camera) => camera.lensDirection == CameraLensDirection.back);
+                (camera) => camera.lensDirection == CameraLensDirection.back);
         await _setCamera(backCameraIndex != -1 ? backCameraIndex : 0);
       }
     } catch (e) {
@@ -204,44 +171,34 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Switch Between Front and Back Cameras
   Future<void> _switchCamera() async {
     if (_cameras == null || _cameras!.isEmpty) return;
-
-    // Update the camera flag
     setState(() {
       _isFrontCamera = !_isFrontCamera;
     });
-
-    // Find the camera index that matches the new lens direction.
     int cameraIndex = 0;
     for (int i = 0; i < _cameras!.length; i++) {
       if ((_isFrontCamera &&
-              _cameras![i].lensDirection == CameraLensDirection.front) ||
+          _cameras![i].lensDirection == CameraLensDirection.front) ||
           (!_isFrontCamera &&
               _cameras![i].lensDirection == CameraLensDirection.back)) {
         cameraIndex = i;
         break;
       }
     }
-    // Dispose of the current controller and set up the new one.
     await _setCamera(cameraIndex);
   }
 
   Future<void> _detectFacesFromCamera(CameraImage cameraImage) async {
     if (_isDetectingFaces) return;
     _isDetectingFaces = true;
-
     try {
-      final inputImage =
-          _convertCameraImage(cameraImage, _cameraController!.description);
+      final inputImage = _convertCameraImage(cameraImage, _cameraController!.description);
       if (inputImage == null) {
         _isDetectingFaces = false;
         return;
       }
-
       final faces = await _faceDetector.processImage(inputImage);
-
       if (mounted) {
         setState(() {
           _faces = faces;
@@ -254,21 +211,14 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Set Camera by Index
   Future<void> _setCamera(int cameraIndex) async {
     if (_cameras == null || _cameras!.isEmpty) return;
-
-    // 1) Temporarily store the old controller and set our field to null
     final oldController = _cameraController;
     _cameraController = null;
-    setState(() {}); // Forces a rebuild, which will show a loading indicator
-
-    // 2) Dispose the old controller safely
+    setState(() {}); // Show loading
     if (oldController != null) {
       await oldController.dispose();
     }
-
-    // 3) Create and initialize the new controller
     try {
       final selectedCamera = _cameras![cameraIndex];
       final newController = CameraController(
@@ -278,29 +228,22 @@ class _RegisterPageState extends State<RegisterPage> {
         imageFormatGroup: ImageFormatGroup.yuv420,
       );
       await newController.initialize();
-
-      // 4) Start the image stream
       newController.startImageStream((CameraImage cameraImage) {
         _detectFacesFromCamera(cameraImage);
       });
-
-      // 5) Update our state with the new controller
       if (!mounted) return;
       setState(() {
         _cameraController = newController;
         _isCameraInitialized = true;
-        _isFrontCamera =
-            selectedCamera.lensDirection == CameraLensDirection.front;
+        _isFrontCamera = selectedCamera.lensDirection == CameraLensDirection.front;
       });
     } catch (e) {
       print('Error setting camera: $e');
     }
   }
 
-  /// Validate that the given image file contains at least one face.
   Future<bool> _validateFace(File imageFile) async {
     try {
-      // Use fromFilePath so that the EXIF rotation is handled.
       final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
       final List<Face> faces = await _faceDetector.processImage(inputImage);
       return faces.isNotEmpty;
@@ -310,9 +253,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Show error popup if the image cannot be used.
   void _showErrorPopup(String message) {
-    // Use navigatorKey.currentContext! instead of local context
     if (navigatorKey.currentContext != null) {
       showDialog(
         context: navigatorKey.currentContext!,
@@ -332,7 +273,6 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Show progress indicator
   void _showProgressIndicator(String message) {
     if (navigatorKey.currentContext != null) {
       showDialog(
@@ -354,7 +294,6 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Hide any open dialog
   void _hideDialog() {
     if (navigatorKey.currentContext != null &&
         Navigator.of(navigatorKey.currentContext!).canPop()) {
@@ -362,7 +301,6 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Capture a picture using the camera.
   Future<void> _takePicture() async {
     if (_processingImage) return;
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
@@ -370,28 +308,16 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
     if (_cameraController!.value.isTakingPicture) return;
-
     setState(() {
       _processingImage = true;
     });
-
     try {
       _showProgressIndicator("Processing image...");
-
-      // Stop the image stream before taking a picture.
       await _cameraController!.stopImageStream();
-
-      // Wait longer to ensure the image stream has fully stopped.
       await Future.delayed(const Duration(milliseconds: 500));
-
-      // Capture the picture.
       final XFile imageFile = await _cameraController!.takePicture();
       print("Picture taken: ${imageFile.path}");
-
-      // Process the captured image.
       await _processCapturedImage(File(imageFile.path));
-
-      // Restart the image stream.
       _cameraController!.startImageStream((CameraImage cameraImage) {
         _detectFacesFromCamera(cameraImage);
       });
@@ -408,14 +334,11 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<void> _pickImage() async {
     if (_processingImage) return;
-
     setState(() {
       _processingImage = true;
     });
-
     try {
-      final XFile? imageFile =
-          await _picker.pickImage(source: ImageSource.gallery);
+      final XFile? imageFile = await _picker.pickImage(source: ImageSource.gallery);
       if (imageFile != null) {
         _showProgressIndicator("Processing image...");
         await _processCapturedImage(File(imageFile.path));
@@ -430,10 +353,23 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Process the captured/selected image: validate face, convert to vector, and store.
+  /// Process the captured/selected image:
+  /// 1. Save a copy of the original full image.
+  /// 2. Detect faces and process for recognition (for preview purposes).
+  /// 3. Add face vector (for count) and store full image path.
   Future<void> _processCapturedImage(File imageFile) async {
     try {
-      // 1) Detect faces using the file (as before).
+      // 0) Save a copy of the original image for later display.
+      final Directory appDir = await getApplicationDocumentsDirectory();
+      final Directory fullImageDir = Directory('${appDir.path}/full_faces');
+      if (!fullImageDir.existsSync()) {
+        fullImageDir.createSync(recursive: true);
+      }
+      String fullImagePath = join(fullImageDir.path, basename(imageFile.path));
+      await imageFile.copy(fullImagePath);
+      fullImagePaths.add(fullImagePath);
+
+      // 1) Detect faces using the file.
       final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
       final List<Face> faces = await _faceDetector.processImage(inputImage);
       _hideDialog();
@@ -442,7 +378,7 @@ class _RegisterPageState extends State<RegisterPage> {
         return;
       }
 
-      // 2) Load and decode the image using the image package.
+      // 2) Load and decode the image.
       final Uint8List imageBytes = await imageFile.readAsBytes();
       final img.Image? fullImage = img.decodeImage(imageBytes);
       if (fullImage == null) {
@@ -465,30 +401,29 @@ class _RegisterPageState extends State<RegisterPage> {
           }
         }
       } else {
-        // For front-camera, force a rotation. Adjust the value as needed.
         rotationAngle = -90;
       }
 
-      // 4) Rotate the full image using the determined rotation angle.
+      // 4) Rotate the full image.
       final img.Image orientedImage = (rotationAngle != 0)
           ? img.copyRotate(fullImage, rotationAngle)
           : fullImage;
 
-      // 5) Use the first detected face and get its bounding box.
+      // 5) Get bounding box from the first detected face.
       final Face face = faces.first;
       Rect box = face.boundingBox;
 
-      // 6) If using front-camera, mirror the bounding box horizontally.
+      // 6) If front camera, mirror the bounding box.
       if (_isFrontCamera) {
         box = Rect.fromLTRB(
-          orientedImage.width - box.right, // new left
+          orientedImage.width - box.right,
           box.top,
-          orientedImage.width - box.left,  // new right
+          orientedImage.width - box.left,
           box.bottom,
         );
       }
 
-      // 7) Add a margin and ensure crop rectangle is within the image bounds.
+      // 7) Add margin and ensure crop rectangle is within bounds.
       const margin = 20;
       int x = (box.left - margin).toInt().clamp(0, orientedImage.width);
       int y = (box.top - margin).toInt().clamp(0, orientedImage.height);
@@ -501,22 +436,15 @@ class _RegisterPageState extends State<RegisterPage> {
         h = orientedImage.height - y;
       }
 
-      // 8) Crop the face from the oriented image.
+      // 8) Crop and resize the face for preview.
       final img.Image croppedFace = img.copyCrop(orientedImage, x, y, w, h);
-      // 9) Resize the cropped face (for example, to 112x112).
       final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
-
-      // 10) Encode the processed image for preview and update the state.
       _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
       setState(() {});
 
-      // 11) Preprocess for recognition: convert the face image to a normalized byte list.
+      // 9) Preprocess and run face recognition (used only for count).
       final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
-
-      // 12) Run face recognition to get the vector.
       List<double> vector = await _runFaceRecognition(processedBytes);
-
-      // 13) Normalize the vector (L2 norm normalization).
       final double norm = math.sqrt(vector.fold(0, (sum, val) => sum + val * val));
       if (norm > 0) {
         vector = vector.map((e) => e / norm).toList();
@@ -525,16 +453,14 @@ class _RegisterPageState extends State<RegisterPage> {
         _showErrorPopup("Face recognition failed. Try again.");
         return;
       }
-
-      // 14) Add the vector to your list and update state.
       setState(() {
         _faceVectors.add(vector);
       });
       print("Captured image processed. Count: ${_faceVectors.length}/5");
 
-      // 15) If you have enough face vectors, proceed to user registration.
+      // 10) When 5 images have been captured, register the user.
       if (_faceVectors.length >= 5) {
-        await _registerUserWithImages();
+        await _registerUserWithImages(fullImagePaths);
       }
     } catch (e) {
       _hideDialog();
@@ -543,81 +469,46 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  Future<void> _registerUserWithImages() async {
+  /// Modified registration function that does not compute an average vector.
+  /// It registers the user with an empty face_vector and saves the 5 full images.
+  Future<void> _registerUserWithImages(List<String> fullImagePaths) async {
     try {
       _showProgressIndicator("Registering user...");
-
-      if (_cameraController != null &&
-          _cameraController!.value.isStreamingImages) {
+      if (_cameraController != null && _cameraController!.value.isStreamingImages) {
         await _cameraController!.stopImageStream();
       }
-
       final db = await DatabaseHelper().database;
       final Directory appDir = await getApplicationDocumentsDirectory();
-      final Directory userDir = Directory('${appDir.path}/temp_faces');
 
-      if (!userDir.existsSync()) {
-        userDir.createSync(recursive: true);
-      }
-
-      // Additionally, ensure at least a placeholder or initial setup
-      if (userDir.listSync().isEmpty) {
-        print(
-            "⚠️ Warning: temp_faces directory is empty. Ensure you're saving images to this directory after capturing.");
-      }
-
-      // Fetch current session images
-      final List<FileSystemEntity> imagesList =
-          userDir.listSync().whereType<File>().toList();
-      imagesList.sort(
-          (a, b) => a.statSync().modified.compareTo(b.statSync().modified));
-
-      // Calculate the average vector (optional, you can store or skip it)
-      List<double> averageVector = List.filled(128, 0.0);
-      for (var vector in _faceVectors) {
-        for (int i = 0; i < 128; i++) {
-          averageVector[i] += vector[i];
-        }
-      }
-      averageVector =
-          averageVector.map((val) => val / _faceVectors.length).toList();
-
-      // Insert user to get userId
+      // Insert user with empty face_vector.
       int userId = await db.insert('users', {
-        'face_vector': jsonEncode(averageVector), // Optional
+        'face_vector': '',
         'nickname': '',
         'name': '',
         'relation': '',
-        'primary_image': '', // to update later
+        'primary_image': '', // will update later
       });
 
-      // ✅ Insert each of the 5 vectors into user_vectors table
-      for (var vector in _faceVectors) {
-        await db.insert('user_vectors', {
-          'user_id': userId,
-          'vector': jsonEncode(vector),
-        });
-      }
-
-      // Move images to final user directory
+      // Create a final directory for the user images.
       final Directory finalUserDir = Directory('${appDir.path}/user_$userId');
       if (!finalUserDir.existsSync()) {
         finalUserDir.createSync(recursive: true);
       }
 
       List<String> finalImagePaths = [];
-      for (var imageFile in imagesList) {
-        String newFilePath = join(finalUserDir.path, basename(imageFile.path));
-        File newFile = await File(imageFile.path).copy(newFilePath);
+      for (var path in fullImagePaths) {
+        String newFilePath = join(finalUserDir.path, basename(path));
+        File newFile = await File(path).copy(newFilePath);
         finalImagePaths.add(newFile.path);
         await db.insert('user_images', {
           'user_id': userId,
           'image_path': newFile.path,
         });
-        imageFile.deleteSync();
+        // Delete the temporary file.
+        File(path).deleteSync();
       }
 
-      // Update primary_image
+      // Update primary_image with the first saved full image.
       if (finalImagePaths.isNotEmpty) {
         await db.update(
           'users',
@@ -627,11 +518,12 @@ class _RegisterPageState extends State<RegisterPage> {
         );
       }
 
+      // Clear stored vectors and image paths.
       _faceVectors.clear();
+      fullImagePaths.clear();
 
       print("✅ User registered with id: $userId");
       _hideDialog();
-
       if (navigatorKey.currentContext != null) {
         Navigator.of(navigatorKey.currentContext!).pushReplacement(
           MaterialPageRoute(
@@ -648,20 +540,15 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Run face recognition using tflite_flutter
   Future<List<double>> _runFaceRecognition(Uint8List imageBytes) async {
     if (interpreter == null) {
       print("Interpreter not initialized");
       return List.filled(128, 0.0);
     }
-
     try {
-      // Input and output buffer definition
       var input = imageBytes.buffer.asFloat32List().reshape([1, 112, 112, 3]);
       var output = List.filled(1 * 128, 0).reshape([1, 128]);
-
       interpreter!.run(input, output);
-
       return List<double>.from(output[0]);
     } catch (e) {
       print("Error running face recognition: $e");
@@ -669,17 +556,13 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  /// Build the camera preview.
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Main Camera Preview and Overlays.
           Positioned.fill(child: _buildCameraPreview(context)),
-
-          // Processed Face Image Preview (displayed if not null)
           if (_processedFaceImage != null)
             Positioned(
               bottom: 120,
@@ -689,8 +572,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) =>
-                          FullScreenImage(imageBytes: _processedFaceImage!),
+                      builder: (context) => FullScreenImage(imageBytes: _processedFaceImage!),
                     ),
                   );
                 },
@@ -704,8 +586,6 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
               ),
             ),
-
-          // Instructions at the top
           Positioned(
             top: 50,
             left: 20,
@@ -723,7 +603,6 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
             ),
           ),
-          // ปุ่มสลับกล้อง มุมล่างซ้าย
           Positioned(
             bottom: 50,
             left: 20,
@@ -735,32 +614,17 @@ class _RegisterPageState extends State<RegisterPage> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 5,
-                          spreadRadius: 2,
-                        ),
-                      ],
+                      boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 5, spreadRadius: 2)],
                     ),
                     padding: const EdgeInsets.all(10),
-                    child:
-                        const Icon(Icons.flip_camera_ios, color: Colors.black),
+                    child: const Icon(Icons.flip_camera_ios, color: Colors.black),
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  "สลับกล้อง",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                const Text("สลับกล้อง", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
-
           Positioned(
             bottom: 50,
             left: MediaQuery.of(context).size.width / 2 - 35,
@@ -774,39 +638,20 @@ class _RegisterPageState extends State<RegisterPage> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 5,
-                          spreadRadius: 2,
-                        ),
-                      ],
+                      boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 5, spreadRadius: 2)],
                     ),
                     child: Center(
                       child: _processingImage
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
+                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.camera_alt, color: Colors.black),
                     ),
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  "ถ่ายภาพ", // ✅ แก้ตรงนี้
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                const Text("ถ่ายภาพ", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
-
-          // ปุ่มเลือกรูป มุมล่างขวา
           Positioned(
             bottom: 50,
             right: 20,
@@ -820,54 +665,29 @@ class _RegisterPageState extends State<RegisterPage> {
                     decoration: BoxDecoration(
                       color: Colors.blue,
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 5,
-                          spreadRadius: 2,
-                        ),
-                      ],
+                      boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 5, spreadRadius: 2)],
                     ),
-                    child: const Center(
-                      child: Icon(Icons.photo_library, color: Colors.black),
-                    ),
+                    child: const Center(child: Icon(Icons.photo_library, color: Colors.black)),
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  "เลือกรูป", // ✅ ข้อความใต้ปุ่ม
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                const Text("เลือกรูป", style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
-
-          // Image count indicator
           Positioned(
             top: 120,
             left: 20,
             child: Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(8),
-              ),
+              decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
               child: Row(
                 children: [
-                  Text(
-                    "จำนวนรูป: ${_faceVectors.length}/5",
-                    style: const TextStyle(color: Colors.white),
-                  ),
+                  Text("จำนวนรูป: ${_faceVectors.length}/5", style: const TextStyle(color: Colors.white)),
                   const SizedBox(width: 5),
                   _faceVectors.length >= 5
-                      ? const Icon(Icons.check_circle,
-                          color: Colors.green, size: 20)
-                      : const Icon(Icons.circle_outlined,
-                          color: Colors.white, size: 20),
+                      ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
+                      : const Icon(Icons.circle_outlined, color: Colors.white, size: 20),
                 ],
               ),
             ),
@@ -883,47 +703,28 @@ class _RegisterPageState extends State<RegisterPage> {
         !_cameraController!.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
-
-    // The camera's preview size
     final previewSize = _cameraController!.value.previewSize!;
     final double cameraAspectRatio = previewSize.width / previewSize.height;
-
-    // The screen size and aspect ratio
     final Size screenSize = MediaQuery.of(buildContext).size;
     final double screenAspectRatio = screenSize.width / screenSize.height;
-
-    // Compute initial scale
     double scale = cameraAspectRatio / screenAspectRatio;
-
-    // Optional extra zoom factor
     double extraZoomFactor = 0.72;
-    // First multiply the scale by extra zoom factor
     scale *= extraZoomFactor;
-
-    // Determine rotation based on sensor orientation
-    final int sensorOrientation =
-        _cameraController!.description.sensorOrientation;
+    final int sensorOrientation = _cameraController!.description.sensorOrientation;
     double rotationAngle = 0;
     if (sensorOrientation == 90) {
       rotationAngle = math.pi / 2;
     } else if (sensorOrientation == 270) {
       rotationAngle = -math.pi / 2;
     }
-
-    // Check if it is front camera to mirror horizontally
-    final bool isFrontCamera = _cameraController!.description.lensDirection ==
-        CameraLensDirection.front;
-
-    // Build a transform matrix that mirrors if front camera plus rotates based on sensor orientation
+    final bool isFrontCamera = _cameraController!.description.lensDirection == CameraLensDirection.front;
     final Matrix4 transformMatrix = isFrontCamera
         ? Matrix4.rotationY(math.pi) * Matrix4.rotationZ(rotationAngle)
         : Matrix4.rotationZ(rotationAngle);
-
     return LayoutBuilder(
       builder: (layoutContext, constraints) {
         return ClipRect(
           child: Transform.scale(
-            // Apply the scale again so the total factor is scale * extraZoomFactor
             scale: scale * extraZoomFactor,
             child: Center(
               child: AspectRatio(
@@ -934,16 +735,11 @@ class _RegisterPageState extends State<RegisterPage> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      // Camera preview
                       CameraPreview(_cameraController!),
-                      // Draw bounding boxes for detected faces
                       CustomPaint(
                         painter: FacePainter(
                           faces: _faces,
-                          imageSize: Size(
-                            previewSize.height,
-                            previewSize.width,
-                          ),
+                          imageSize: Size(previewSize.height, previewSize.width),
                           isFrontCamera: isFrontCamera,
                           screenSize: constraints.biggest,
                         ),
@@ -973,8 +769,6 @@ class FacePainter extends CustomPainter {
     required this.screenSize,
   });
 
-  /// Rotates a rectangle 90° clockwise.
-  /// Transformation: (x, y) => (y, originalWidth - x)
   Rect _rotateRect90(Rect rect, Size originalSize) {
     double newLeft = rect.top;
     double newTop = originalSize.width - rect.right;
@@ -983,8 +777,6 @@ class FacePainter extends CustomPainter {
     return Rect.fromLTRB(newLeft, newTop, newRight, newBottom);
   }
 
-  /// Mirrors a rectangle both horizontally and vertically.
-  /// mirrorWidth and mirrorHeight are the dimensions of the rotated coordinate system.
   Rect _mirrorRectBoth(Rect rect, double mirrorWidth, double mirrorHeight) {
     return Rect.fromLTRB(
       mirrorWidth - rect.right,
@@ -1000,33 +792,21 @@ class FacePainter extends CustomPainter {
       ..color = Colors.red
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
-
-    // After a 90° clockwise rotation, the effective dimensions swap:
-    // rotatedWidth is the original image height, and rotatedHeight is the original image width.
     double rotatedWidth = imageSize.height;
     double rotatedHeight = imageSize.width;
-
-    // Scale factors to map the rotated coordinates to the canvas.
     final double scaleX = size.width / rotatedWidth;
     final double scaleY = size.height / rotatedHeight;
-
     for (var face in faces) {
-      // Rotate the original bounding box.
       Rect rotatedRect = _rotateRect90(face.boundingBox, imageSize);
-
-      // For the front camera, mirror both horizontally and vertically.
       if (isFrontCamera) {
         rotatedRect = _mirrorRectBoth(rotatedRect, rotatedWidth, rotatedHeight);
       }
-
-      // Scale the rotated (and mirrored) rectangle to the canvas dimensions.
       Rect scaledRect = Rect.fromLTRB(
         rotatedRect.left * scaleX,
         rotatedRect.top * scaleY,
         rotatedRect.right * scaleX,
         rotatedRect.bottom * scaleY,
       );
-
       canvas.drawRect(scaledRect, paint);
     }
   }
@@ -1045,12 +825,8 @@ class FullScreenImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Full Screen Image"),
-      ),
-      body: Center(
-        child: Image.memory(imageBytes, fit: BoxFit.contain),
-      ),
+      appBar: AppBar(title: const Text("Full Screen Image")),
+      body: Center(child: Image.memory(imageBytes, fit: BoxFit.contain)),
     );
   }
 }

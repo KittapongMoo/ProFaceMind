@@ -41,7 +41,7 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
   Future<Database> _getDatabase() async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'facemind.db');
-    return openDatabase(path, version: 2);
+    return openDatabase(path, version: 3);
   }
 
   Future<void> _loadUserData() async {
@@ -56,7 +56,6 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
     }
 
     final imageResult = await db.query('user_images', where: 'user_id = ?', whereArgs: [widget.userId]);
-
     setState(() {
       imagePaths = imageResult.map((e) => e['image_path'] as String).toList();
     });
