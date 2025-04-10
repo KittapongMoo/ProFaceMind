@@ -558,7 +558,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware{
 
     // Define matching parameters.
     const int requiredVectorCount = 1; // With an average vector stored, we require one valid sample.
-    const double rejectionThreshold = 0.5; // Minimum average cosine similarity to be considered a match.
+    const double rejectionThreshold = 0.79; // Minimum average cosine similarity to be considered a match.
 
     double bestAvgSim = -1.0;
     Map<String, dynamic>? bestUser;
