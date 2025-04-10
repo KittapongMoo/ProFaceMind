@@ -244,19 +244,19 @@ class _HistoryPageState extends State<HistoryPage> {
                                   context: context,
                                   builder: (context) {
                                     return AlertDialog(
-                                      title: const Text('Confirm Deletion'),
-                                      content: const Text('Are you sure you want to delete this history record?'),
+                                      title: const Text('การลบข้อมูล'),
+                                      content: const Text('คุณแน่ใจหรือไม่ที่จะทำการยินยันในการลบประวัติการสแกนใบหน้าของบุคคลท่านนี้?'),
                                       actions: [
                                         TextButton(
                                           onPressed: () => Navigator.pop(context),
-                                          child: const Text('Cancel'),
+                                          child: const Text('ยกเลิก'),
                                         ),
                                         TextButton(
                                           onPressed: () async {
                                             Navigator.pop(context);
                                             await _deleteHistoryRecord(recordId);
                                           },
-                                          child: const Text('Delete'),
+                                          child: const Text('ยืนยัน'),
                                         ),
                                       ],
                                     );

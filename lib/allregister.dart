@@ -188,19 +188,19 @@ class _AllRegisterPageState extends State<AllRegisterPage> {
                                           context: context,
                                           builder: (context) {
                                             return AlertDialog(
-                                              title: const Text('Confirm Deletion'),
-                                              content: const Text('Are you sure you want to delete this user?'),
+                                              title: const Text('การลบข้อมูล'),
+                                              content: const Text('คุณแน่ใจหรือไม่ที่จะทำการยินยันในการลบข้อมูลของบุคคลท่านนี้?'),
                                               actions: [
                                                 TextButton(
                                                   onPressed: () => Navigator.pop(context),
-                                                  child: const Text('Cancel'),
+                                                  child: const Text('ยกเลิก'),
                                                 ),
                                                 TextButton(
                                                   onPressed: () async {
                                                     Navigator.pop(context);
                                                     await _deleteUser(userId);
                                                   },
-                                                  child: const Text('Delete'),
+                                                  child: const Text('ยืนยัน'),
                                                 ),
                                               ],
                                             );
