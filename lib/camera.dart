@@ -65,6 +65,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
   );
 
   bool _isDetectingFaces = false;
+  bool _isRecognizing = false;
 
   // We'll update _faces every time new faces are detected.
   List<Face> _faces = [];
@@ -88,24 +89,10 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     _loadModel();
     _loadProfileImage(); // ✅ โหลดรูปโปรไฟล์  <<< ใส่ตรงนี้เลย
     // Start a timer to check for a face match every 10 seconds.
-    _timer = Timer.periodic(const Duration(seconds: 1), (Timer timer) {
+    _timer = Timer.periodic(const Duration(milliseconds: 500), (Timer timer) {
       _recognizeFace();
     });
     // _checkHistoryDatabase();
-  }
-
-  Future<void> _loadProfileImage() async {
-    final prefs = await SharedPreferences.getInstance();
-    final imagePath = prefs.getString('imagePath');
-    if (imagePath != null && imagePath.isNotEmpty) {
-      setState(() {
-        _profileImageFile = File(imagePath);
-      });
-    } else {
-      setState(() {
-        _profileImageFile = null; // ใช้ไอคอนแทน
-      });
-    }
   }
 
   @override
@@ -127,13 +114,14 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
 
   @override
   void didPopNext() {
-    // When returning to this page, restart the image stream and timer.
+    // Restart the image stream and timer when returning.
     _cameraController?.startImageStream((CameraImage cameraImage) {
       if (!_isDetectingFaces) {
         _detectFacesFromCamera(cameraImage);
       }
     });
-    _loadProfileImage(); // ✅ โหลดรูปโปรไฟล์อีกครั้งเมื่อกลับเข้าหน้านี้
+    _loadProfileImage();
+    // Restart timer with the same interval.
     _timer = Timer.periodic(const Duration(seconds: 2), (Timer timer) {
       _recognizeFace();
     });
@@ -146,6 +134,20 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     _faceDetector.close();
     routeObserver.unsubscribe(this);
     super.dispose();
+  }
+
+  Future<void> _loadProfileImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final imagePath = prefs.getString('imagePath');
+    if (imagePath != null && imagePath.isNotEmpty) {
+      setState(() {
+        _profileImageFile = File(imagePath);
+      });
+    } else {
+      setState(() {
+        _profileImageFile = null; // ใช้ไอคอนแทน
+      });
+    }
   }
 
   /// Load MobileFaceNet Model via TFLite.
@@ -378,10 +380,12 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     );
   }
 
-  /// Trigger face recognition every 10 seconds.
+  /// Trigger face recognition periodically.
   Future<void> _recognizeFace() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized)
-      return;
+    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+    // Prevent overlapping calls.
+    if (_isRecognizing) return;
+    _isRecognizing = true;
 
     try {
       final XFile imageFile = await _cameraController!.takePicture();
@@ -390,19 +394,19 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
       final Uint8List bytes = await imageFile.readAsBytes();
       final img.Image? decodedImage = img.decodeImage(bytes);
       if (decodedImage == null) {
-        print("Failed to decode captured image");
+        print("❌❌❌Failed to decode captured image");
+        _isRecognizing = false;
         return;
       }
 
+      // Read EXIF data for rotation and adjust accordingly.
       final Map<String, IfdTag> exifData = await readExifFromBytes(bytes);
       int rotationAngle = 0;
       if (!_isFrontCamera) {
         if (exifData.isNotEmpty && exifData.containsKey("Image Orientation")) {
           final orientation = exifData["Image Orientation"]?.printable;
-          if (orientation == "Rotated 90 CW")
-            rotationAngle = 90;
-          else if (orientation == "Rotated 180")
-            rotationAngle = 180;
+          if (orientation == "Rotated 90 CW") rotationAngle = 90;
+          else if (orientation == "Rotated 180") rotationAngle = 180;
           else if (orientation == "Rotated 270 CW") rotationAngle = -90;
         }
       } else {
@@ -419,15 +423,15 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
       if (faces.isEmpty) {
         setState(() {
           _matchedUser = {"nickname": "??", "name": "??", "relation": "??"};
+          _lastConfidence = null; // Reset confidence when no face is detected.
         });
+        _isRecognizing = false;
         return;
       }
 
-      final Uint8List fullImageBlob =
-          Uint8List.fromList(img.encodePng(orientedImage));
+      final Uint8List fullImageBlob = Uint8List.fromList(img.encodePng(orientedImage));
       final Face face = faces.first;
       Rect box = face.boundingBox;
-
       if (_isFrontCamera) {
         box = Rect.fromLTRB(
           orientedImage.width - box.right,
@@ -437,6 +441,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
         );
       }
 
+      // Crop with margin.
       const margin = 20;
       int x = (box.left - margin).toInt().clamp(0, orientedImage.width);
       int y = (box.top - margin).toInt().clamp(0, orientedImage.height);
@@ -446,41 +451,35 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
       if (y + h > orientedImage.height) h = orientedImage.height - y;
 
       final img.Image croppedFace = img.copyCrop(orientedImage, x, y, w, h);
-      final img.Image resizedFace =
-          img.copyResize(croppedFace, width: 112, height: 112);
+      final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
       _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
-      setState(() {});
+      setState(() {}); // Update UI for the processed face preview.
 
-      final Uint8List processedBytes =
-          _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
+      final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
       List<double> vector = await _runFaceRecognition(processedBytes);
 
-      // ✅ Normalize
-      final double norm =
-          math.sqrt(vector.fold(0, (sum, val) => sum + val * val));
+      // Normalize the face vector.
+      final double norm = math.sqrt(vector.fold(0, (sum, val) => sum + val * val));
       if (norm > 0) {
         vector = vector.map((e) => e / norm).toList();
       }
 
-      // ✅ Add to buffer
-      if (_vectorBuffer.length >= _maxBufferLength) {
-        _vectorBuffer.removeAt(0);
-      }
+      // Buffer the vectors.
+      if (_vectorBuffer.length >= _maxBufferLength) _vectorBuffer.removeAt(0);
       _vectorBuffer.add(vector);
 
-      // ✅ Update progress
       setState(() {
         _vectorProgress = _vectorBuffer.length;
       });
 
-      // ✅ Wait until we have 5 vectors
+      // Wait until we have enough vectors.
       if (_vectorBuffer.length < _maxBufferLength) {
-        print(
-            "Waiting for more vectors... ($_vectorProgress/$_maxBufferLength)");
+        print("⌚⌚⌚Waiting for more vectors... ($_vectorProgress/$_maxBufferLength)");
+        _isRecognizing = false;
         return;
       }
 
-      // ✅ Average the buffer
+      // Average the vectors.
       List<double> avgVector = List.filled(128, 0);
       for (var v in _vectorBuffer) {
         for (int i = 0; i < 128; i++) {
@@ -489,7 +488,6 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
       }
       avgVector = avgVector.map((e) => e / _maxBufferLength).toList();
 
-      // ✅ Use average vector for match and validation
       await _validateEmbeddingDistribution(avgVector);
       Map<String, dynamic>? matchedUser = await _findMatchingUser(avgVector);
 
@@ -497,6 +495,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
         await _saveHistory(0, fullImageBlob);
         setState(() {
           _matchedUser = {"nickname": "??", "name": "??", "relation": "??"};
+          _lastConfidence = null;
         });
       } else {
         await _saveHistory(matchedUser['userId'] as int, fullImageBlob);
@@ -505,13 +504,15 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
         });
       }
 
-      // ✅ Clear buffer after recognition
+      // Clear buffer and reset progress.
       _vectorBuffer.clear();
       setState(() {
         _vectorProgress = 0;
       });
     } catch (e) {
       print("❌❌❌Error in recognition: $e");
+    } finally {
+      _isRecognizing = false;
     }
   }
 
