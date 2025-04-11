@@ -48,8 +48,6 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
   double? _lastConfidence;
   // 👇 เพิ่มตรงนี้
   File? _profileImageFile;
-  CameraImage? _latestCameraImage;
-
 
   Color _getConfidenceColor(double? confidence) {
     if (confidence == null) return Colors.grey;
@@ -90,7 +88,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     _lastImageFuture = _getLastImagePath();
     _loadModel();
     _loadProfileImage(); // ✅ โหลดรูปโปรไฟล์  <<< ใส่ตรงนี้เลย
-    // Start a timer to check for a face match every 2 seconds.
+    // Start a timer to check for a face match every 10 seconds.
     _timer = Timer.periodic(const Duration(milliseconds: 500), (Timer timer) {
       _recognizeFace();
     });
@@ -171,10 +169,10 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
         CameraDescription selectedCamera = _isFrontCamera
             ? _cameras!.firstWhere(
                 (camera) => camera.lensDirection == CameraLensDirection.front,
-                orElse: () => _cameras!.first)
+            orElse: () => _cameras!.first)
             : _cameras!.firstWhere(
                 (camera) => camera.lensDirection == CameraLensDirection.back,
-                orElse: () => _cameras!.first);
+            orElse: () => _cameras!.first);
 
         _cameraController = CameraController(
           selectedCamera,
@@ -189,9 +187,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
 
         // Start image stream for face detection.
         _cameraController!.startImageStream((CameraImage cameraImage) {
-          // Save the latest image from the stream.
-          _latestCameraImage = cameraImage;
-          // Optionally, still call your face-detection method for overlay
+          // Avoid multiple concurrent detections.
           if (!_isDetectingFaces) {
             _detectFacesFromCamera(cameraImage);
           }
@@ -224,7 +220,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
   Uint8List _imageToByteListFloat32(
       img.Image image, int inputSize, double mean, double std) {
     final Float32List convertedBytes =
-        Float32List(1 * inputSize * inputSize * 3);
+    Float32List(1 * inputSize * inputSize * 3);
     int pixelIndex = 0;
     for (int y = 0; y < inputSize; y++) {
       for (int x = 0; x < inputSize; x++) {
@@ -260,9 +256,9 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
         final int rowOffset2 = row * image.planes[2].bytesPerRow;
         for (int col = 0; col < uvWidth; col++) {
           nv21[offset++] =
-              image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
+          image.planes[1].bytes[rowOffset1 + col * uvPixelStride];
           nv21[offset++] =
-              image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
+          image.planes[2].bytes[rowOffset2 + col * uvPixelStride];
         }
       }
       final imageSize = Size(image.width.toDouble(), image.height.toDouble());
@@ -301,7 +297,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     bool detecting = true;
     try {
       final inputImage =
-          _convertCameraImage(cameraImage, _cameraController!.description);
+      _convertCameraImage(cameraImage, _cameraController!.description);
       if (inputImage == null) {
         detecting = false;
         return;
@@ -368,7 +364,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
                           faces: _faces,
                           // Note: swap dimensions if needed.
                           imageSize:
-                              Size(previewSize.height, previewSize.width),
+                          Size(previewSize.height, previewSize.width),
                           isFrontCamera: isFrontCamera,
                           screenSize: constraints.biggest,
                         ),
@@ -386,52 +382,54 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
 
   /// Trigger face recognition periodically.
   Future<void> _recognizeFace() async {
-    if (_cameraController == null ||
-        !_cameraController!.value.isInitialized ||
-        _latestCameraImage == null) {
-      return;
-    }
-
+    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+    // Prevent overlapping calls.
     if (_isRecognizing) return;
     _isRecognizing = true;
 
     try {
-      // Convert the latest camera image into an InputImage (for face detection)
-      // This uses your existing helper.
-      final InputImage? inputImage = _convertCameraImage(_latestCameraImage!, _cameraController!.description);
-      if (inputImage == null) {
+      final XFile imageFile = await _cameraController!.takePicture();
+      print("Picture taken: ${imageFile.path}");
+
+      final Uint8List bytes = await imageFile.readAsBytes();
+      final img.Image? decodedImage = img.decodeImage(bytes);
+      if (decodedImage == null) {
+        print("❌❌❌Failed to decode captured image");
         _isRecognizing = false;
         return;
       }
 
-      // Process the image to detect faces
+      // Read EXIF data for rotation and adjust accordingly.
+      final Map<String, IfdTag> exifData = await readExifFromBytes(bytes);
+      int rotationAngle = 0;
+      if (!_isFrontCamera) {
+        if (exifData.isNotEmpty && exifData.containsKey("Image Orientation")) {
+          final orientation = exifData["Image Orientation"]?.printable;
+          if (orientation == "Rotated 90 CW") rotationAngle = 90;
+          else if (orientation == "Rotated 180") rotationAngle = 180;
+          else if (orientation == "Rotated 270 CW") rotationAngle = -90;
+        }
+      } else {
+        rotationAngle = -90;
+      }
+
+      final img.Image orientedImage = (rotationAngle != 0)
+          ? img.copyRotate(decodedImage, rotationAngle)
+          : decodedImage;
+
+      final inputImage = InputImage.fromFilePath(imageFile.path);
       final List<Face> faces = await _faceDetector.processImage(inputImage);
+
       if (faces.isEmpty) {
         setState(() {
           _matchedUser = {"nickname": "??", "name": "??", "relation": "??"};
-          _lastConfidence = null;
+          _lastConfidence = null; // Reset confidence when no face is detected.
         });
         _isRecognizing = false;
         return;
       }
 
-      // To perform further processing (crop, resize, and run face recognition) we need an RGB image.
-      // Here we call a helper that converts the YUV420 CameraImage to an img.Image.
-      final img.Image? decodedImage = _convertCameraImageToImg(_latestCameraImage!, _cameraController!.description);
-      if (decodedImage == null) {
-        _isRecognizing = false;
-        return;
-      }
-
-      // Optionally adjust rotation according to sensor orientation.
-      int rotationAngle = !_isFrontCamera
-          ? _cameraController!.description.sensorOrientation
-          : -90; // or any value suitable for your device
-      final img.Image orientedImage = (rotationAngle != 0)
-          ? img.copyRotate(decodedImage, rotationAngle)
-          : decodedImage;
-
-      // Use the first detected face to crop (similar to before)
+      final Uint8List fullImageBlob = Uint8List.fromList(img.encodePng(orientedImage));
       final Face face = faces.first;
       Rect box = face.boundingBox;
       if (_isFrontCamera) {
@@ -443,7 +441,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
         );
       }
 
-      // Apply a margin for cropping.
+      // Crop with margin.
       const margin = 20;
       int x = (box.left - margin).toInt().clamp(0, orientedImage.width);
       int y = (box.top - margin).toInt().clamp(0, orientedImage.height);
@@ -454,33 +452,34 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
 
       final img.Image croppedFace = img.copyCrop(orientedImage, x, y, w, h);
       final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
-
-      // Save the processed face image for display.
       _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
-      setState(() {});
+      setState(() {}); // Update UI for the processed face preview.
 
-      // Convert the resized face image for recognition.
       final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
       List<double> vector = await _runFaceRecognition(processedBytes);
 
-      // Normalize and accumulate vectors (same logic as before)
+      // Normalize the face vector.
       final double norm = math.sqrt(vector.fold(0, (sum, val) => sum + val * val));
       if (norm > 0) {
         vector = vector.map((e) => e / norm).toList();
       }
+
+      // Buffer the vectors.
       if (_vectorBuffer.length >= _maxBufferLength) _vectorBuffer.removeAt(0);
       _vectorBuffer.add(vector);
+
       setState(() {
         _vectorProgress = _vectorBuffer.length;
       });
 
-      // Process when a sufficient number of vectors have been collected…
+      // Wait until we have enough vectors.
       if (_vectorBuffer.length < _maxBufferLength) {
         print("⌚⌚⌚Waiting for more vectors... ($_vectorProgress/$_maxBufferLength)");
         _isRecognizing = false;
         return;
       }
 
+      // Average the vectors.
       List<double> avgVector = List.filled(128, 0);
       for (var v in _vectorBuffer) {
         for (int i = 0; i < 128; i++) {
@@ -493,18 +492,19 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
       Map<String, dynamic>? matchedUser = await _findMatchingUser(avgVector);
 
       if (matchedUser == null) {
-        await _saveHistory(0, Uint8List.fromList(img.encodePng(orientedImage)));
+        await _saveHistory(0, fullImageBlob);
         setState(() {
           _matchedUser = {"nickname": "??", "name": "??", "relation": "??"};
           _lastConfidence = null;
         });
       } else {
-        await _saveHistory(matchedUser['userId'] as int, Uint8List.fromList(img.encodePng(orientedImage)));
+        await _saveHistory(matchedUser['userId'] as int, fullImageBlob);
         setState(() {
           _matchedUser = matchedUser;
         });
       }
 
+      // Clear buffer and reset progress.
       _vectorBuffer.clear();
       setState(() {
         _vectorProgress = 0;
@@ -515,39 +515,6 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
       _isRecognizing = false;
     }
   }
-
-  img.Image? _convertCameraImageToImg(CameraImage image, CameraDescription camera) {
-    try {
-      final int width = image.width;
-      final int height = image.height;
-      final img.Image rgbImage = img.Image(width, height);
-
-      // Loop through each pixel. (There are better optimized methods for production.)
-      for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-          // Y plane index:
-          final int yIndex = y * image.planes[0].bytesPerRow + x;
-          final int Y = image.planes[0].bytes[yIndex];
-
-          // For U and V, assume pixel stride and row stride from the U and V planes.
-          final int uvIndex = (y >> 1) * image.planes[1].bytesPerRow + (x >> 1) * image.planes[1].bytesPerPixel!;
-          final int U = image.planes[1].bytes[uvIndex];
-          final int V = image.planes[2].bytes[uvIndex];
-
-          // Simple YUV to RGB conversion.
-          int r = (Y + 1.370705 * (V - 128)).round().clamp(0, 255);
-          int g = (Y - 0.337633 * (U - 128) - 0.698001 * (V - 128)).round().clamp(0, 255);
-          int b = (Y + 1.732446 * (U - 128)).round().clamp(0, 255);
-          rgbImage.setPixelRgba(x, y, r, g, b);
-        }
-      }
-      return rgbImage;
-    } catch (e) {
-      print("Error converting CameraImage to img.Image: $e");
-      return null;
-    }
-  }
-
 
   /// Run face recognition using tflite_flutter.
   Future<List<double>> _runFaceRecognition(Uint8List imageBytes) async {
@@ -688,8 +655,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     double min = similarities.reduce(math.min);
     double max = similarities.reduce(math.max);
     double variance = similarities
-            .map((sim) => (sim - avg) * (sim - avg))
-            .reduce((a, b) => a + b) /
+        .map((sim) => (sim - avg) * (sim - avg))
+        .reduce((a, b) => a + b) /
         similarities.length;
     double stdDev = math.sqrt(variance);
 
@@ -898,7 +865,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           '$name ($relation)',
@@ -927,7 +894,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
                                         context,
                                         MaterialPageRoute(
                                             builder: (context) =>
-                                                const SetPhoneNumber()),
+                                            const SetPhoneNumber()),
                                       );
                                     },
                                     child: Padding(
@@ -1015,7 +982,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
                   ),
                   child: IconButton(
                     icon:
-                        const Icon(Icons.flip_camera_ios, color: Colors.black),
+                    const Icon(Icons.flip_camera_ios, color: Colors.black),
                     onPressed: () {
                       setState(() {
                         _isFrontCamera = !_isFrontCamera;
