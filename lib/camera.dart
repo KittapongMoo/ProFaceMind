@@ -122,7 +122,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     });
     _loadProfileImage();
     // Restart timer with the same interval.
-    _timer = Timer.periodic(const Duration(seconds: 2), (Timer timer) {
+    _timer = Timer.periodic(const Duration(milliseconds: 500), (Timer timer) {
       _recognizeFace();
     });
   }
