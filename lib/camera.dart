@@ -87,9 +87,9 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     });
     _lastImageFuture = _getLastImagePath();
     _loadModel();
-    _loadProfileImage(); // ✅ โหลดรูปโปรไฟล์  <<< ใส่ตรงนี้เลย
+    _loadProfileImage();
     // Start a timer to check for a face match every 10 seconds.
-    _timer = Timer.periodic(const Duration(milliseconds: 500), (Timer timer) {
+    _timer = Timer.periodic(const Duration(milliseconds: 800), (Timer timer) {
       _recognizeFace();
     });
     // _checkHistoryDatabase();
@@ -122,7 +122,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     });
     _loadProfileImage();
     // Restart timer with the same interval.
-    _timer = Timer.periodic(const Duration(milliseconds: 500), (Timer timer) {
+    _timer = Timer.periodic(const Duration(milliseconds: 800), (Timer timer) {
       _recognizeFace();
     });
   }
