@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'camera.dart';
+import 'database_helper.dart';
 
 class FillInfoPage extends StatefulWidget {
   final int userId; // (1) Add this field
@@ -36,45 +37,52 @@ class _FillInfoPageState extends State<FillInfoPage> {
   }
 
   Future<void> _loadUserData() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'facemind.db');
-    final db = await openDatabase(path);
+    try {
+      final db = await DatabaseHelper().database;
+      final userResult = await db.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [widget.userId],
+      );
 
-    // Fetch user data
-    final userResult = await db.query(
-      'users',
-      where: 'id = ?',
-      whereArgs: [widget.userId],
-    );
+      if (userResult.isNotEmpty) {
+        final user = userResult.first;
+        nicknameController.text = user['nickname'] as String? ?? '-';
+        nameController.text = user['name'] as String? ?? '';
+        relationController.text = user['relation'] as String? ?? '';
 
-    if (userResult.isNotEmpty) {
-      final user = userResult.first;
-      nicknameController.text = user['nickname'] as String? ?? '-';
-      nameController.text = user['name'] as String? ?? '';
-      relationController.text = user['relation'] as String? ?? '';
+        List<dynamic> faceVector;
+        try {
+          faceVector = jsonDecode((user['face_vector'] as String?) ?? '[]');
+        } catch (e) {
+          faceVector = [];
+          print('⚠️ Error decoding face vector: $e');
+        }
 
-      List<dynamic> faceVector = jsonDecode(user['face_vector'] as String);
+        print('🆔 User ID: ${widget.userId}');
+        print('🙋 Nickname: ${nicknameController.text}');
+        print('🙋 Name: ${nameController.text}');
+        print('🙋 Relation: ${relationController.text}');
+        print('📷 Primary Image: ${user['primary_image']}');
+        print('🧬 Face Vector: $faceVector');
+      } else {
+        print('❌ No user found with ID: ${widget.userId}');
+      }
 
-      print('🆔 User ID: ${widget.userId}');
-      print('🙋 Nickname: ${nicknameController.text}');
-      print('🙋 Name: ${nameController.text}');
-      print('🙋 Relation: ${relationController.text}');
-      print('📷 Primary Image: ${user['primary_image']}');
-      print('🧬 Face Vector: $faceVector');
-    } else {
-      print('❌ No user found with ID: ${widget.userId}');
+      final imageResult = await db.query(
+        'user_images',
+        where: 'user_id = ?',
+        whereArgs: [widget.userId],
+      );
+
+      print('📸 Found images: ${imageResult.length}');
+
+      setState(() {
+        imagePaths = imageResult.map((e) => e['image_path'] as String).toList();
+      });
+    } catch (e) {
+      print('❌ Error in _loadUserData: $e');
     }
-
-    // 🔴 CLEARLY FETCH ONLY IMAGES WITH THE CURRENT USER ID
-    final imageResult = await db.query(
-      'user_images',
-      where: 'user_id = ?',
-      whereArgs: [widget.userId],
-    );
-
-    setState(() {
-      imagePaths = imageResult.map((e) => e['image_path'] as String).toList();
-    });
   }
 
   @override
