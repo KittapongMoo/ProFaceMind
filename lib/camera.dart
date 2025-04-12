@@ -114,14 +114,21 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
 
   @override
   void didPopNext() {
-    // Restart the image stream and timer when returning.
     _cameraController?.startImageStream((CameraImage cameraImage) {
       if (!_isDetectingFaces) {
         _detectFacesFromCamera(cameraImage);
       }
     });
+
     _loadProfileImage();
-    // Restart timer with the same interval.
+
+    // 👇 Refresh last image when user comes back
+    if (mounted) {
+      setState(() {
+        _lastImageFuture = _getLastImagePath();
+      });
+    }
+
     _timer = Timer.periodic(const Duration(milliseconds: 800), (Timer timer) {
       _recognizeFace();
     });
