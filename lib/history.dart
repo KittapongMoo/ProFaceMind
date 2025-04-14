@@ -1,3 +1,5 @@
+// Optimized HistoryPage with lazy image loading and memory-safe database access.
+
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -22,32 +24,28 @@ class _HistoryPageState extends State<HistoryPage> {
     super.initState();
     _selectedDate = DateTime.now();
     _historyFuture = _loadHistory(_selectedDate);
-    _checkHistoryDatabase(); // Debug function call.
   }
 
-  // Load history records for the given date.
-  // This query joins the history table with the users table.
   Future<List<Map<String, dynamic>>> _loadHistory(DateTime date) async {
     final db = await DatabaseHelper().database;
-    // Format date as yyyy-MM-dd to use with SQLite's date() function.
     final formattedDate = "${date.year.toString().padLeft(4, '0')}-"
         "${date.month.toString().padLeft(2, '0')}-"
         "${date.day.toString().padLeft(2, '0')}";
     return await db.rawQuery('''
-      SELECT h.*, u.nickname
+      SELECT h.id, h.user_id, h.matched_at, u.nickname
       FROM history h
       LEFT JOIN users u ON u.id = h.user_id
       WHERE date(h.matched_at) = ?
       ORDER BY h.matched_at DESC
+      LIMIT 30
     ''', [formattedDate]);
   }
 
-  // Open the date picker and update the history list.
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime(2020), // Adjust as needed.
+      firstDate: DateTime(2020),
       lastDate: DateTime.now(),
     );
     if (picked != null && picked != _selectedDate) {
@@ -58,33 +56,34 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
-  // Debug function to check the history database.
-  Future<void> _checkHistoryDatabase() async {
-    try {
-      final db = await DatabaseHelper().database;
-      final tableInfo = await db.rawQuery("PRAGMA table_info(history)");
-      print("Table info for 'history': $tableInfo");
-
-      final contents = await db.rawQuery("SELECT * FROM history");
-      print("⏳⏳⏳Contents of 'history': $contents");
-    } catch (e) {
-      print("❌❌❌Error checking history database: $e");
-    }
-  }
-
-  // Delete a history record by its id.
   Future<void> _deleteHistoryRecord(int id) async {
     final db = await DatabaseHelper().database;
     await db.delete('history', where: 'id = ?', whereArgs: [id]);
-    // Refresh the list.
     setState(() {
       _historyFuture = _loadHistory(_selectedDate);
     });
   }
 
+  Future<Uint8List?> _loadFaceImage(int recordId) async {
+    final db = await DatabaseHelper().database;
+    final result = await db.query(
+      'history',
+      columns: ['face_image'],
+      where: 'id = ?',
+      whereArgs: [recordId],
+      limit: 1,
+    );
+    if (result.isNotEmpty) {
+      final blob = result.first['face_image'];
+      if (blob != null) {
+        return Uint8List.fromList((blob as List).cast<int>());
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Format the date for display (dd/MM/yyyy).
     final displayDate = "${_selectedDate.day.toString().padLeft(2, '0')}/"
         "${_selectedDate.month.toString().padLeft(2, '0')}/"
         "${_selectedDate.year}";
@@ -111,12 +110,11 @@ class _HistoryPageState extends State<HistoryPage> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Column(
             children: [
-              // Date selector container.
               GestureDetector(
                 onTap: () => _selectDate(context),
                 child: Container(
                   padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
@@ -135,7 +133,6 @@ class _HistoryPageState extends State<HistoryPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              // History records list.
               Expanded(
                 child: FutureBuilder<List<Map<String, dynamic>>>(
                   future: _historyFuture,
@@ -159,21 +156,6 @@ class _HistoryPageState extends State<HistoryPage> {
                         final recordId = record['id'] as int;
                         final nickname = record['nickname'] ?? 'ไม่ทราบชื่อ';
                         final matchedAt = record['matched_at'] as String;
-
-                        // Retrieve the face_image blob as dynamic.
-                        final dynamic blobData = record['face_image'];
-                        Uint8List? faceImageBytes;
-                        if (blobData != null) {
-                          try {
-                            // Convert blobData to Uint8List.
-                            faceImageBytes = Uint8List.fromList(blobData.cast<int>());
-                            print("Retrieved face image blob of length: ${faceImageBytes.length}");
-                          } catch (e) {
-                            print("Error converting blob to Uint8List: $e");
-                          }
-                        }
-
-                        // Parse matchedAt to a DateTime.
                         DateTime matchedDateTime = DateTime.parse(matchedAt);
                         final timeString =
                             "${matchedDateTime.hour.toString().padLeft(2, '0')}:"
@@ -186,75 +168,67 @@ class _HistoryPageState extends State<HistoryPage> {
                           elevation: 1,
                           margin: const EdgeInsets.symmetric(vertical: 8),
                           child: ListTile(
-                            leading: GestureDetector(
-                              onTap: () {
-                                if (faceImageBytes != null) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => FullImageScreen(
-                                        imageBytes: faceImageBytes!, // use ! to assert non-null
-                                        title: 'Scanned Image',
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
-                              child: Container(
-                                width: 60,
-                                height: 70,
-                                child: faceImageBytes != null
-                                    ? Transform.rotate(
-                                  angle: math.pi/2, // 180° rotation; adjust if needed
-                                  child: ClipOval(
-                                    child: Image.memory(
-                                      faceImageBytes,
-                                      fit: BoxFit.cover,
-                                      width: 70,
-                                      height: 70,
-                                    ),
+                            leading: FutureBuilder<Uint8List?>(
+                              future: _loadFaceImage(recordId),
+                              builder: (context, snapshot) {
+                                final faceImageBytes = snapshot.data;
+                                return GestureDetector(
+                                  onTap: () {
+                                    if (faceImageBytes != null) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => FullImageScreen(
+                                            imageBytes: faceImageBytes,
+                                            title: 'Scanned Image',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  child: CircleAvatar(
+                                    radius: 35,
+                                    backgroundColor: Colors.grey.shade300,
+                                    backgroundImage: faceImageBytes != null
+                                        ? MemoryImage(faceImageBytes)
+                                        : const AssetImage(
+                                                'assets/images/test_user.jpg')
+                                            as ImageProvider,
                                   ),
-                                )
-                                    : CircleAvatar(
-                                  radius: 35,
-                                  backgroundImage:
-                                  const AssetImage('assets/images/test_user.jpg'),
-                                ),
-                              ),
+                                );
+                              },
                             ),
-                            title: Text(
-                              'ชื่อ: $nickname',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'เวลา: $timeString',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.black87,
-                              ),
-                            ),
+                            title: Text('ชื่อ: $nickname',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                )),
+                            subtitle: Text('เวลา: $timeString',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.black87,
+                                )),
                             trailing: IconButton(
                               icon: const Icon(Icons.delete, color: Colors.red),
                               onPressed: () {
-                                // Show a confirmation dialog.
                                 showDialog(
                                   context: context,
                                   builder: (context) {
                                     return AlertDialog(
                                       title: const Text('การลบข้อมูล'),
-                                      content: const Text('คุณแน่ใจหรือไม่ที่จะทำการยินยันในการลบประวัติการสแกนใบหน้าของบุคคลท่านนี้?'),
+                                      content: const Text(
+                                          'คุณแน่ใจหรือไม่ที่จะทำการยินยันในการลบประวัติการสแกนใบหน้าของบุคคลท่านนี้?'),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.pop(context),
+                                          onPressed: () =>
+                                              Navigator.pop(context),
                                           child: const Text('ยกเลิก'),
                                         ),
                                         TextButton(
                                           onPressed: () async {
                                             Navigator.pop(context);
-                                            await _deleteHistoryRecord(recordId);
+                                            await _deleteHistoryRecord(
+                                                recordId);
                                           },
                                           child: const Text('ยืนยัน'),
                                         ),
@@ -283,18 +257,17 @@ class FullImageScreen extends StatelessWidget {
   final Uint8List imageBytes;
   final String? title;
 
-  const FullImageScreen({Key? key, required this.imageBytes, this.title}) : super(key: key);
+  const FullImageScreen({Key? key, required this.imageBytes, this.title})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(title ?? 'Full Image'),
-      ),
+      appBar: AppBar(title: Text(title ?? 'Full Image')),
       body: Center(
         child: InteractiveViewer(
           child: Transform.rotate(
-            angle: math.pi / 2, // rotates the image -90° (counterclockwise)
+            angle: math.pi / 2,
             child: Image.memory(imageBytes),
           ),
         ),
