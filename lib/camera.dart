@@ -43,7 +43,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
   Interpreter? interpreter;
   Uint8List? _processedFaceImage;
   List<List<double>> _vectorBuffer = [];
-  final int _maxBufferLength = 5;
+  final int _maxBufferLength = 2;
   int _vectorProgress = 0; // Track number of collected vectors
   double? _lastConfidence;
   // 👇 เพิ่มตรงนี้
@@ -558,7 +558,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
       groupedResults.putIfAbsent(userId, () => []).add(row);
     }
 
-    const double rejectionThreshold = 0.7;
+    const double rejectionThreshold = 0.6
+    ;
     double bestSim = -1.0;
     Map<String, dynamic>? bestUser;
 
