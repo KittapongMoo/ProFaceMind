@@ -359,7 +359,18 @@ class _RegisterPageState extends State<RegisterPage> {
   /// 3. Add face vector (for count) and store full image path.
   Future<void> _processCapturedImage(File imageFile) async {
     try {
-      // 0) Save a copy of the original image for later display.
+      // 1) Detect faces using the file first.
+      final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
+      final List<Face> faces = await _faceDetector.processImage(inputImage);
+      _hideDialog();
+
+      // 2) If no faces are detected, show an error and do not save the image.
+      if (faces.isEmpty) {
+        _showErrorPopup("No face detected in this image");
+        return;
+      }
+
+      // 3) Since a face was detected, save a copy of the original image for later display.
       final Directory appDir = await getApplicationDocumentsDirectory();
       final Directory fullImageDir = Directory('${appDir.path}/full_faces');
       if (!fullImageDir.existsSync()) {
@@ -369,16 +380,8 @@ class _RegisterPageState extends State<RegisterPage> {
       await imageFile.copy(fullImagePath);
       fullImagePaths.add(fullImagePath);
 
-      // 1) Detect faces using the file.
-      final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
-      final List<Face> faces = await _faceDetector.processImage(inputImage);
-      _hideDialog();
-      if (faces.isEmpty) {
-        _showErrorPopup("No face detected in this image");
-        return;
-      }
-
-      // 2) Load and decode the image.
+      // 4) Continue with the rest of the processing.
+      // Load and decode the image.
       final Uint8List imageBytes = await imageFile.readAsBytes();
       final img.Image? fullImage = img.decodeImage(imageBytes);
       if (fullImage == null) {
@@ -386,7 +389,7 @@ class _RegisterPageState extends State<RegisterPage> {
         return;
       }
 
-      // 3) Read EXIF orientation data.
+      // 5) Read EXIF orientation data and determine rotation angle.
       final Map<String, IfdTag> exifData = await readExifFromBytes(imageBytes);
       int rotationAngle = 0;
       if (!_isFrontCamera) {
@@ -404,16 +407,16 @@ class _RegisterPageState extends State<RegisterPage> {
         rotationAngle = -90;
       }
 
-      // 4) Rotate the full image.
+      // 6) Rotate the full image.
       final img.Image orientedImage = (rotationAngle != 0)
           ? img.copyRotate(fullImage, rotationAngle)
           : fullImage;
 
-      // 5) Get bounding box from the first detected face.
+      // 7) Get bounding box from the first detected face.
       final Face face = faces.first;
       Rect box = face.boundingBox;
 
-      // 6) If front camera, mirror the bounding box.
+      // 8) If using the front camera, mirror the bounding box.
       if (_isFrontCamera) {
         box = Rect.fromLTRB(
           orientedImage.width - box.right,
@@ -423,7 +426,7 @@ class _RegisterPageState extends State<RegisterPage> {
         );
       }
 
-      // 7) Add margin and ensure crop rectangle is within bounds.
+      // 9) Add margin and ensure crop rectangle is within bounds.
       const margin = 20;
       int x = (box.left - margin).toInt().clamp(0, orientedImage.width);
       int y = (box.top - margin).toInt().clamp(0, orientedImage.height);
@@ -436,13 +439,13 @@ class _RegisterPageState extends State<RegisterPage> {
         h = orientedImage.height - y;
       }
 
-      // 8) Crop and resize the face for preview.
+      // 10) Crop and resize the face for preview.
       final img.Image croppedFace = img.copyCrop(orientedImage, x, y, w, h);
       final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
       _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
       setState(() {});
 
-      // 9) Preprocess and run face recognition (used only for count).
+      // 11) Preprocess and run face recognition (for count purposes).
       final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
       List<double> vector = await _runFaceRecognition(processedBytes);
       final double norm = math.sqrt(vector.fold(0, (sum, val) => sum + val * val));
@@ -458,7 +461,7 @@ class _RegisterPageState extends State<RegisterPage> {
       });
       print("Captured image processed. Count: ${_faceVectors.length}/5");
 
-      // 10) When 5 images have been captured, register the user.
+      // 12) When 5 images have been captured, register the user.
       if (_faceVectors.length >= 5) {
         await _registerUserWithImages(fullImagePaths);
       }
