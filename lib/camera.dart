@@ -768,6 +768,16 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     }
   }
 
+  Future<void> _resetFirstLaunch(BuildContext context) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_first_launch', true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('First launch flag reset! Restart the app to see the effect.'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1226,6 +1236,11 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
             ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _resetFirstLaunch(context),
+        tooltip: 'Reset First Launch',
+        child: const Icon(Icons.restore),
       ),
     );
   }

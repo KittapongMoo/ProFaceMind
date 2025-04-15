@@ -51,6 +51,8 @@ class _SetPhoneNumberState extends State<SetPhoneNumber> {
       await prefs.setString('emergency_relation', _relationController.text.trim());
       await prefs.setString('emergency_phone', _phoneController.text.trim());
 
+      await prefs.setBool('is_first_launch', false);
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('ข้อมูลถูกบันทึกเรียบร้อยแล้ว!')),
       );

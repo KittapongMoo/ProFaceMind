@@ -5,6 +5,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'register.dart';
 import 'package:facemind/database_helper.dart'; // adjust if it's in a subfolder
+import 'package:shared_preferences/shared_preferences.dart';
+import 'camera.dart';
 
 // Global navigator key and route observer.
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -14,12 +16,20 @@ final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize the history table.
-  await DatabaseHelper().database; // will automatically init tables if needed
-  runApp(const MyApp());
+  await DatabaseHelper().database; // already in your code
+
+  // NEW: Read the first-launch flag (defaults to true if not set).
+  final SharedPreferences prefs = await SharedPreferences.getInstance();
+  bool isFirstLaunch = prefs.getBool('is_first_launch') ?? true;
+
+  // Pass the flag to your MyApp widget.
+  runApp(MyApp(isFirstLaunch: isFirstLaunch));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool isFirstLaunch;
+
+  const MyApp({super.key, required this.isFirstLaunch});
 
   @override
   Widget build(BuildContext context) {
@@ -30,10 +40,11 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.teal,
       ),
       debugShowCheckedModeBanner: false,
-      home: const PersonalInfoPage(),
+      // Conditionally display the page:
+      home: isFirstLaunch ? const PersonalInfoPage() : const CameraPage(),
       supportedLocales: const [
         Locale('en', 'US'),
-        Locale('th', 'TH'), // Ensure Thai locale is supported.
+        Locale('th', 'TH'),
       ],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
