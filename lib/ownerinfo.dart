@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'setmap.dart'; // แผนที่
 import 'SecondPage.dart';
 
 class Ownerinfo extends StatefulWidget {
@@ -151,7 +152,7 @@ class _OwnerinfoState extends State<Ownerinfo> {
       if (!mounted) return;
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const SecondPage()),
+        MaterialPageRoute(builder: (context) => const Setmap()),
       );
     } catch (e) {
       debugPrint("Error saving information: $e");

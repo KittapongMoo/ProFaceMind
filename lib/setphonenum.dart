@@ -4,6 +4,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'secondpage.dart';
+import 'camera.dart';
 
 class SetPhoneNumber extends StatefulWidget {
   const SetPhoneNumber({Key? key}) : super(key: key);
@@ -59,7 +60,7 @@ class _SetPhoneNumberState extends State<SetPhoneNumber> {
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const SecondPage()),
+        MaterialPageRoute(builder: (context) => const CameraPage()),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

@@ -176,7 +176,7 @@ class PersonalInfoPage extends StatelessWidget {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => SecondPage()),
+                        MaterialPageRoute(builder: (context) => Ownerinfo()),
                       );
                     },
                     style: ElevatedButton.styleFrom(
