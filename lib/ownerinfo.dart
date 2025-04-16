@@ -1,9 +1,11 @@
 import 'dart:io';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 import 'setmap.dart'; // แผนที่
 import 'SecondPage.dart';
@@ -88,30 +90,34 @@ class _OwnerinfoState extends State<Ownerinfo> {
     }
   }
 
-  // Method to select date
-  Future<void> _selectDate(BuildContext context) async {
-    if (!mounted) return; // Ensure the widget is still in the tree
+  String _formatDateThai(DateTime? date) {
+    if (date == null) return '';
+    // Convert year to Buddhist Era year (พ.ศ.)
+    final buddhistYear = date.year + 543;
+    final day = date.day;
+    // Get the full month name in Thai using the 'th_TH' locale
+    final month = DateFormat.MMMM('th_TH').format(date);
+    return '$day $month $buddhistYear';
+  }
 
-    final DateTime? picked = await showDatePicker(
+  Future<void> _selectThaiDate(BuildContext context) async {
+    // Use a temporary value for initial date if _selectedDate is null.
+    DateTime initial = _selectedDate ?? DateTime(2000, 1, 1);
+
+    DateTime? pickedDate = await showModalBottomSheet<DateTime>(
       context: context,
-      initialDate: _selectedDate ?? DateTime(2000),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      helpText: 'เลือกวันเกิด',
-      cancelText: 'ยกเลิก',
-      confirmText: 'เลือก',
-      locale: const Locale('th', 'TH'), // Set locale to Thai
-      builder: (BuildContext context, Widget? child) {
-        return Theme(
-          data: ThemeData.light(), // Ensure correct styling
-          child: child!,
+      builder: (BuildContext context) {
+        return ThaiDatePicker(
+          initialDate: initial,
+          minimumDate: DateTime(1900, 1, 1),
+          maximumDate: DateTime.now(),
         );
       },
     );
 
-    if (picked != null && picked != _selectedDate) {
+    if (pickedDate != null) {
       setState(() {
-        _selectedDate = picked;
+        _selectedDate = pickedDate;
       });
     }
   }
@@ -503,10 +509,8 @@ class _OwnerinfoState extends State<Ownerinfo> {
                 ),
                 _buildDatePickerField(
                   label: 'วันเกิด',
-                  value: _selectedDate != null
-                      ? "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}"
-                      : '',
-                  onTap: () => _selectDate(context),
+                  value: _selectedDate != null ? _formatDateThai(_selectedDate) : '',
+                  onTap: () => _selectThaiDate(context),
                 ),
                 _buildDropdownField(
                   label: 'ส่วนสูง',
@@ -551,3 +555,135 @@ class _OwnerinfoState extends State<Ownerinfo> {
     );
   }
 }
+
+class ThaiDatePicker extends StatefulWidget {
+  final DateTime initialDate;
+  final DateTime minimumDate;
+  final DateTime maximumDate;
+
+  const ThaiDatePicker({
+    Key? key,
+    required this.initialDate,
+    required this.minimumDate,
+    required this.maximumDate,
+  }) : super(key: key);
+
+  @override
+  _ThaiDatePickerState createState() => _ThaiDatePickerState();
+}
+
+class _ThaiDatePickerState extends State<ThaiDatePicker> {
+  late int selectedDay;
+  late int selectedMonth;
+  late int selectedYear;
+  late List<int> years;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize with the provided initialDate
+    selectedDay = widget.initialDate.day;
+    selectedMonth = widget.initialDate.month;
+    selectedYear = widget.initialDate.year;
+    // Generate a list of available years from minimumDate.year to maximumDate.year
+    years = List<int>.generate(
+      widget.maximumDate.year - widget.minimumDate.year + 1,
+          (index) => widget.minimumDate.year + index,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 300,
+      color: Colors.white,
+      child: Column(
+        children: [
+          // Header with Cancel and Confirm buttons
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            height: 50,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('ยกเลิก'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    // Combine day, month, and year into a new DateTime.
+                    // Note: selectedYear is Gregorian. When displaying
+                    // the date outside, you can add 543.
+                    DateTime newDate = DateTime(selectedYear, selectedMonth, selectedDay);
+                    Navigator.pop(context, newDate);
+                  },
+                  child: const Text('เลือก'),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // The pickers in a Row: Day, Month, and Year (with Buddhist Era display)
+          Expanded(
+            child: Row(
+              children: [
+                // Day Picker
+                Expanded(
+                  child: CupertinoPicker(
+                    itemExtent: 32,
+                    scrollController: FixedExtentScrollController(initialItem: selectedDay - 1),
+                    onSelectedItemChanged: (index) {
+                      setState(() {
+                        selectedDay = index + 1;
+                      });
+                    },
+                    children: List<Widget>.generate(
+                      31,
+                          (index) => Center(child: Text('${index + 1}')),
+                    ),
+                  ),
+                ),
+                // Month Picker (showing month names in Thai)
+                Expanded(
+                  child: CupertinoPicker(
+                    itemExtent: 32,
+                    scrollController: FixedExtentScrollController(initialItem: selectedMonth - 1),
+                    onSelectedItemChanged: (index) {
+                      setState(() {
+                        selectedMonth = index + 1;
+                      });
+                    },
+                    children: List<Widget>.generate(12, (index) {
+                      // Use a dummy DateTime to get the month name in Thai.
+                      String monthName = DateFormat.MMMM('th_TH').format(DateTime(2000, index + 1));
+                      return Center(child: Text(monthName));
+                    }),
+                  ),
+                ),
+                // Year Picker (displaying Buddhist Era year)
+                Expanded(
+                  child: CupertinoPicker(
+                    itemExtent: 32,
+                    scrollController: FixedExtentScrollController(
+                        initialItem: selectedYear - widget.minimumDate.year),
+                    onSelectedItemChanged: (index) {
+                      setState(() {
+                        selectedYear = years[index];
+                      });
+                    },
+                    children: years.map((year) {
+                      // Display the year with 543 added (Buddhist Era)
+                      return Center(child: Text('${year + 543}'));
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

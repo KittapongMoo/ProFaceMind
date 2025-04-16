@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:intl/intl.dart'; // For date formatting
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -38,7 +40,18 @@ class _ProfilePageState extends State<ProfilePage> {
     super.dispose();
   }
 
-  /// ✅ โหลดข้อมูลจาก SharedPreferences
+  /// Helper function to format the date in Thai format.
+  String _formatDateThai(DateTime? date) {
+    if (date == null) return '';
+    // Convert the Gregorian year to Buddhist Era (พ.ศ.)
+    final buddhistYear = date.year + 543;
+    final day = date.day;
+    // Get the full month name in Thai using the 'th_TH' locale.
+    final month = DateFormat.MMMM('th_TH').format(date);
+    return '$day $month $buddhistYear';
+  }
+
+  /// Loads profile data from SharedPreferences.
   Future<void> _loadProfileData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -56,7 +69,7 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
-  /// ✅ บันทึกข้อมูลลง SharedPreferences
+  /// Saves profile data to SharedPreferences.
   Future<void> _saveProfileData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('nickname', _nicknameController.text.trim());
@@ -75,11 +88,11 @@ class _ProfilePageState extends State<ProfilePage> {
     );
 
     setState(() {
-      _isEditing = false; // ✅ ปิดโหมดแก้ไข
+      _isEditing = false; // Exit edit mode
     });
   }
 
-  /// ✅ เลือกรูปภาพจากแกลเลอรี
+  /// Selects an image from the gallery.
   Future<void> _pickImage() async {
     final status = await Permission.photos.request();
     if (!status.isGranted) {
@@ -89,7 +102,8 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
 
-    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+    final pickedFile =
+    await ImagePicker().pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
         _image = File(pickedFile.path);
@@ -98,22 +112,23 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  /// ✅ เลือกวันเกิดจากปฏิทิน
+  /// Uses a custom Thai date picker (via a modal bottom sheet) for selecting the date.
   Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
+    DateTime initial = _selectedDate ?? DateTime(2000, 1, 1);
+    DateTime? pickedDate = await showModalBottomSheet<DateTime>(
       context: context,
-      initialDate: _selectedDate ?? DateTime(2000),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      helpText: 'เลือกวันเกิด',
-      cancelText: 'ยกเลิก',
-      confirmText: 'เลือก',
-      locale: const Locale('th', 'TH'),
+      builder: (BuildContext context) {
+        return ThaiDatePicker(
+          initialDate: initial,
+          minimumDate: DateTime(1900, 1, 1),
+          maximumDate: DateTime.now(),
+        );
+      },
     );
 
-    if (picked != null) {
+    if (pickedDate != null) {
       setState(() {
-        _selectedDate = picked;
+        _selectedDate = pickedDate;
       });
     }
   }
@@ -122,17 +137,17 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.transparent, // ทำให้ AppBar โปร่งใส
-        elevation: 0, // ลบเงาออก
+        backgroundColor: Colors.transparent, // Transparent AppBar
+        elevation: 0, // Remove shadow
         leading: Padding(
-          padding: const EdgeInsets.only(left: 16, top: 8), // ปรับระยะห่างจากขอบจอ
+          padding: const EdgeInsets.only(left: 16, top: 8), // Adjust spacing
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white, // พื้นหลังสีขาว
+              color: Colors.white, // White background
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black26, // เงาสีดำบางๆ
+                  color: Colors.black26, // Light shadow
                   blurRadius: 5,
                   spreadRadius: 2,
                 ),
@@ -140,7 +155,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             child: IconButton(
               onPressed: () {
-                Navigator.pop(context); // กลับไปหน้าก่อนหน้า
+                Navigator.pop(context); // Go back
               },
               icon: const Icon(Icons.arrow_back, color: Colors.black),
             ),
@@ -148,29 +163,25 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         title: const Text(
           "ข้อมูลส่วนตัว",
-          style: TextStyle(color: Colors.black), // เปลี่ยนสีข้อความเป็นดำ
+          style: TextStyle(color: Colors.black), // Black text
         ),
-        centerTitle: true, // ทำให้หัวข้ออยู่ตรงกลาง
-
-        /// ✅ ปุ่มแก้ไขที่อยู่ด้านขวาบน (ไม่หายไป)
+        centerTitle: true,
         actions: [
           _isEditing
               ? IconButton(
             icon: const Icon(Icons.check, color: Colors.green),
-            onPressed: _saveProfileData, // กดแล้วบันทึกข้อมูล
+            onPressed: _saveProfileData, // Save on tap
           )
               : IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () {
               setState(() {
-                _isEditing = true; // ✅ เข้าโหมดแก้ไข
+                _isEditing = true; // Enter edit mode
               });
             },
           ),
         ],
       ),
-
-
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
@@ -178,9 +189,7 @@ class _ProfilePageState extends State<ProfilePage> {
             _buildEditableField("ชื่อเล่น", _nicknameController),
             _buildEditableField("ชื่อจริง", _firstnameController),
             _buildEditableField("นามสกุล", _lastnameController),
-
             _buildDatePicker(),
-
             _buildDropdownField(
               label: "ส่วนสูง",
               value: _selectedHeight,
@@ -193,20 +202,19 @@ class _ProfilePageState extends State<ProfilePage> {
               items: List.generate(101, (index) => '${50 + index} กก.'),
               onChanged: (value) => setState(() => _selectedWeight = value!),
             ),
-
             _buildEditableField("โรคประจำตัว", _conditionController),
-
             const SizedBox(height: 20),
-            const Text("รูปโปรไฟล์ :", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text("รูปโปรไฟล์ :",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-
             Center(
               child: GestureDetector(
                 onTap: _isEditing ? _pickImage : null,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: _image != null
-                      ? Image.file(_image!, width: 120, height: 120, fit: BoxFit.cover)
+                      ? Image.file(_image!,
+                      width: 120, height: 120, fit: BoxFit.cover)
                       : const Text("ไม่มีรูปภาพ"),
                 ),
               ),
@@ -217,8 +225,9 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  /// ✅ ช่องข้อมูลที่แก้ไขได้เมื่ออยู่ในโหมดแก้ไข
-  Widget _buildEditableField(String label, TextEditingController controller) {
+  /// Widget for an editable text field (active in edit mode).
+  Widget _buildEditableField(
+      String label, TextEditingController controller) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Column(
@@ -231,15 +240,16 @@ class _ProfilePageState extends State<ProfilePage> {
           const SizedBox(height: 8),
           Container(
             decoration: BoxDecoration(
-              color: Colors.grey[200], // พื้นหลังสีเทาอ่อน
-              borderRadius: BorderRadius.circular(20), // ทำให้ขอบโค้งมน
+              color: Colors.grey[200], // Light gray background
+              borderRadius: BorderRadius.circular(20), // Rounded corners
             ),
             child: TextFormField(
               controller: controller,
-              enabled: _isEditing, // แก้ไขได้เมื่ออยู่ในโหมดแก้ไข
+              enabled: _isEditing, // Editable in edit mode
               decoration: const InputDecoration(
-                border: InputBorder.none, // ไม่มีเส้นขอบ
-                contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                border: InputBorder.none, // No border
+                contentPadding:
+                EdgeInsets.symmetric(vertical: 16, horizontal: 12),
               ),
             ),
           ),
@@ -248,8 +258,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-
-  /// ✅ Widget สำหรับ DatePicker
+  /// Widget for displaying/selecting the date.
   Widget _buildDatePicker() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
@@ -264,24 +273,26 @@ class _ProfilePageState extends State<ProfilePage> {
           GestureDetector(
             onTap: _isEditing ? () => _selectDate(context) : null,
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+              padding:
+              const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
               decoration: BoxDecoration(
-                color: Colors.grey[200], // พื้นหลังสีเทาอ่อน
-                borderRadius: BorderRadius.circular(20), // ขอบโค้งมน
+                color: Colors.grey[200], // Light gray background
+                borderRadius: BorderRadius.circular(20), // Rounded corners
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     _selectedDate != null
-                        ? "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}"
+                        ? _formatDateThai(_selectedDate)
                         : "เลือกวันเกิด",
                     style: TextStyle(
                       fontSize: 16,
-                      color: _selectedDate != null ? Colors.black : Colors.grey,
+                      color:
+                      _selectedDate != null ? Colors.black : Colors.grey,
                     ),
                   ),
-                  // ✅ แสดงไอคอนเฉพาะเมื่ออยู่ในโหมดแก้ไข
+                  // Show calendar icon only in edit mode.
                   if (_isEditing)
                     const Icon(Icons.calendar_today, color: Colors.grey),
                 ],
@@ -293,7 +304,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  /// ✅ Widget สำหรับ Dropdown
+  /// Widget for a dropdown field.
   Widget _buildDropdownField({
     required String label,
     required String value,
@@ -313,38 +324,169 @@ class _ProfilePageState extends State<ProfilePage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: Colors.grey[200], // พื้นหลังสีเทาอ่อน
-              borderRadius: BorderRadius.circular(20), // ขอบโค้งมน
+              color: Colors.grey[200], // Light gray background
+              borderRadius: BorderRadius.circular(20), // Rounded corners
             ),
             child: _isEditing
                 ? DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: value,
-                isExpanded: true, // ✅ ทำให้ช่องไม่หดเมื่อ dropdown แสดง
+                isExpanded: true,
                 onChanged: onChanged,
                 items: items.map((String item) {
                   return DropdownMenuItem<String>(
                     value: item,
-                    child: Text(item, style: const TextStyle(fontSize: 16)),
+                    child: Text(item,
+                        style: const TextStyle(fontSize: 16)),
                   );
                 }).toList(),
               ),
             )
                 : SizedBox(
-              height: 50, // ✅ กำหนดความสูงให้เท่ากับ dropdown
+              height: 50, // Keeps the same height as the dropdown when not editing
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(value, style: const TextStyle(fontSize: 16)),
               ),
-            ), // ✅ แสดงข้อความเมื่อไม่อยู่ในโหมดแก้ไข แต่ไม่ให้ช่องเล็กลง
+            ),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildReadonlyBox(String value) => Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+          color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
+      child: Text(value));
+}
 
+/// Custom ThaiDatePicker widget for selecting dates in Thai format.
+class ThaiDatePicker extends StatefulWidget {
+  final DateTime initialDate;
+  final DateTime minimumDate;
+  final DateTime maximumDate;
 
+  const ThaiDatePicker({
+    Key? key,
+    required this.initialDate,
+    required this.minimumDate,
+    required this.maximumDate,
+  }) : super(key: key);
 
-  Widget _buildReadonlyBox(String value) => Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)), child: Text(value));
+  @override
+  _ThaiDatePickerState createState() => _ThaiDatePickerState();
+}
+
+class _ThaiDatePickerState extends State<ThaiDatePicker> {
+  late int selectedDay;
+  late int selectedMonth;
+  late int selectedYear;
+  late List<int> years;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedDay = widget.initialDate.day;
+    selectedMonth = widget.initialDate.month;
+    selectedYear = widget.initialDate.year;
+    years = List<int>.generate(
+      widget.maximumDate.year - widget.minimumDate.year + 1,
+          (index) => widget.minimumDate.year + index,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 300,
+      color: Colors.white,
+      child: Column(
+        children: [
+          // Header with Cancel and Confirm buttons.
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            height: 50,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('ยกเลิก'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    DateTime newDate =
+                    DateTime(selectedYear, selectedMonth, selectedDay);
+                    Navigator.pop(context, newDate);
+                  },
+                  child: const Text('เลือก'),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // The pickers in a row: Day, Month, and Year (with Buddhist Era display).
+          Expanded(
+            child: Row(
+              children: [
+                // Day Picker.
+                Expanded(
+                  child: CupertinoPicker(
+                    itemExtent: 32,
+                    scrollController:
+                    FixedExtentScrollController(initialItem: selectedDay - 1),
+                    onSelectedItemChanged: (index) {
+                      setState(() {
+                        selectedDay = index + 1;
+                      });
+                    },
+                    children: List<Widget>.generate(
+                      31,
+                          (index) => Center(child: Text('${index + 1}')),
+                    ),
+                  ),
+                ),
+                // Month Picker showing month names in Thai.
+                Expanded(
+                  child: CupertinoPicker(
+                    itemExtent: 32,
+                    scrollController:
+                    FixedExtentScrollController(initialItem: selectedMonth - 1),
+                    onSelectedItemChanged: (index) {
+                      setState(() {
+                        selectedMonth = index + 1;
+                      });
+                    },
+                    children: List<Widget>.generate(12, (index) {
+                      String monthName = DateFormat.MMMM('th_TH')
+                          .format(DateTime(2000, index + 1));
+                      return Center(child: Text(monthName));
+                    }),
+                  ),
+                ),
+                // Year Picker displaying year in Buddhist Era.
+                Expanded(
+                  child: CupertinoPicker(
+                    itemExtent: 32,
+                    scrollController: FixedExtentScrollController(
+                        initialItem: selectedYear - widget.minimumDate.year),
+                    onSelectedItemChanged: (index) {
+                      setState(() {
+                        selectedYear = years[index];
+                      });
+                    },
+                    children: years.map((year) {
+                      return Center(child: Text('${year + 543}'));
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
