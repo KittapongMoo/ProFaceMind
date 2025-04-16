@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'setphonenum.dart';
 
 class Selectposition extends StatefulWidget {
-  const Selectposition({super.key});
+  const Selectposition({Key? key}) : super(key: key);
 
   @override
   _SelectpositionState createState() => _SelectpositionState();
@@ -25,7 +25,8 @@ class _SelectpositionState extends State<Selectposition> {
   void initState() {
     super.initState();
     _getCurrentLocation();
-    googlePlace = GooglePlace("AIzaSyChd-Tfsm3EFmC8Jc5RXAj2Kg6r5pXojyU");
+    // Replace with your own API key.
+    googlePlace = GooglePlace("YOUR_API_KEY");
   }
 
   Future<void> _getCurrentLocation() async {
@@ -70,7 +71,7 @@ class _SelectpositionState extends State<Selectposition> {
 
       _getAddressFromLatLng(_selectedPosition!);
     } catch (e) {
-      debugPrint("❌ ไม่สามารถดึงตำแหน่ง GPS ได้: $e");
+      debugPrint("❌ Unable to retrieve GPS position: $e");
       setState(() => _isLoading = false);
     }
   }
@@ -79,19 +80,19 @@ class _SelectpositionState extends State<Selectposition> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("ต้องเปิด GPS"),
-        content: const Text("กรุณาเปิด GPS เพื่อใช้งานแผนที่"),
+        title: const Text("Please enable GPS"),
+        content: const Text("Enable GPS to use the map feature"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("ปิด"),
+            child: const Text("Close"),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               Geolocator.openLocationSettings();
             },
-            child: const Text("ไปที่ตั้งค่า"),
+            child: const Text("Settings"),
           ),
         ],
       ),
@@ -102,19 +103,20 @@ class _SelectpositionState extends State<Selectposition> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("สิทธิ์ถูกปฏิเสธ"),
-        content: const Text("กรุณาให้สิทธิ์ตำแหน่งในตั้งค่าแอปเพื่อใช้งานฟีเจอร์นี้"),
+        title: const Text("Permission Denied"),
+        content: const Text(
+            "Please grant location permission in app settings to use this feature"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("ปิด"),
+            child: const Text("Close"),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               Geolocator.openAppSettings();
             },
-            child: const Text("ไปที่ตั้งค่า"),
+            child: const Text("Settings"),
           ),
         ],
       ),
@@ -130,13 +132,14 @@ class _SelectpositionState extends State<Selectposition> {
 
       if (placemarks.isNotEmpty) {
         Placemark place = placemarks.first;
-        String address = "${place.street}, ${place.subLocality}, ${place.locality}, ${place.postalCode}";
+        String address =
+            "${place.street}, ${place.subLocality}, ${place.locality}, ${place.postalCode}";
         setState(() {
           _searchController.text = address;
         });
       }
     } catch (e) {
-      debugPrint("❌ ไม่สามารถดึงที่อยู่จากพิกัดได้: $e");
+      debugPrint("❌ Unable to retrieve address: $e");
     }
   }
 
@@ -184,7 +187,7 @@ class _SelectpositionState extends State<Selectposition> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณาเลือกตำแหน่งก่อน')),
+        const SnackBar(content: Text('Please select a location first')),
       );
     }
   }
@@ -194,6 +197,7 @@ class _SelectpositionState extends State<Selectposition> {
     return Scaffold(
       body: Stack(
         children: [
+          // Google Map
           if (_selectedPosition != null)
             GoogleMap(
               onMapCreated: (controller) {
@@ -212,7 +216,7 @@ class _SelectpositionState extends State<Selectposition> {
                 Marker(
                   markerId: const MarkerId('selected-location'),
                   position: _selectedPosition!,
-                  infoWindow: const InfoWindow(title: "ตำแหน่งที่เลือก"),
+                  infoWindow: const InfoWindow(title: "Selected Position"),
                   icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
                 )
               },
@@ -228,7 +232,7 @@ class _SelectpositionState extends State<Selectposition> {
           else
             const Center(child: CircularProgressIndicator()),
 
-          // Search bar
+          // Search Bar
           Positioned(
             top: 40,
             left: 16,
@@ -244,11 +248,14 @@ class _SelectpositionState extends State<Selectposition> {
                 onChanged: _onSearchChanged,
                 onSubmitted: (value) {
                   if (predictions.isNotEmpty) {
-                    _selectLocation(predictions.first.placeId!, predictions.first.description!);
+                    _selectLocation(
+                      predictions.first.placeId!,
+                      predictions.first.description!,
+                    );
                   }
                 },
                 decoration: const InputDecoration(
-                  hintText: "ค้นหาสถานที่",
+                  hintText: "Search location",
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   prefixIcon: Icon(Icons.search, color: Colors.blue),
@@ -257,10 +264,10 @@ class _SelectpositionState extends State<Selectposition> {
             ),
           ),
 
-          // Current location button (top right)
+          // Current Location Button (top right)
           Positioned(
             top: 40,
-            right: 16,
+            right: 5,
             child: FloatingActionButton(
               mini: true,
               backgroundColor: Colors.white,
@@ -270,33 +277,40 @@ class _SelectpositionState extends State<Selectposition> {
             ),
           ),
 
-          // Suggestion List
+          // Prediction List using the same left/right margins as the search box
           if (predictions.isNotEmpty)
             Positioned(
-              top: 90,
+              top: 95,
               left: 16,
-              right: 16,
-              child: Material(
-                elevation: 3,
-                child: ListView.builder(
-                  itemCount: predictions.length,
-                  shrinkWrap: true,
-                  itemBuilder: (context, index) {
-                    return ListTile(
-                      title: Text(predictions[index].description ?? ""),
-                      onTap: () {
-                        _selectLocation(
-                          predictions[index].placeId!,
-                          predictions[index].description!,
+              right: 60,
+              child: AnimatedOpacity(
+                opacity: predictions.isNotEmpty ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: Material(
+                  elevation: 3,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ListView.builder(
+                      itemCount: predictions.length,
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.all(8),
+                      itemBuilder: (context, index) {
+                        return PredictionTile(
+                          prediction: predictions[index],
+                          onTap: _selectLocation,
                         );
                       },
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ),
             ),
 
-          // Floating panel with address + button
+          // Floating Panel with Address and Select Button
           Positioned(
             left: 0,
             right: 0,
@@ -339,7 +353,7 @@ class _SelectpositionState extends State<Selectposition> {
                         ),
                       ),
                       child: const Text(
-                        "เลือกที่นี่",
+                        "Select Here",
                         style: TextStyle(fontSize: 18, color: Colors.white),
                       ),
                     ),
@@ -349,6 +363,39 @@ class _SelectpositionState extends State<Selectposition> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// Custom widget for Prediction Tile
+class PredictionTile extends StatelessWidget {
+  final AutocompletePrediction prediction;
+  final Function(String, String) onTap;
+
+  const PredictionTile({
+    Key? key,
+    required this.prediction,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8.0),
+      ),
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ListTile(
+        leading: const Icon(Icons.location_on, color: Colors.blueAccent),
+        title: Text(
+          prediction.description ?? "",
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        onTap: () {
+          onTap(prediction.placeId!, prediction.description!);
+        },
       ),
     );
   }
