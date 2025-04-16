@@ -442,8 +442,8 @@ class _RegisterPageState extends State<RegisterPage> {
       // 10) Crop and resize the face for preview.
       final img.Image croppedFace = img.copyCrop(orientedImage, x, y, w, h);
       final img.Image resizedFace = img.copyResize(croppedFace, width: 112, height: 112);
-      _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
-      setState(() {});
+      // _processedFaceImage = Uint8List.fromList(img.encodeJpg(resizedFace));
+      // setState(() {});
 
       // 11) Preprocess and run face recognition (for count purposes).
       final Uint8List processedBytes = _imageToByteListFloat32(resizedFace, 112, 127.5, 128.0);
@@ -589,29 +589,29 @@ class _RegisterPageState extends State<RegisterPage> {
         fit: StackFit.expand,
         children: [
           Positioned.fill(child: _buildCameraPreview(context)),
-          if (_processedFaceImage != null)
-            Positioned(
-              bottom: 120,
-              left: 20,
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => FullScreenImage(imageBytes: _processedFaceImage!),
-                    ),
-                  );
-                },
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.blue, width: 2),
-                  ),
-                  child: Image.memory(_processedFaceImage!, fit: BoxFit.cover),
-                ),
-              ),
-            ),
+          // if (_processedFaceImage != null)
+          //   Positioned(
+          //     bottom: 120,
+          //     left: 20,
+          //     child: GestureDetector(
+          //       onTap: () {
+          //         Navigator.push(
+          //           context,
+          //           MaterialPageRoute(
+          //             builder: (context) => FullScreenImage(imageBytes: _processedFaceImage!),
+          //           ),
+          //         );
+          //       },
+          //       child: Container(
+          //         width: 100,
+          //         height: 100,
+          //         decoration: BoxDecoration(
+          //           border: Border.all(color: Colors.blue, width: 2),
+          //         ),
+          //         child: Image.memory(_processedFaceImage!, fit: BoxFit.cover),
+          //       ),
+          //     ),
+          //   ),
           Positioned(
             top: 50,
             left: 20,
