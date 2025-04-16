@@ -429,7 +429,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
 
       if (faces.isEmpty) {
         setState(() {
-          _matchedUser = {"nickname": "??", "name": "??", "relation": "??"};
+          _matchedUser = {"nickname": "ไม่มีข้อมูล", "name": "ไม่มีข้อมูล", "relation": "ไม่มีข้อมูล"};
           _lastConfidence = null; // Reset confidence when no face is detected.
         });
         _isRecognizing = false;
@@ -501,7 +501,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
       if (matchedUser == null) {
         await _saveHistory(0, fullImageBlob);
         setState(() {
-          _matchedUser = {"nickname": "??", "name": "??", "relation": "??"};
+          _matchedUser = {"nickname": "ไม่มีข้อมูล", "name": "ไม่มีข้อมูล", "relation": "ไม่มีข้อมูล"};
           _lastConfidence = null;
         });
       } else {
@@ -1199,15 +1199,15 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    'ชื่อเล่น : ${_matchedUser?['nickname'] ?? "??"}',
+                    'ชื่อเล่น : ${_matchedUser?['nickname'] ?? "ไม่มีข้อมูล"}',
                     style: const TextStyle(color: Colors.white, fontSize: 16),
                   ),
                   Text(
-                    'ชื่อ : ${_matchedUser?['name'] ?? "??"}',
+                    'ชื่อ : ${_matchedUser?['name'] ?? "ไม่มีข้อมูล"}',
                     style: const TextStyle(color: Colors.white, fontSize: 16),
                   ),
                   Text(
-                    'ความสัมพันธ์ : ${_matchedUser?['relation'] ?? "??"}',
+                    'ความสัมพันธ์ : ${_matchedUser?['relation'] ?? "ไม่มีข้อมูล"}',
                     style: const TextStyle(color: Colors.white, fontSize: 16),
                   ),
                   if (_lastConfidence != null)
