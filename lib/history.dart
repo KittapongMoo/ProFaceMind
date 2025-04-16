@@ -266,10 +266,7 @@ class FullImageScreen extends StatelessWidget {
       appBar: AppBar(title: Text(title ?? 'Full Image')),
       body: Center(
         child: InteractiveViewer(
-          child: Transform.rotate(
-            angle: math.pi / 2,
-            child: Image.memory(imageBytes),
-          ),
+          child: Image.memory(imageBytes),
         ),
       ),
     );
