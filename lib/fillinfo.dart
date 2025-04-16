@@ -19,6 +19,7 @@ class FillInfoPage extends StatefulWidget {
 
 class _FillInfoPageState extends State<FillInfoPage> {
   bool isEditing = true;
+  bool _isFormValid = false;
   final PageController _pageController = PageController();
 
   List<String> imagePaths = [];
@@ -83,6 +84,15 @@ class _FillInfoPageState extends State<FillInfoPage> {
     } catch (e) {
       print('❌ Error in _loadUserData: $e');
     }
+  }
+
+  void _checkFormValidity() {
+    bool isValid = nicknameController.text.trim().isNotEmpty &&
+        nameController.text.trim().isNotEmpty &&
+        relationController.text.trim().isNotEmpty;
+    setState(() {
+      _isFormValid = isValid;
+    });
   }
 
   @override
@@ -217,7 +227,7 @@ class _FillInfoPageState extends State<FillInfoPage> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () async {
+                        onPressed: !_isFormValid ? null : () async {
                           final db = await openDatabase(
                               join(await getDatabasesPath(), 'facemind.db'));
                           await db.update(
@@ -275,6 +285,7 @@ class _FillInfoPageState extends State<FillInfoPage> {
           TextField(
             controller: controller,
             enabled: isEditable,
+            onChanged: (value) => _checkFormValidity(),
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.grey[200],
