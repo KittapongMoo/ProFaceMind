@@ -31,8 +31,9 @@ class _HistoryPageState extends State<HistoryPage> {
     final formattedDate = "${date.year.toString().padLeft(4, '0')}-"
         "${date.month.toString().padLeft(2, '0')}-"
         "${date.day.toString().padLeft(2, '0')}";
+    // Updated query to also fetch 'name' and 'relation'
     return await db.rawQuery('''
-      SELECT h.id, h.user_id, h.matched_at, u.nickname
+      SELECT h.id, h.user_id, h.matched_at, u.nickname, u.name, u.relation
       FROM history h
       LEFT JOIN users u ON u.id = h.user_id
       WHERE date(h.matched_at) = ?
@@ -114,7 +115,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 onTap: () => _selectDate(context),
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
@@ -155,6 +156,8 @@ class _HistoryPageState extends State<HistoryPage> {
                         final record = historyRecords[index];
                         final recordId = record['id'] as int;
                         final nickname = record['nickname'] ?? 'ไม่ทราบชื่อ';
+                        final name = record['name'] ?? 'ไม่ทราบชื่อ';
+                        final relation = record['relation'] ?? 'ไม่ทราบชื่อ';
                         final matchedAt = record['matched_at'] as String;
                         DateTime matchedDateTime = DateTime.parse(matchedAt);
                         final timeString =
@@ -192,20 +195,42 @@ class _HistoryPageState extends State<HistoryPage> {
                                     backgroundImage: faceImageBytes != null
                                         ? MemoryImage(faceImageBytes)
                                         : const AssetImage(
-                                                'assets/images/test_user.jpg')
-                                            as ImageProvider,
+                                        'assets/images/test_user.jpg')
+                                    as ImageProvider,
                                   ),
                                 );
                               },
                             ),
-                            title: Text('ชื่อ: $nickname',
+                            // Updated title to include nickname, name, and relation.
+                            title: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'ชื่อเล่น: $nickname',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                Text(
+                                  'ชื่อ: $name',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                Text(
+                                  'ความสัมพันธ์: $relation',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            subtitle: Text('เวลา: $timeString น.',
                                 style: const TextStyle(
                                   fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                )),
-                            subtitle: Text('เวลา: $timeString',
-                                style: const TextStyle(
-                                  fontSize: 14,
                                   color: Colors.black87,
                                 )),
                             trailing: IconButton(
@@ -227,8 +252,7 @@ class _HistoryPageState extends State<HistoryPage> {
                                         TextButton(
                                           onPressed: () async {
                                             Navigator.pop(context);
-                                            await _deleteHistoryRecord(
-                                                recordId);
+                                            await _deleteHistoryRecord(recordId);
                                           },
                                           child: const Text('ยืนยัน'),
                                         ),
