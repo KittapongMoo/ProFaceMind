@@ -1198,6 +1198,15 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
+                  if (_matchedUser != null && _lastConfidence != null)
+                    Center(
+                      child: Icon(
+                        Icons.check_circle,
+                        color: Colors.green,
+                        size: 30,
+                      ),
+                    ),
+                  SizedBox(height: 8),
                   Text(
                     'ชื่อเล่น : ${_matchedUser?['nickname'] ?? "ไม่มีข้อมูล"}',
                     style: const TextStyle(color: Colors.white, fontSize: 16),
