@@ -1198,15 +1198,15 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  if (_matchedUser != null && _lastConfidence != null)
-                    Center(
-                      child: Icon(
-                        Icons.check_circle,
-                        color: Colors.green,
-                        size: 30,
-                      ),
+                  Center(
+                    child: Icon(
+                      _lastConfidence != null ? Icons.check_circle : Icons.cancel,
+                      size: 30,
+                      color: _lastConfidence != null ? Colors.green : Colors.red,
                     ),
-                  // SizedBox(height: 8),
+                  ),
+                  const SizedBox(height: 8),
+
                   Text(
                     'ชื่อเล่น : ${_matchedUser?['nickname'] ?? "ไม่มีข้อมูล"}',
                     style: const TextStyle(color: Colors.white, fontSize: 16),
@@ -1224,11 +1224,8 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
                       padding: const EdgeInsets.only(top: 8),
                       child: Row(
                         children: [
-                          Text(
-                            "ความมั่นใจ: ",
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 14),
-                          ),
+                          const Text("ความมั่นใจ: ",
+                              style: TextStyle(color: Colors.white, fontSize: 14)),
                           Text(
                             "${(_lastConfidence! * 100).toStringAsFixed(1)}%",
                             style: TextStyle(
