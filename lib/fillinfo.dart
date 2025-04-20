@@ -25,11 +25,10 @@ class _FillInfoPageState extends State<FillInfoPage> {
   List<String> imagePaths = [];
 
   final TextEditingController nicknameController =
-  TextEditingController(text: '');
-  final TextEditingController nameController =
-  TextEditingController(text: '');
+      TextEditingController(text: '');
+  final TextEditingController nameController = TextEditingController(text: '');
   final TextEditingController relationController =
-  TextEditingController(text: '');
+      TextEditingController(text: '');
 
   @override
   void initState() {
@@ -95,12 +94,26 @@ class _FillInfoPageState extends State<FillInfoPage> {
     });
   }
 
+  // Add this helper inside _FillInfoPageState:
+  Future<void> _deleteCurrentUser() async {
+    final db = await DatabaseHelper().database;
+    // delete all images for this user
+    await db.delete(
+      'user_images',
+      where: 'user_id = ?',
+      whereArgs: [widget.userId],
+    );
+    // delete the user record itself
+    await db.delete(
+      'users',
+      where: 'id = ?',
+      whereArgs: [widget.userId],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery
-        .of(context)
-        .size
-        .height;
+    final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
       body: Stack(
@@ -110,28 +123,27 @@ class _FillInfoPageState extends State<FillInfoPage> {
             height: screenHeight * 0.6,
             child: imagePaths.isNotEmpty
                 ? PageView.builder(
-              controller: _pageController,
-              itemCount: imagePaths.length,
-              itemBuilder: (context, index) {
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            FullImagePage(
-                              imagePath: imagePaths[index],
+                    controller: _pageController,
+                    itemCount: imagePaths.length,
+                    itemBuilder: (context, index) {
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => FullImagePage(
+                                imagePath: imagePaths[index],
+                              ),
                             ),
-                      ),
-                    );
-                  },
-                  child: Image.file(
-                    File(imagePaths[index]),
-                    fit: BoxFit.cover,
-                  ),
-                );
-              },
-            )
+                          );
+                        },
+                        child: Image.file(
+                          File(imagePaths[index]),
+                          fit: BoxFit.cover,
+                        ),
+                      );
+                    },
+                  )
                 : const Center(child: CircularProgressIndicator()),
           ),
 
@@ -140,7 +152,10 @@ class _FillInfoPageState extends State<FillInfoPage> {
             top: 40,
             left: 16,
             child: FloatingActionButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () async {
+                await _deleteCurrentUser();
+                Navigator.pop(context);
+              },
               backgroundColor: Colors.white,
               shape: const CircleBorder(),
               child: const Icon(Icons.arrow_back, color: Colors.black),
@@ -188,8 +203,8 @@ class _FillInfoPageState extends State<FillInfoPage> {
                                     ? _pageController.page ?? 0
                                     : 0;
                                 return Container(
-                                  margin: const EdgeInsets.symmetric(
-                                      horizontal: 4),
+                                  margin:
+                                      const EdgeInsets.symmetric(horizontal: 4),
                                   width: (index == selected.round()) ? 12 : 8,
                                   height: 8,
                                   decoration: BoxDecoration(
@@ -209,8 +224,8 @@ class _FillInfoPageState extends State<FillInfoPage> {
                     const Center(
                       child: Text(
                         'ข้อมูล',
-                        style:
-                        TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.bold),
                       ),
                     ),
 
@@ -227,25 +242,27 @@ class _FillInfoPageState extends State<FillInfoPage> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: !_isFormValid ? null : () async {
-                          final db = await openDatabase(
-                              join(await getDatabasesPath(), 'facemind.db'));
-                          await db.update(
-                            'users',
-                            {
-                              'nickname': nicknameController.text,
-                              'name': nameController.text,
-                              'relation': relationController.text,
-                            },
-                            where: 'id = ?',
-                            whereArgs: [widget.userId],
-                          );
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const CameraPage()),
-                          );
-                        },
+                        onPressed: !_isFormValid
+                            ? null
+                            : () async {
+                                final db = await openDatabase(join(
+                                    await getDatabasesPath(), 'facemind.db'));
+                                await db.update(
+                                  'users',
+                                  {
+                                    'nickname': nicknameController.text,
+                                    'name': nameController.text,
+                                    'relation': relationController.text,
+                                  },
+                                  where: 'id = ?',
+                                  whereArgs: [widget.userId],
+                                );
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) => const CameraPage()),
+                                );
+                              },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue,
                           padding: const EdgeInsets.symmetric(vertical: 15),
@@ -255,7 +272,7 @@ class _FillInfoPageState extends State<FillInfoPage> {
                         ),
                         child: const Text('ยืนยัน',
                             style:
-                            TextStyle(fontSize: 18, color: Colors.white)),
+                                TextStyle(fontSize: 18, color: Colors.white)),
                       ),
                     ),
 
@@ -271,16 +288,16 @@ class _FillInfoPageState extends State<FillInfoPage> {
   }
 
 // Widget ช่องข้อมูลที่แก้ไขได้
-  Widget _buildEditableField(String label, TextEditingController controller,
-      bool isEditable) {
+  Widget _buildEditableField(
+      String label, TextEditingController controller, bool isEditable) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('$label :',
-              style: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.bold)),
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 5),
           TextField(
             controller: controller,
@@ -290,7 +307,7 @@ class _FillInfoPageState extends State<FillInfoPage> {
               filled: true,
               fillColor: Colors.grey[200],
               contentPadding:
-              const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                  const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(20),
                 borderSide: BorderSide.none,
