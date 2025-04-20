@@ -38,7 +38,7 @@ class _HistoryPageState extends State<HistoryPage> {
       LEFT JOIN users u ON u.id = h.user_id
       WHERE date(h.matched_at) = ?
       ORDER BY h.matched_at DESC
-      LIMIT 30
+      LIMIT 500
     ''', [formattedDate]);
   }
 
