@@ -1206,7 +1206,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
                         size: 30,
                       ),
                     ),
-                  SizedBox(height: 8),
+                  // SizedBox(height: 8),
                   Text(
                     'ชื่อเล่น : ${_matchedUser?['nickname'] ?? "ไม่มีข้อมูล"}',
                     style: const TextStyle(color: Colors.white, fontSize: 16),
