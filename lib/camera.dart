@@ -21,6 +21,7 @@ import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:facemind/database_helper.dart';
 import 'package:exif/exif.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 // Import ML Kit face detection:
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
@@ -46,8 +47,10 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
   final int _maxBufferLength = 2;
   int _vectorProgress = 0; // Track number of collected vectors
   double? _lastConfidence;
-  // 👇 เพิ่มตรงนี้
   File? _profileImageFile;
+  final FlutterTts _flutterTts = FlutterTts();
+  bool _isSpeaking = false;
+  String? _pendingTtsText;
 
   Color _getConfidenceColor(double? confidence) {
     if (confidence == null) return Colors.grey;
@@ -88,12 +91,28 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
     _lastImageFuture = _getLastImagePath();
     _loadModel();
     _loadProfileImage();
-    // Start a timer to check for a face match every 10 seconds.
-    _timer = Timer.periodic(const Duration(milliseconds: 800), (Timer timer) {
+    _timer = Timer.periodic(const Duration(milliseconds: 800), (timer) {
       _recognizeFace();
     });
-    // _checkHistoryDatabase();
+
+    // TTS setup:
+    _flutterTts.setLanguage("th-TH");
+    _flutterTts.setSpeechRate(0.5);
+    _flutterTts.setStartHandler(() {
+      _isSpeaking = true;
+    });
+    _flutterTts.setCompletionHandler(() {
+      _isSpeaking = false;
+      // if another utterance was queued while speaking, speak it now:
+      if (_pendingTtsText != null) {
+        _flutterTts.speak(_pendingTtsText!);
+        _pendingTtsText = null;
+      }
+    });
+    // Make speak() await the end of the utterance
+    _flutterTts.awaitSpeakCompletion(true);
   }
+
 
   @override
   void didChangeDependencies() {
@@ -509,6 +528,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
         setState(() {
           _matchedUser = matchedUser;
         });
+        _speakMatchedUser();
       }
 
       // Clear buffer and reset progress.
@@ -776,6 +796,24 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
         content: Text('First launch flag reset! Restart the app to see the effect.'),
       ),
     );
+  }
+
+  Future<void> _speakMatchedUser() async {
+    if (_matchedUser == null || _lastConfidence == null) return;
+
+    final nick = _matchedUser!['nickname'] ?? "ไม่มีข้อมูล";
+    final name = _matchedUser!['name']     ?? "ไม่มีข้อมูล";
+    final rel  = _matchedUser!['relation'] ?? "ไม่มีข้อมูล";
+
+    String text = "ชื่อเล่น $nick, ชื่อ $name, ความสัมพันธ์ $rel";
+
+    if (_isSpeaking) {
+      // Already speaking → overwrite pending text
+      _pendingTtsText = text;
+    } else {
+      // Not speaking → start immediately (and await completion)
+      await _flutterTts.speak(text);
+    }
   }
 
   @override
