@@ -26,7 +26,7 @@ class _SelectpositionState extends State<Selectposition> {
     super.initState();
     _getCurrentLocation();
     // Replace with your own API key.
-    googlePlace = GooglePlace("YOUR_API_KEY");
+    googlePlace = GooglePlace("YOUR API");
   }
 
   Future<void> _getCurrentLocation() async {
@@ -255,7 +255,7 @@ class _SelectpositionState extends State<Selectposition> {
                   }
                 },
                 decoration: const InputDecoration(
-                  hintText: "Search location",
+                  hintText: "โปรดระบุสถานที่...",
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   prefixIcon: Icon(Icons.search, color: Colors.blue),
@@ -353,7 +353,7 @@ class _SelectpositionState extends State<Selectposition> {
                         ),
                       ),
                       child: const Text(
-                        "Select Here",
+                        "เลือกที่นี่",
                         style: TextStyle(fontSize: 18, color: Colors.white),
                       ),
                     ),
