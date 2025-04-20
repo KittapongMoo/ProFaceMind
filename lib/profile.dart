@@ -226,8 +226,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   /// Widget for an editable text field (active in edit mode).
-  Widget _buildEditableField(
-      String label, TextEditingController controller) {
+  Widget _buildEditableField(String label, TextEditingController controller) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Column(
@@ -240,14 +239,15 @@ class _ProfilePageState extends State<ProfilePage> {
           const SizedBox(height: 8),
           Container(
             decoration: BoxDecoration(
-              color: Colors.grey[200], // Light gray background
-              borderRadius: BorderRadius.circular(20), // Rounded corners
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(20),
             ),
             child: TextFormField(
               controller: controller,
-              enabled: _isEditing, // Editable in edit mode
+              enabled: _isEditing,
+              style: const TextStyle(color: Colors.black),   // ← add this
               decoration: const InputDecoration(
-                border: InputBorder.none, // No border
+                border: InputBorder.none,
                 contentPadding:
                 EdgeInsets.symmetric(vertical: 16, horizontal: 12),
               ),
@@ -257,6 +257,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
   }
+
 
   /// Widget for displaying/selecting the date.
   Widget _buildDatePicker() {
