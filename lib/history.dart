@@ -351,8 +351,8 @@ class ThaiDatePicker extends StatefulWidget {
   final DateTime initialDate;
   final DateTime minimumDate;
   final DateTime maximumDate;
-
   final void Function(int year, int month, int day)? onDateChanged;
+
   const ThaiDatePicker({
     Key? key,
     required this.initialDate,
@@ -375,6 +375,8 @@ class _ThaiDatePickerState extends State<ThaiDatePicker> {
     selectedDay   = widget.initialDate.day;
     selectedMonth = widget.initialDate.month;
     selectedYear  = widget.initialDate.year;
+
+    // build the full list of valid years
     years = List<int>.generate(
       widget.maximumDate.year - widget.minimumDate.year + 1,
           (i) => widget.minimumDate.year + i,
@@ -383,49 +385,89 @@ class _ThaiDatePickerState extends State<ThaiDatePicker> {
 
   @override
   Widget build(BuildContext context) {
+    final max = widget.maximumDate;
+    final min = widget.minimumDate;
+
+    // clamp the year
+    if (selectedYear < min.year) selectedYear = min.year;
+    if (selectedYear > max.year) selectedYear = max.year;
+
+    // determine valid months for this year
+    final isMaxYear = selectedYear == max.year;
+    final monthCount = isMaxYear ? max.month : 12;
+    final months = List<int>.generate(monthCount, (i) => i + 1);
+
+    // clamp month
+    if (selectedMonth < 1) selectedMonth = 1;
+    if (selectedMonth > monthCount) selectedMonth = monthCount;
+
+    // determine days in this selected month/year
+    final daysInMonth = DateUtils.getDaysInMonth(selectedYear, selectedMonth);
+    // if this is the current month of the max year, cap at max.day
+    final isMaxMonth = isMaxYear && selectedMonth == max.month;
+    final dayCount = isMaxMonth ? max.day : daysInMonth;
+    final days = List<int>.generate(dayCount, (i) => i + 1);
+
+    // clamp day
+    if (selectedDay < 1) selectedDay = 1;
+    if (selectedDay > dayCount) selectedDay = dayCount;
+
     return Column(
       children: [
         Expanded(
           child: Row(
             children: [
-              // Day
+              // ─── Day Picker ─────────────────
               Expanded(
                 child: CupertinoPicker(
                   itemExtent: 32,
-                  scrollController: FixedExtentScrollController(initialItem: selectedDay - 1),
+                  scrollController:
+                  FixedExtentScrollController(initialItem: selectedDay - 1),
                   onSelectedItemChanged: (i) {
-                    setState(() => selectedDay = i + 1);
-                    widget.onDateChanged?.call(selectedYear, selectedMonth, selectedDay);
+                    setState(() => selectedDay = days[i]);
+                    widget.onDateChanged
+                        ?.call(selectedYear, selectedMonth, selectedDay);
                   },
-                  children: List.generate(31, (i) => Center(child: Text('${i + 1}'))),
+                  children: days
+                      .map((d) => Center(child: Text('$d')))
+                      .toList(),
                 ),
               ),
-              // Month (Thai)
-              Expanded(
-                child: CupertinoPicker(
-                  itemExtent: 32,
-                  scrollController: FixedExtentScrollController(initialItem: selectedMonth - 1),
-                  onSelectedItemChanged: (i) {
-                    setState(() => selectedMonth = i + 1);
-                    widget.onDateChanged?.call(selectedYear, selectedMonth, selectedDay);
-                  },
-                  children: List.generate(12, (i) {
-                    final m = DateFormat.MMMM('th_TH').format(DateTime(2000, i + 1));
-                    return Center(child: Text(m));
-                  }),
-                ),
-              ),
-              // Year (B.E.)
+
+              // ─── Month Picker ────────────────
               Expanded(
                 child: CupertinoPicker(
                   itemExtent: 32,
                   scrollController: FixedExtentScrollController(
-                      initialItem: selectedYear - widget.minimumDate.year),
+                      initialItem: months.indexOf(selectedMonth)),
+                  onSelectedItemChanged: (i) {
+                    setState(() => selectedMonth = months[i]);
+                    widget.onDateChanged
+                        ?.call(selectedYear, selectedMonth, selectedDay);
+                  },
+                  children: months.map((m) {
+                    final mName = DateFormat.MMMM('th_TH')
+                        .format(DateTime(2000, m));
+                    return Center(child: Text(mName));
+                  }).toList(),
+                ),
+              ),
+
+              // ─── Year Picker ─────────────────
+              Expanded(
+                child: CupertinoPicker(
+                  itemExtent: 32,
+                  scrollController: FixedExtentScrollController(
+                    initialItem: years.indexOf(selectedYear),
+                  ),
                   onSelectedItemChanged: (i) {
                     setState(() => selectedYear = years[i]);
-                    widget.onDateChanged?.call(selectedYear, selectedMonth, selectedDay);
+                    widget.onDateChanged
+                        ?.call(selectedYear, selectedMonth, selectedDay);
                   },
-                  children: years.map((y) => Center(child: Text('${y + 543}'))).toList(),
+                  children: years
+                      .map((y) => Center(child: Text('${y + 543}')))
+                      .toList(),
                 ),
               ),
             ],
@@ -436,4 +478,5 @@ class _ThaiDatePickerState extends State<ThaiDatePicker> {
     );
   }
 }
+
 
