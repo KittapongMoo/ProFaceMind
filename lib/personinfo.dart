@@ -15,6 +15,10 @@ class PersonInfoPage extends StatefulWidget {
 class _PersonInfoPageState extends State<PersonInfoPage> {
   bool isEditing = false;
   final PageController _pageController = PageController();
+  final _formKey = GlobalKey<FormState>();
+
+  bool formValid = false;
+
   List<String> imagePaths = [];
 
   final TextEditingController nicknameController = TextEditingController();
@@ -28,6 +32,18 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
     super.initState();
     _loadUserData();
     _checkTTSAvailability();
+
+    nicknameController.addListener(_onTextChanged);
+    nameController.addListener(_onTextChanged);
+    relationController.addListener(_onTextChanged);
+  }
+
+  @override
+  void dispose() {
+    nicknameController.removeListener(_onTextChanged);
+    nameController.removeListener(_onTextChanged);
+    relationController.removeListener(_onTextChanged);
+    super.dispose();
   }
 
   Future<void> _checkTTSAvailability() async {
@@ -36,6 +52,15 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
 
     var languages = await flutterTts.getLanguages;
     print("🌐 รองรับภาษาดังนี้: $languages");
+  }
+
+  void _onTextChanged() {
+    final ok = nicknameController.text.trim().isNotEmpty
+        && nameController.text.trim().isNotEmpty
+        && relationController.text.trim().isNotEmpty;
+    if (ok != formValid) {
+      setState(() => formValid = ok);
+    }
   }
 
   Future<Database> _getDatabase() async {
@@ -96,11 +121,17 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('$label :', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 4),
-          TextField(
+          TextFormField(
             controller: controller,
             enabled: isEditing,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'กรุณากรอกข้อมูล $label';
+              }
+              return null;
+            },
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.grey[200],
@@ -220,17 +251,18 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
                         Positioned(
                           right: 0,
                           top: 0,
-                          child: IconButton(
-                            icon: Icon(isEditing ? Icons.check : Icons.edit),
+                          child: isEditing
+                          // when editing: show nothing
+                              ? const SizedBox.shrink()
+                          // when *not* editing: show the edit pencil
+                              : IconButton(
+                            icon: const Icon(Icons.edit),
                             onPressed: () {
-                              if (isEditing) {
-                                _updateUserData();
-                              } else {
-                                setState(() => isEditing = true);
-                              }
+                              setState(() => isEditing = true);
                             },
                           ),
                         ),
+
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -242,16 +274,21 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _updateUserData,
+                          onPressed: formValid ? _updateUserData : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue,
+                            disabledBackgroundColor: Colors.grey,  // grey when onPressed == null
                             padding: const EdgeInsets.symmetric(vertical: 15),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text("ยืนยัน", style: TextStyle(fontSize: 18, color: Colors.white)),
+                          child: const Text(
+                            "ยืนยัน",
+                            style: TextStyle(fontSize: 18, color: Colors.white),
+                          ),
                         ),
+
                       ),
                   ],
                 ),
