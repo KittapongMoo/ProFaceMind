@@ -113,7 +113,8 @@ class _FillInfoPageState extends State<FillInfoPage> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => FullImagePage(
-                            imagePath: imagePaths[index],
+                            imagePaths: imagePaths,
+                            initialIndex: index,
                           ),
                         ),
                       );
@@ -276,21 +277,60 @@ class _FillInfoPageState extends State<FillInfoPage> {
   }
 }
 
-class FullImagePage extends StatelessWidget {
-  final String imagePath;
-  const FullImagePage({Key? key, required this.imagePath}) : super(key: key);
+class FullImagePage extends StatefulWidget {
+  final List<String> imagePaths;
+  final int initialIndex;
+
+  const FullImagePage({
+    Key? key,
+    required this.imagePaths,
+    required this.initialIndex,
+  }) : super(key: key);
+
+  @override
+  _FullImagePageState createState() => _FullImagePageState();
+}
+
+class _FullImagePageState extends State<FullImagePage> {
+  late PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Full Image'),
-        backgroundColor: Colors.white,
-        leading: IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
-      ),
       backgroundColor: Colors.black,
-      body: Center(
-        child: InteractiveViewer(child: Image.file(File(imagePath))),
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close, size: 32, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: PageView.builder(
+        controller: _pageController,
+        itemCount: widget.imagePaths.length,
+        itemBuilder: (context, idx) {
+          return Center(
+            child: InteractiveViewer(
+              child: Image.file(
+                File(widget.imagePaths[idx]),
+                fit: BoxFit.contain,
+              ),
+            ),
+          );
+        },
       ),
     );
   }

@@ -136,7 +136,10 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => FullImagePage(imagePath: imagePaths[index]),
+                        builder: (_) => FullImagePage(
+                          imagePaths: imagePaths,
+                          initialIndex: index,
+                        ),
                       ),
                     );
                   },
@@ -285,26 +288,61 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
   }
 }
 
-class FullImagePage extends StatelessWidget {
-  final String imagePath;
-  const FullImagePage({Key? key, required this.imagePath}) : super(key: key);
+class FullImagePage extends StatefulWidget {
+  final List<String> imagePaths;
+  final int initialIndex;
+
+  const FullImagePage({
+    Key? key,
+    required this.imagePaths,
+    required this.initialIndex,
+  }) : super(key: key);
+
+  @override
+  _FullImagePageState createState() => _FullImagePageState();
+}
+
+class _FullImagePageState extends State<FullImagePage> {
+  late PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    // start on the tapped image
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text("ดูรูปเต็ม"),
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.black,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.close, size: 32, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      backgroundColor: Colors.black,
-      body: Center(
-        child: InteractiveViewer(
-          child: Image.file(File(imagePath)),
-        ),
+      body: PageView.builder(
+        controller: _pageController,
+        itemCount: widget.imagePaths.length,
+        itemBuilder: (context, pageIndex) {
+          return Center(
+            child: InteractiveViewer(
+              child: Image.file(
+                File(widget.imagePaths[pageIndex]),
+                fit: BoxFit.contain,
+              ),
+            ),
+          );
+        },
       ),
     );
   }
