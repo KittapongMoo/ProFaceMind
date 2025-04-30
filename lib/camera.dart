@@ -1071,12 +1071,10 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
               children: [
                 // animated bar
                 TweenAnimationBuilder<double>(
-                  tween: Tween<double>(
-                    begin: 0,
-                    end: _vectorProgress / _maxBufferLength,
-                  ),
+                  tween: Tween(begin: 0.0, end: _vectorProgress / _maxBufferLength),
                   duration: const Duration(milliseconds: 400),
                   builder: (context, animatedValue, child) {
+                    final isGreen = animatedValue >= 0.8;  // ← starts green at 80%
                     return ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: LinearProgressIndicator(
@@ -1084,7 +1082,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
                         minHeight: 10,
                         backgroundColor: Colors.white24,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          _vectorProgress >= _maxBufferLength ? Colors.green : Colors.blue,
+                          isGreen ? Colors.green : Colors.blue,
                         ),
                       ),
                     );
