@@ -1,5 +1,3 @@
-// Optimized HistoryPage with lazy image loading and memory-safe database access.
-
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -7,6 +5,8 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'dart:math' as math;
 import 'package:facemind/database_helper.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:intl/intl.dart';  // for Thai month names
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({Key? key}) : super(key: key);
@@ -43,18 +43,55 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
+    DateTime temp = _selectedDate;
+    await showModalBottomSheet<DateTime>(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SizedBox(
+        height: 300,
+        child: Column(
+          children: [
+            // ─── Cancel / Confirm ───────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    child: const Text('ยกเลิก'),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    child: const Text('เลือก'),
+                    onPressed: () {
+                      setState(() {
+                        _selectedDate   = temp;
+                        _historyFuture  = _loadHistory(_selectedDate);
+                      });
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // ─── ThaiDatePicker ────────────────────────────
+            Expanded(
+              child: ThaiDatePicker(
+                initialDate: _selectedDate,
+                minimumDate: DateTime(2020, 1, 1),
+                maximumDate: DateTime.now(),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-        _historyFuture = _loadHistory(_selectedDate);
-      });
-    }
   }
 
   Future<void> _deleteHistoryRecord(int id) async {
@@ -85,9 +122,10 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final displayDate = "${_selectedDate.day.toString().padLeft(2, '0')}/"
-        "${_selectedDate.month.toString().padLeft(2, '0')}/"
-        "${_selectedDate.year}";
+    final day       = _selectedDate.day.toString().padLeft(2, '0');
+    final monthName = DateFormat.MMMM('th_TH').format(_selectedDate);
+    final beYear   = _selectedDate.year + 543;
+    final displayDate = "$day $monthName $beYear";
     return Scaffold(
       backgroundColor: const Color(0xFFF5F8FC),
       appBar: AppBar(
@@ -296,3 +334,83 @@ class FullImageScreen extends StatelessWidget {
     );
   }
 }
+
+class ThaiDatePicker extends StatefulWidget {
+  final DateTime initialDate;
+  final DateTime minimumDate;
+  final DateTime maximumDate;
+
+  const ThaiDatePicker({
+    Key? key,
+    required this.initialDate,
+    required this.minimumDate,
+    required this.maximumDate,
+  }) : super(key: key);
+
+  @override
+  _ThaiDatePickerState createState() => _ThaiDatePickerState();
+}
+
+class _ThaiDatePickerState extends State<ThaiDatePicker> {
+  late int selectedDay, selectedMonth, selectedYear;
+  late List<int> years;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedDay   = widget.initialDate.day;
+    selectedMonth = widget.initialDate.month;
+    selectedYear  = widget.initialDate.year;
+    years = List<int>.generate(
+      widget.maximumDate.year - widget.minimumDate.year + 1,
+          (i) => widget.minimumDate.year + i,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              // Day
+              Expanded(
+                child: CupertinoPicker(
+                  itemExtent: 32,
+                  scrollController: FixedExtentScrollController(initialItem: selectedDay - 1),
+                  onSelectedItemChanged: (i) => setState(() => selectedDay = i + 1),
+                  children: List.generate(31, (i) => Center(child: Text('${i + 1}'))),
+                ),
+              ),
+              // Month (Thai)
+              Expanded(
+                child: CupertinoPicker(
+                  itemExtent: 32,
+                  scrollController: FixedExtentScrollController(initialItem: selectedMonth - 1),
+                  onSelectedItemChanged: (i) => setState(() => selectedMonth = i + 1),
+                  children: List.generate(12, (i) {
+                    final m = DateFormat.MMMM('th_TH').format(DateTime(2000, i + 1));
+                    return Center(child: Text(m));
+                  }),
+                ),
+              ),
+              // Year (B.E.)
+              Expanded(
+                child: CupertinoPicker(
+                  itemExtent: 32,
+                  scrollController: FixedExtentScrollController(
+                      initialItem: selectedYear - widget.minimumDate.year),
+                  onSelectedItemChanged: (i) => setState(() => selectedYear = years[i]),
+                  children: years.map((y) => Center(child: Text('${y + 543}'))).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+      ],
+    );
+  }
+}
+
