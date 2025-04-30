@@ -259,7 +259,7 @@ class _RegisterPageState extends State<RegisterPage> {
         context: navigatorKey.currentContext!,
         builder: (BuildContext dialogContext) {
           return AlertDialog(
-            title: const Text("Error"),
+            title: const Text("เกิดข้อผิดพลาด"),
             content: Text(message),
             actions: [
               TextButton(
@@ -312,7 +312,7 @@ class _RegisterPageState extends State<RegisterPage> {
       _processingImage = true;
     });
     try {
-      _showProgressIndicator("Processing image...");
+      _showProgressIndicator("กำลังดำเนินการ...");
       await _cameraController!.stopImageStream();
       await Future.delayed(const Duration(milliseconds: 500));
       final XFile imageFile = await _cameraController!.takePicture();
@@ -340,7 +340,7 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       final XFile? imageFile = await _picker.pickImage(source: ImageSource.gallery);
       if (imageFile != null) {
-        _showProgressIndicator("Processing image...");
+        _showProgressIndicator("กำลังดำเนินการ...");
         await _processCapturedImage(File(imageFile.path));
       }
     } catch (e) {
@@ -366,7 +366,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
       // 2) If no faces are detected, show an error and do not save the image.
       if (faces.isEmpty) {
-        _showErrorPopup("No face detected in this image");
+        _showErrorPopup("ไม่สามารถตรวจพบใบหน้าได้โปรดดำเนินการใหม่อีกครั้ง");
         return;
       }
 
@@ -623,7 +623,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text(
-                "กรุณาลงทะเบียนใบหน้าของคุณผ่านการถ่ายรูปใบหน้าของคุณในมุมที่แตกต่างกัน",
+                "กรุณาลงทะเบียนใบหน้าของคุณผ่านการถ่ายรูปใบหน้าของคุณในลักษณะใบหน้าตั้งตรง",
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white, fontSize: 15),
               ),
