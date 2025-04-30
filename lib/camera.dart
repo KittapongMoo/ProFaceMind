@@ -1065,18 +1065,40 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
           Positioned(
             top: 160,
             left: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: _vectorProgress >= _maxBufferLength
-                    ? Colors.green
-                    : Colors.black87,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                'ความคืบหน้า: ${((_vectorProgress / _maxBufferLength) * 100).toStringAsFixed(0)}%',
-                style: const TextStyle(color: Colors.white, fontSize: 16),
-              ),
+            right: 20,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // animated bar
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(
+                    begin: 0,
+                    end: _vectorProgress / _maxBufferLength,
+                  ),
+                  duration: const Duration(milliseconds: 400),
+                  builder: (context, animatedValue, child) {
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: animatedValue,
+                        minHeight: 10,
+                        backgroundColor: Colors.white24,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          _vectorProgress >= _maxBufferLength ? Colors.green : Colors.blue,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 6),
+
+                // percentage label
+                Text(
+                  '${((_vectorProgress / _maxBufferLength) * 100).toStringAsFixed(0)}%',
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              ],
             ),
           ),
 
