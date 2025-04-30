@@ -216,16 +216,43 @@ class _FillInfoPageState extends State<FillInfoPage> {
                               ? null
                               : () async {
                             final db = await DatabaseHelper().database;
+
+                            // 1. ตรวจสอบชื่อซ้ำ (except current record)
+                            final duplicates = await db.query(
+                              'users',
+                              where: 'name = ? AND id != ?',
+                              whereArgs: [nameController.text.trim(), widget.userId],
+                            );
+                            if (duplicates.isNotEmpty) {
+                              // 2. ถ้ามี ให้โชว์ AlertDialog แจ้งผู้ใช้
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('เกิดข้อผิดพลาด'),
+                                  content: const Text('ไม่สามารถลงทะเบียนได้ เนื่องจากชื่อนี้เคยมีการลงทะเบียนแล้ว'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('ตกลง'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              return;
+                            }
+
+                            // 3. ถ้าไม่ซ้ำ ให้ทำการอัปเดตข้อมูลปกติ
                             await db.update(
                               'users',
                               {
-                                'nickname': nicknameController.text,
-                                'name': nameController.text,
-                                'relation': relationController.text,
+                                'nickname': nicknameController.text.trim(),
+                                'name': nameController.text.trim(),
+                                'relation': relationController.text.trim(),
                               },
                               where: 'id = ?',
                               whereArgs: [widget.userId],
                             );
+
                             Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(builder: (_) => const CameraPage()),
