@@ -43,56 +43,68 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    DateTime temp = _selectedDate;
-    await showModalBottomSheet<DateTime>(
+    final pickedDate = await showModalBottomSheet<DateTime>(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => SizedBox(
-        height: 300,
-        child: Column(
-          children: [
-            // ─── Cancel / Confirm ───────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    child: const Text('ยกเลิก'),
-                    onPressed: () => Navigator.pop(context),
+      builder: (context) {
+        DateTime tempDate = _selectedDate;
+        return StatefulBuilder(builder: (context, setModalState) {
+          return SizedBox(
+            height: 300,
+            child: Column(
+              children: [
+                // ── Cancel / Confirm ───────────────────
+                Padding(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        child: const Text('ยกเลิก'),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        child: const Text('เลือก'),
+                        onPressed: () => Navigator.pop(context, tempDate),
+                      ),
+                    ],
                   ),
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    child: const Text('เลือก'),
-                    onPressed: () {
-                      setState(() {
-                        _selectedDate   = temp;
-                        _historyFuture  = _loadHistory(_selectedDate);
+                ),
+                const Divider(height: 1),
+                // ── Your custom ThaiDatePicker ───────────────────
+                Expanded(
+                  child: ThaiDatePicker(
+                    initialDate: _selectedDate,
+                    minimumDate: DateTime(2020, 1, 1),
+                    maximumDate: DateTime.now(),
+                    onDateChanged: (year, month, day) {
+                      setModalState(() {
+                        tempDate = DateTime(year, month, day);
                       });
-                      Navigator.pop(context);
                     },
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const Divider(height: 1),
-            // ─── ThaiDatePicker ────────────────────────────
-            Expanded(
-              child: ThaiDatePicker(
-                initialDate: _selectedDate,
-                minimumDate: DateTime(2020, 1, 1),
-                maximumDate: DateTime.now(),
-              ),
-            ),
-          ],
-        ),
-      ),
+          );
+        });
+      },
     );
+
+    if (pickedDate != null && pickedDate != _selectedDate) {
+      setState(() {
+        _selectedDate  = pickedDate;
+        _historyFuture = _loadHistory(_selectedDate);
+      });
+    }
   }
+
 
   Future<void> _deleteHistoryRecord(int id) async {
     final db = await DatabaseHelper().database;
@@ -340,11 +352,13 @@ class ThaiDatePicker extends StatefulWidget {
   final DateTime minimumDate;
   final DateTime maximumDate;
 
+  final void Function(int year, int month, int day)? onDateChanged;
   const ThaiDatePicker({
     Key? key,
     required this.initialDate,
     required this.minimumDate,
     required this.maximumDate,
+    this.onDateChanged,
   }) : super(key: key);
 
   @override
@@ -379,7 +393,10 @@ class _ThaiDatePickerState extends State<ThaiDatePicker> {
                 child: CupertinoPicker(
                   itemExtent: 32,
                   scrollController: FixedExtentScrollController(initialItem: selectedDay - 1),
-                  onSelectedItemChanged: (i) => setState(() => selectedDay = i + 1),
+                  onSelectedItemChanged: (i) {
+                    setState(() => selectedDay = i + 1);
+                    widget.onDateChanged?.call(selectedYear, selectedMonth, selectedDay);
+                  },
                   children: List.generate(31, (i) => Center(child: Text('${i + 1}'))),
                 ),
               ),
@@ -388,7 +405,10 @@ class _ThaiDatePickerState extends State<ThaiDatePicker> {
                 child: CupertinoPicker(
                   itemExtent: 32,
                   scrollController: FixedExtentScrollController(initialItem: selectedMonth - 1),
-                  onSelectedItemChanged: (i) => setState(() => selectedMonth = i + 1),
+                  onSelectedItemChanged: (i) {
+                    setState(() => selectedMonth = i + 1);
+                    widget.onDateChanged?.call(selectedYear, selectedMonth, selectedDay);
+                  },
                   children: List.generate(12, (i) {
                     final m = DateFormat.MMMM('th_TH').format(DateTime(2000, i + 1));
                     return Center(child: Text(m));
@@ -401,7 +421,10 @@ class _ThaiDatePickerState extends State<ThaiDatePicker> {
                   itemExtent: 32,
                   scrollController: FixedExtentScrollController(
                       initialItem: selectedYear - widget.minimumDate.year),
-                  onSelectedItemChanged: (i) => setState(() => selectedYear = years[i]),
+                  onSelectedItemChanged: (i) {
+                    setState(() => selectedYear = years[i]);
+                    widget.onDateChanged?.call(selectedYear, selectedMonth, selectedDay);
+                  },
                   children: years.map((y) => Center(child: Text('${y + 543}'))).toList(),
                 ),
               ),
