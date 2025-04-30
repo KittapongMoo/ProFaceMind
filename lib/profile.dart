@@ -24,6 +24,8 @@ class _ProfilePageState extends State<ProfilePage> {
   final TextEditingController _conditionController = TextEditingController();
   String? _imagePath;
   File? _image;
+  final _formKey = GlobalKey<FormState>();
+  AutovalidateMode _autoValidateMode = AutovalidateMode.disabled;
 
   @override
   void initState() {
@@ -92,6 +94,24 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
+  void _trySaveProfileData() {
+    setState(() => _autoValidateMode = AutovalidateMode.always);
+
+    if (!_formKey.currentState!.validate()) {
+      return; // ❌ Stop if any required field is invalid
+    }
+
+    if (_selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณาเลือกวันเกิด')),
+      );
+      return;
+    }
+
+    _saveProfileData(); // ✅ Safe to save now
+  }
+
+
   /// Selects an image from the gallery.
   Future<void> _pickImage() async {
     final status = await Permission.photos.request();
@@ -103,7 +123,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
 
     final pickedFile =
-    await ImagePicker().pickImage(source: ImageSource.gallery);
+        await ImagePicker().pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
         _image = File(pickedFile.path);
@@ -169,95 +189,112 @@ class _ProfilePageState extends State<ProfilePage> {
         actions: [
           _isEditing
               ? IconButton(
-            icon: const Icon(Icons.check, color: Colors.green),
-            onPressed: _saveProfileData, // Save on tap
-          )
+                  icon: const Icon(Icons.check, color: Colors.green),
+                  onPressed: _trySaveProfileData, // Save on tap
+                )
               : IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () {
-              setState(() {
-                _isEditing = true; // Enter edit mode
-              });
-            },
-          ),
+                  icon: const Icon(Icons.edit),
+                  onPressed: () {
+                    setState(() {
+                      _isEditing = true; // Enter edit mode
+                    });
+                  },
+                ),
         ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: ListView(
-          children: [
-            _buildEditableField("ชื่อเล่น", _nicknameController),
-            _buildEditableField("ชื่อจริง", _firstnameController),
-            _buildEditableField("นามสกุล", _lastnameController),
-            _buildDatePicker(),
-            _buildDropdownField(
-              label: "ส่วนสูง",
-              value: _selectedHeight,
-              items: List.generate(101, (index) => '${150 + index} ซม.'),
-              onChanged: (value) => setState(() => _selectedHeight = value!),
-            ),
-            _buildDropdownField(
-              label: "น้ำหนัก",
-              value: _selectedWeight,
-              items: List.generate(101, (index) => '${50 + index} กก.'),
-              onChanged: (value) => setState(() => _selectedWeight = value!),
-            ),
-            _buildEditableField("โรคประจำตัว", _conditionController),
-            const SizedBox(height: 20),
-            const Text("รูปโปรไฟล์ :",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Center(
-              child: GestureDetector(
-                onTap: _isEditing ? _pickImage : null,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: _image != null
-                      ? Image.file(_image!,
-                      width: 120, height: 120, fit: BoxFit.cover)
-                      : const Text("ไม่มีรูปภาพ"),
+        child: Form(
+          key: _formKey,
+          autovalidateMode: _autoValidateMode,
+          child: ListView(
+            children: [
+              _buildEditableField("ชื่อเล่น", _nicknameController),
+              _buildEditableField("ชื่อจริง", _firstnameController),
+              _buildEditableField("นามสกุล", _lastnameController),
+              _buildDatePicker(),
+              _buildDropdownField(
+                label: "ส่วนสูง",
+                value: _selectedHeight,
+                items: List.generate(101, (index) => '${150 + index} ซม.'),
+                onChanged: (value) => setState(() => _selectedHeight = value!),
+              ),
+              _buildDropdownField(
+                label: "น้ำหนัก",
+                value: _selectedWeight,
+                items: List.generate(101, (index) => '${50 + index} กก.'),
+                onChanged: (value) => setState(() => _selectedWeight = value!),
+              ),
+              _buildEditableField("โรคประจำตัว", _conditionController, isRequired: false),
+              const SizedBox(height: 20),
+              const Text("รูปโปรไฟล์ :",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              Center(
+                child: GestureDetector(
+                  onTap: _isEditing ? _pickImage : null,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: _image != null
+                        ? Image.file(_image!,
+                            width: 120, height: 120, fit: BoxFit.cover)
+                        : const Text("ไม่มีรูปภาพ"),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   /// Widget for an editable text field (active in edit mode).
-  Widget _buildEditableField(String label, TextEditingController controller) {
+  Widget _buildEditableField(
+      String label,
+      TextEditingController controller, {
+        bool isRequired = true, // ✅ Add this
+      }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$label :',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
+          Text('$label :',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: TextFormField(
-              controller: controller,
-              enabled: _isEditing,
-              style: const TextStyle(color: Colors.black),   // ← add this
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                contentPadding:
-                EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          TextFormField(
+            controller: controller,
+            enabled: _isEditing,
+            style: const TextStyle(color: Colors.black),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: Colors.grey[200],
+              contentPadding:
+              const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide.none,
+              ),
+              errorStyle: const TextStyle(
+                color: Colors.red,
+                fontSize: 13,
+                height: 1.2,
               ),
             ),
+            validator: isRequired
+                ? (value) {
+              if (_isEditing && (value == null || value.trim().isEmpty)) {
+                return 'กรุณากรอก$label';
+              }
+              return null;
+            }
+                : null,
           ),
         ],
       ),
     );
   }
-
 
   /// Widget for displaying/selecting the date.
   Widget _buildDatePicker() {
@@ -274,8 +311,7 @@ class _ProfilePageState extends State<ProfilePage> {
           GestureDetector(
             onTap: _isEditing ? () => _selectDate(context) : null,
             child: Container(
-              padding:
-              const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
               decoration: BoxDecoration(
                 color: Colors.grey[200], // Light gray background
                 borderRadius: BorderRadius.circular(20), // Rounded corners
@@ -289,8 +325,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         : "เลือกวันเกิด",
                     style: TextStyle(
                       fontSize: 16,
-                      color:
-                      _selectedDate != null ? Colors.black : Colors.grey,
+                      color: _selectedDate != null ? Colors.black : Colors.grey,
                     ),
                   ),
                   // Show calendar icon only in edit mode.
@@ -330,26 +365,27 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             child: _isEditing
                 ? DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: value,
-                isExpanded: true,
-                onChanged: onChanged,
-                items: items.map((String item) {
-                  return DropdownMenuItem<String>(
-                    value: item,
-                    child: Text(item,
-                        style: const TextStyle(fontSize: 16)),
-                  );
-                }).toList(),
-              ),
-            )
+                    child: DropdownButton<String>(
+                      value: value,
+                      isExpanded: true,
+                      onChanged: onChanged,
+                      items: items.map((String item) {
+                        return DropdownMenuItem<String>(
+                          value: item,
+                          child:
+                              Text(item, style: const TextStyle(fontSize: 16)),
+                        );
+                      }).toList(),
+                    ),
+                  )
                 : SizedBox(
-              height: 50, // Keeps the same height as the dropdown when not editing
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(value, style: const TextStyle(fontSize: 16)),
-              ),
-            ),
+                    height:
+                        50, // Keeps the same height as the dropdown when not editing
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(value, style: const TextStyle(fontSize: 16)),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -394,7 +430,7 @@ class _ThaiDatePickerState extends State<ThaiDatePicker> {
     selectedYear = widget.initialDate.year;
     years = List<int>.generate(
       widget.maximumDate.year - widget.minimumDate.year + 1,
-          (index) => widget.minimumDate.year + index,
+      (index) => widget.minimumDate.year + index,
     );
   }
 
@@ -419,7 +455,7 @@ class _ThaiDatePickerState extends State<ThaiDatePicker> {
                 TextButton(
                   onPressed: () {
                     DateTime newDate =
-                    DateTime(selectedYear, selectedMonth, selectedDay);
+                        DateTime(selectedYear, selectedMonth, selectedDay);
                     Navigator.pop(context, newDate);
                   },
                   child: const Text('เลือก'),
@@ -436,8 +472,8 @@ class _ThaiDatePickerState extends State<ThaiDatePicker> {
                 Expanded(
                   child: CupertinoPicker(
                     itemExtent: 32,
-                    scrollController:
-                    FixedExtentScrollController(initialItem: selectedDay - 1),
+                    scrollController: FixedExtentScrollController(
+                        initialItem: selectedDay - 1),
                     onSelectedItemChanged: (index) {
                       setState(() {
                         selectedDay = index + 1;
@@ -445,7 +481,7 @@ class _ThaiDatePickerState extends State<ThaiDatePicker> {
                     },
                     children: List<Widget>.generate(
                       31,
-                          (index) => Center(child: Text('${index + 1}')),
+                      (index) => Center(child: Text('${index + 1}')),
                     ),
                   ),
                 ),
@@ -453,8 +489,8 @@ class _ThaiDatePickerState extends State<ThaiDatePicker> {
                 Expanded(
                   child: CupertinoPicker(
                     itemExtent: 32,
-                    scrollController:
-                    FixedExtentScrollController(initialItem: selectedMonth - 1),
+                    scrollController: FixedExtentScrollController(
+                        initialItem: selectedMonth - 1),
                     onSelectedItemChanged: (index) {
                       setState(() {
                         selectedMonth = index + 1;

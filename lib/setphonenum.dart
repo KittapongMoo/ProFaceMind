@@ -27,6 +27,8 @@ class _SetPhoneNumberState extends State<SetPhoneNumber> {
   @override
   void initState() {
     super.initState();
+    // 🗑️🔄️ Clear ข้อมูลผู้ใช้ให้เหมือนตอนเริ่มต้น
+    // SharedPreferences.getInstance().then((prefs) => prefs.clear());
     _loadSavedData();
     _requestLocation();
   }
@@ -280,15 +282,22 @@ class _SetPhoneNumberState extends State<SetPhoneNumber> {
           TextFormField(
             controller: controller,
             keyboardType: keyboardType,
+            autovalidateMode: AutovalidateMode.onUserInteraction, // 👈 Auto validate on user input
             inputFormatters: keyboardType == TextInputType.phone
                 ? [
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(10),
             ]
                 : [],
+            onChanged: (_) {
+              // 👇 Trigger rebuild and form validation
+              if (_formKey.currentState != null) {
+                _formKey.currentState!.validate();
+              }
+            },
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return 'กรุณากรอก $label';
+                return 'กรุณากรอก$label';
               }
               if (keyboardType == TextInputType.phone && value.trim().length != 10) {
                 return 'กรุณากรอกเบอร์โทรให้ครบ 10 หลัก';
@@ -297,6 +306,7 @@ class _SetPhoneNumberState extends State<SetPhoneNumber> {
             },
             decoration: InputDecoration(
               hintText: hint,
+              hintStyle: const TextStyle(color: Colors.grey), // optional
               filled: true,
               fillColor: Colors.grey[200],
               contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),

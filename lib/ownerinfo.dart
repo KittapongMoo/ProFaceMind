@@ -34,10 +34,19 @@ class _OwnerinfoState extends State<Ownerinfo> {
   String _selectedWeight = "50 กก.";
   bool _isLoading = false;
   String? _imagePath;
+  AutovalidateMode _autoValidateMode = AutovalidateMode.disabled;
+
+  bool get _isFormValid {
+    return _formKey.currentState?.validate() == true &&
+        _selectedDate != null &&
+        _image != null;
+  }
 
   @override
   void initState() {
     super.initState();
+    // 🗑️🔄️ Clear ข้อมูลผู้ใช้ให้เหมือนตอนเริ่มต้น
+    // SharedPreferences.getInstance().then((prefs) => prefs.clear());
     _loadSavedInformation(); // Load saved data when opening the app
   }
 
@@ -125,8 +134,24 @@ class _OwnerinfoState extends State<Ownerinfo> {
 
   // Method to save information to SharedPreferences
   Future<void> _saveInformation() async {
-    if (!_formKey.currentState!.validate()) {
-      return; // If form is not valid, do not proceed
+    setState(() {
+      _autoValidateMode = AutovalidateMode.always; // Enable validation only now
+    });
+
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณาเลือกวันเกิด')),
+      );
+      return;
+    }
+
+    if (_image == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณาเลือกรูปภาพโปรไฟล์')),
+      );
+      return;
     }
 
     setState(() {
@@ -134,21 +159,16 @@ class _OwnerinfoState extends State<Ownerinfo> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance(); // Define prefs here
+      final prefs = await SharedPreferences.getInstance();
 
       await prefs.setString('nickname', _nicknameController.text.trim());
       await prefs.setString('firstname', _firstnameController.text.trim());
       await prefs.setString('lastname', _lastnameController.text.trim());
-      await prefs.setString(
-          'birthdate', _selectedDate?.toIso8601String() ?? '');
+      await prefs.setString('birthdate', _selectedDate!.toIso8601String());
       await prefs.setString('height', _selectedHeight);
       await prefs.setString('weight', _selectedWeight);
       await prefs.setString('condition', _conditionController.text.trim());
-
-      // Save image path if an image is selected
-      if (_image != null) {
-        await prefs.setString('imagePath', _image!.path);
-      }
+      await prefs.setString('imagePath', _image!.path);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('ข้อมูลถูกบันทึกเรียบร้อยแล้ว!')),
@@ -188,6 +208,8 @@ class _OwnerinfoState extends State<Ownerinfo> {
       _conditionController.text = prefs.getString('condition') ?? '';
       _imagePath = prefs.getString('imagePath');
       _image = _imagePath != null ? File(_imagePath!) : null;
+
+      _autoValidateMode = AutovalidateMode.disabled; // ✅ Add this line here too
     });
   }
 
@@ -258,28 +280,37 @@ class _OwnerinfoState extends State<Ownerinfo> {
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.grey[200], // พื้นหลังสีเทาอ่อน
-              borderRadius: BorderRadius.circular(20), // ทำให้ขอบโค้งมน
-            ),
-            child: TextFormField(
-              controller: controller,
-              keyboardType: keyboardType,
-              readOnly: readOnly, // ใช้สำหรับช่องที่ไม่ต้องการให้แก้ไข
-              decoration: const InputDecoration(
-                border: InputBorder.none, // ไม่มีขอบ
-                contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          TextFormField(
+            controller: controller,
+            keyboardType: keyboardType,
+            readOnly: readOnly,
+            decoration: InputDecoration(
+              hintText: hintText,
+              hintStyle: const TextStyle(
+                color: Colors.grey,
+                fontSize: 16,
               ),
-              validator: isRequired
-                  ? (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'กรุณากรอก $label';
-                }
-                return null;
-              }
-                  : null,
+              filled: true,
+              fillColor: Colors.grey[200],
+              contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide.none,
+              ),
+              errorStyle: const TextStyle(
+                fontSize: 13,
+                height: 1.5,
+                color: Colors.red,
+              ),
             ),
+            validator: isRequired
+                ? (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'กรุณากรอก$label';
+              }
+              return null;
+            }
+                : null,
           ),
         ],
       ),
@@ -339,38 +370,56 @@ class _OwnerinfoState extends State<Ownerinfo> {
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$label :',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: onTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey[200], // พื้นหลังสีเทาอ่อน
-                borderRadius: BorderRadius.circular(20), // ขอบโค้งมน
+      child: FormField<DateTime>(
+        validator: (_) {
+          if (_autoValidateMode == AutovalidateMode.always && _selectedDate == null) {
+            return 'กรุณาเลือก$label';
+          }
+          return null;
+        },
+        builder: (FormFieldState<DateTime> field) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$label :',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    value.isNotEmpty ? value : 'เลือก $label',
-                    style: TextStyle(
-                        fontSize: 16,
-                        color: value.isNotEmpty ? Colors.black : Colors.grey
-                    ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: onTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  const Icon(Icons.calendar_today, color: Colors.grey), // ไอคอนปฏิทิน
-                ],
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        value.isNotEmpty ? value : 'เลือก $label',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: value.isNotEmpty ? Colors.black : Colors.grey,
+                        ),
+                      ),
+                      const Icon(Icons.calendar_today, color: Colors.grey),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-        ],
+              if (field.hasError)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0, left: 12.0),
+                  child: Text(
+                    field.errorText!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -378,45 +427,94 @@ class _OwnerinfoState extends State<Ownerinfo> {
 
   // Widget for image picker
   Widget _buildImagePicker() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 16),
-        const Text(
-          'รูปภาพของคุณ :',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        Center(
-          child: InkWell(
-            onTap: _pickImage,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12.0),
-              child: _image != null
-                  ? Image.file(
-                _image!,
-                width: 120,
-                height: 120,
-                fit: BoxFit.cover,
-              )
-                  : Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(12.0),
-                  border: Border.all(color: Colors.grey),
-                ),
-                child: const Icon(
-                  Icons.add_a_photo,
-                  size: 40,
-                  color: Colors.grey,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: FormField<File>(
+        validator: (_) {
+          if (_autoValidateMode == AutovalidateMode.always && _image == null) {
+            return 'กรุณาเลือกรูปภาพโปรไฟล์';
+          }
+          return null;
+        },
+        builder: (FormFieldState<File> field) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'รูปภาพของคุณ :',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: InkWell(
+                  onTap: _pickImage,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12.0),
+                    child: _image != null
+                        ? Image.file(
+                      _image!,
+                      width: 120,
+                      height: 120,
+                      fit: BoxFit.cover,
+                    )
+                        : Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12.0),
+                        border: Border.all(color: Colors.grey),
+                      ),
+                      child: const Icon(
+                        Icons.add_a_photo,
+                        size: 40,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-        ),
-      ],
+              if (field.hasError)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    field.errorText!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _resetInformation() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('nickname');
+    await prefs.remove('firstname');
+    await prefs.remove('lastname');
+    await prefs.remove('birthdate');
+    await prefs.remove('height');
+    await prefs.remove('weight');
+    await prefs.remove('condition');
+    await prefs.remove('imagePath');
+
+    setState(() {
+      _nicknameController.clear();
+      _firstnameController.clear();
+      _lastnameController.clear();
+      _conditionController.clear();
+      _selectedDate = null;
+      _selectedHeight = "150 ซม.";
+      _selectedWeight = "50 กก.";
+      _image = null;
+      _imagePath = null;
+      _autoValidateMode = AutovalidateMode.disabled; // 👈 Add this line
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('ข้อมูลทั้งหมดถูกรีเซตแล้ว')),
     );
   }
 
@@ -484,6 +582,7 @@ class _OwnerinfoState extends State<Ownerinfo> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Form(
+            autovalidateMode: _autoValidateMode,
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -493,19 +592,19 @@ class _OwnerinfoState extends State<Ownerinfo> {
                   label: 'ชื่อเล่น',
                   hintText: 'กรอกชื่อเล่น',
                   controller: _nicknameController,
-                  isRequired: false,
+                  isRequired: true,
                 ),
                 _buildInputField(
                   label: 'ชื่อจริง',
                   hintText: 'กรอกชื่อจริง',
                   controller: _firstnameController,
-                  isRequired: false,
+                  isRequired: true,
                 ),
                 _buildInputField(
                   label: 'นามสกุล',
                   hintText: 'กรอกนามสกุล',
                   controller: _lastnameController,
-                  isRequired: false,
+                  isRequired: true,
                 ),
                 _buildDatePickerField(
                   label: 'วันเกิด',
@@ -546,6 +645,16 @@ class _OwnerinfoState extends State<Ownerinfo> {
 
                 // ส่วนของรูปภาพ (ลบ Card ออก)
                 _buildImagePicker(),
+
+                // สำหรับรีเซตข้อมูลวันจริงเอาออกด้วย
+                // TextButton.icon(
+                //   onPressed: _resetInformation,
+                //   icon: const Icon(Icons.restart_alt, color: Colors.red),
+                //   label: const Text(
+                //     'รีเซตข้อมูล (Dev)',
+                //     style: TextStyle(color: Colors.red),
+                //   ),
+                // ),
               ],
             ),
           ),
