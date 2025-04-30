@@ -294,7 +294,7 @@ class FullImagePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text("ดูรูปเต็ม"),
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
