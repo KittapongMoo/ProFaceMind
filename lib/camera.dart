@@ -1292,7 +1292,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
                       padding: const EdgeInsets.only(top: 8),
                       child: Row(
                         children: [
-                          const Text("ความมั่นใจ: ",
+                          const Text("ความแม่นยำ : ",
                               style: TextStyle(color: Colors.white, fontSize: 14)),
                           Text(
                             "${(_lastConfidence! * 100).toStringAsFixed(1)}%",
