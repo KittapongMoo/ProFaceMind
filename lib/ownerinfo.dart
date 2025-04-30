@@ -110,24 +110,66 @@ class _OwnerinfoState extends State<Ownerinfo> {
   }
 
   Future<void> _selectThaiDate(BuildContext context) async {
-    // Use a temporary value for initial date if _selectedDate is null.
-    DateTime initial = _selectedDate ?? DateTime(2000, 1, 1);
+    // temporary holder for the picker's date
+    DateTime tempDate = _selectedDate ?? DateTime(2000, 1, 1);
 
-    DateTime? pickedDate = await showModalBottomSheet<DateTime>(
+    final picked = await showModalBottomSheet<DateTime>(
       context: context,
-      builder: (BuildContext context) {
-        return ThaiDatePicker(
-          initialDate: initial,
-          minimumDate: DateTime(1900, 1, 1),
-          maximumDate: DateTime.now(),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SizedBox(
+              height: 350,
+              child: Column(
+                children: [
+                  // ── Cancel / Confirm ───────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          child: const Text('ยกเลิก'),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          child: const Text('เลือก'),
+                          onPressed: () => Navigator.pop(context, tempDate),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  // ── Your custom ThaiDatePicker ───────────────────
+                  Expanded(
+                    child: ThaiDatePicker(
+                      initialDate: tempDate,
+                      minimumDate: DateTime(1900, 1, 1),
+                      maximumDate: DateTime.now(),
+                      onDateChanged: (y, m, d) {
+                        setModalState(() {
+                          tempDate = DateTime(y, m, d);
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
 
-    if (pickedDate != null) {
-      setState(() {
-        _selectedDate = pickedDate;
-      });
+    // only update if “เลือก” was tapped
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
     }
   }
 
