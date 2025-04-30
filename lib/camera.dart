@@ -22,6 +22,7 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:facemind/database_helper.dart';
 import 'package:exif/exif.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:flutter/services.dart';
 
 // Import ML Kit face detection:
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
@@ -920,8 +921,7 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
                                 children: [
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           '$name ($relation)',
@@ -931,13 +931,23 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
                                           ),
                                         ),
                                         const SizedBox(height: 4),
-                                        Text(
-                                          phone,
-                                          style: const TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF6B7280),
-                                            letterSpacing: 1.2,
+
+                                        // Wrap the phone Text in a GestureDetector:
+                                        GestureDetector(
+                                          onTap: () {
+                                            Clipboard.setData(ClipboardData(text: phone));
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(content: Text('คัดลอกหมายเลข $phone เรียบร้อยแล้ว')),
+                                            );
+                                          },
+                                          child: Text(
+                                            phone,
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF6B7280),
+                                              letterSpacing: 1.2,
+                                            ),
                                           ),
                                         ),
                                       ],
