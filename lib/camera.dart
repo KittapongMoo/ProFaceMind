@@ -936,6 +936,12 @@ class _CameraPageState extends State<CameraPage> with RouteAware {
                                         GestureDetector(
                                           onTap: () {
                                             Clipboard.setData(ClipboardData(text: phone));
+
+                                            // 1) pop the dialog:
+                                            Navigator.of(context).pop();
+
+                                            // 2) then show the SnackBar
+                                            //    (context here must be the State's context, i.e. your Scaffold)
                                             ScaffoldMessenger.of(context).showSnackBar(
                                               SnackBar(content: Text('คัดลอกหมายเลข $phone เรียบร้อยแล้ว')),
                                             );
