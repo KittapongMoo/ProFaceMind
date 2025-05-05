@@ -15,7 +15,7 @@
 
 
     <application
-        android:label="FaceMind App"
+        android:label="FaceMind"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true">
