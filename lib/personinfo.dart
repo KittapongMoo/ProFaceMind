@@ -15,7 +15,7 @@ class PersonInfoPage extends StatefulWidget {
 class _PersonInfoPageState extends State<PersonInfoPage> {
   bool isEditing = false;
   bool formValid = false;
-  bool _nameExists = false; // ← new
+  bool _nameExists = false;
 
   final PageController _pageController = PageController();
   final _formKey = GlobalKey<FormState>();
@@ -23,7 +23,7 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
   List<String> imagePaths = [];
 
   final TextEditingController nicknameController = TextEditingController();
-  final TextEditingController nameController     = TextEditingController();
+  final TextEditingController nameController = TextEditingController();
   final TextEditingController relationController = TextEditingController();
 
   final FlutterTts flutterTts = FlutterTts();
@@ -36,7 +36,7 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
 
     nicknameController.addListener(_onTextChanged);
     nameController.addListener(() {
-      _checkNameExists();  // ← new
+      _checkNameExists();
       _onTextChanged();
     });
     relationController.addListener(_onTextChanged);
@@ -51,17 +51,17 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
   }
 
   Future<void> _checkTTSAvailability() async {
-    var engines   = await flutterTts.getEngines;
+    var engines = await flutterTts.getEngines;
     var languages = await flutterTts.getLanguages;
     print("🔍 Engines: $engines");
     print("🌐 Languages: $languages");
   }
 
   void _onTextChanged() {
-    final ok = nicknameController.text.trim().isNotEmpty
-        && nameController.text.trim().isNotEmpty
-        && relationController.text.trim().isNotEmpty
-        && !_nameExists;                // ← block duplicates
+    final ok = nicknameController.text.trim().isNotEmpty &&
+        nameController.text.trim().isNotEmpty &&
+        relationController.text.trim().isNotEmpty &&
+        !_nameExists;
     if (ok != formValid) {
       setState(() => formValid = ok);
     }
@@ -69,7 +69,7 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
 
   Future<Database> _getDatabase() async {
     final dbPath = await getDatabasesPath();
-    final path   = join(dbPath, 'facemind.db');
+    final path = join(dbPath, 'facemind.db');
     return openDatabase(path, version: 3);
   }
 
@@ -88,8 +88,6 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
 
   Future<void> _loadUserData() async {
     final db = await _getDatabase();
-
-    // load this user
     final userResult = await db.query(
       'users',
       where: 'id = ?',
@@ -98,11 +96,10 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
     if (userResult.isNotEmpty) {
       final user = userResult.first;
       nicknameController.text = user['nickname'] as String? ?? '';
-      nameController.text     = user['name']     as String? ?? '';
+      nameController.text = user['name'] as String? ?? '';
       relationController.text = user['relation'] as String? ?? '';
     }
 
-    // load images
     final imageResult = await db.query(
       'user_images',
       where: 'user_id = ?',
@@ -114,19 +111,15 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
   }
 
   Future<void> _updateUserData(BuildContext context) async {
-    // 1. Make sure your Form is valid
     if (!_formKey.currentState!.validate()) return;
 
     final db = await _getDatabase();
-
-    // 2. Check for any other user with the same name
     final dup = await db.query(
       'users',
       where: 'name = ? AND id != ?',
       whereArgs: [nameController.text.trim(), widget.userId],
     );
     if (dup.isNotEmpty) {
-      // 3. Only call context if still mounted
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('ชื่อนี้มีอยู่ในระบบแล้ว')),
@@ -134,19 +127,17 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
       return;
     }
 
-    // 4. All clear — write to the database
     await db.update(
       'users',
       {
         'nickname': nicknameController.text.trim(),
-        'name':     nameController.text.trim(),
+        'name': nameController.text.trim(),
         'relation': relationController.text.trim(),
       },
       where: 'id = ?',
       whereArgs: [widget.userId],
     );
 
-    // 5. Finally update your UI
     if (!mounted) return;
     setState(() => isEditing = false);
   }
@@ -222,14 +213,6 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
               ),
             ),
           ),
-          if (_nameExists)
-            Padding(
-              padding: const EdgeInsets.only(top: 4, left: 12),
-              child: Text(
-                'ชื่อนี้มีอยู่ในระบบแล้ว',
-                style: TextStyle(color: Colors.red[700], fontSize: 12),
-              ),
-            ),
         ],
       ),
     );
@@ -242,7 +225,7 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // Image pager (60%)
+          // Image pager
           SizedBox(
             height: screenHeight * 0.6,
             child: imagePaths.isNotEmpty
@@ -278,7 +261,7 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
                   topLeft: Radius.circular(25),
                   topRight: Radius.circular(25),
                 ),
-                boxShadow: [ BoxShadow(color: Colors.black26, blurRadius: 10, spreadRadius: 2) ],
+                boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10, spreadRadius: 2)],
               ),
               constraints: BoxConstraints(
                 minHeight: screenHeight * 0.45,
@@ -286,71 +269,73 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
               ),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (imagePaths.length > 1)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(imagePaths.length, (i) {
-                            double selected = _pageController.hasClients
-                                ? (_pageController.page ?? 0)
-                                : 0;
-                            return Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              width: (i == selected.round()) ? 12 : 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: (i == selected.round()) ? Colors.blue : Colors.grey,
+                child: Form(
+                  key: _formKey, // ✅ Added Form with key
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (imagePaths.length > 1)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(imagePaths.length, (i) {
+                              double selected = _pageController.hasClients
+                                  ? (_pageController.page ?? 0)
+                                  : 0;
+                              return Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                width: (i == selected.round()) ? 12 : 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: (i == selected.round()) ? Colors.blue : Colors.grey,
+                                ),
+                              );
+                            }),
+                          ),
+                        ),
+                      Stack(
+                        children: [
+                          const Center(
+                            child: Text("ข้อมูล", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                          ),
+                          if (!isEditing)
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: IconButton(
+                                icon: const Icon(Icons.edit),
+                                onPressed: () => setState(() => isEditing = true),
                               ),
-                            );
-                          }),
-                        ),
-                      ),
-                    Stack(
-                      children: [
-                        const Center(
-                          child: Text("ข้อมูล", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                        ),
-                        if (!isEditing)
-                          Positioned(
-                            right: 0, top: 0,
-                            child: IconButton(
-                              icon: const Icon(Icons.edit),
-                              onPressed: () => setState(() => isEditing = true),
                             ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    _buildEditableField("ชื่อเล่น", nicknameController),
-                    _buildNameField(),                   // ← replaced
-                    _buildEditableField("ความสัมพันธ์", relationController),
-
-                    const SizedBox(height: 20),
-                    if (isEditing)
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: formValid
-                              ? () => _updateUserData(context)
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            disabledBackgroundColor: Colors.grey,
-                            padding: const EdgeInsets.symmetric(vertical: 15),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text("ยืนยัน", style: TextStyle(fontSize: 18, color: Colors.white)),
-                        ),
+                        ],
                       ),
-                  ],
+                      const SizedBox(height: 16),
+                      _buildEditableField("ชื่อเล่น", nicknameController),
+                      _buildNameField(),
+                      _buildEditableField("ความสัมพันธ์", relationController),
+                      const SizedBox(height: 20),
+                      if (isEditing)
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: formValid
+                                ? () => _updateUserData(context)
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              disabledBackgroundColor: Colors.grey,
+                              padding: const EdgeInsets.symmetric(vertical: 15),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text("ยืนยัน", style: TextStyle(fontSize: 18, color: Colors.white)),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -363,20 +348,20 @@ class _PersonInfoPageState extends State<PersonInfoPage> {
             child: FloatingActionButton(
               onPressed: () => Navigator.pop(context, true),
               backgroundColor: Colors.white,
-              shape: const CircleBorder(),      // ← forces perfect circle
+              shape: const CircleBorder(),
               child: const Icon(Icons.arrow_back, color: Colors.black),
               heroTag: 'backBtn',
             ),
           ),
 
-// Speak button
+          // Speak button
           Positioned(
             top: 40,
             right: 16,
             child: FloatingActionButton(
               onPressed: _speakUserInfo,
               backgroundColor: Colors.white,
-              shape: const CircleBorder(),      // ← forces perfect circle
+              shape: const CircleBorder(),
               child: const Icon(Icons.volume_up, color: Colors.blue),
               heroTag: 'speakBtn',
             ),
@@ -391,7 +376,8 @@ class FullImagePage extends StatefulWidget {
   final List<String> imagePaths;
   final int initialIndex;
   const FullImagePage({Key? key, required this.imagePaths, required this.initialIndex}) : super(key: key);
-  @override _FullImagePageState createState() => _FullImagePageState();
+  @override
+  _FullImagePageState createState() => _FullImagePageState();
 }
 
 class _FullImagePageState extends State<FullImagePage> {
@@ -410,7 +396,9 @@ class _FullImagePageState extends State<FullImagePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(backgroundColor: Colors.black, elevation: 0,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close, size: 32, color: Colors.white),
           onPressed: () => Navigator.pop(context),
