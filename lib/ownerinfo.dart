@@ -611,6 +611,8 @@ class _OwnerinfoState extends State<Ownerinfo> {
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
+                    height: 1.0,
+                    leadingDistribution: TextLeadingDistribution.even,
                   ),
                 ),
                 const SizedBox(height: 8), // เพิ่มระยะห่างด้านล่าง
